@@ -1,4 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -70,7 +71,11 @@ import { StatusBadgeComponent } from '../shared/status-badge';
             </div>
             <div style="padding:16px;display:flex;gap:14px">
               <div style="width:78px;height:78px;border-radius:14px;overflow:hidden;flex-shrink:0;position:relative;box-shadow:var(--shadow)">
-                <svg viewBox="0 0 78 78" width="78" height="78"><rect width="78" height="78" fill="#cfe6da"/><circle cx="39" cy="31" r="16" fill="#5b7d6f"/><path d="M14 78 q0 -22 25 -22 q25 0 25 22z" fill="#5b7d6f"/></svg>
+                @if (selfieUrl()) {
+                  <img [src]="selfieUrl()" alt="selfie" style="width:78px;height:78px;object-fit:cover" />
+                } @else {
+                  <svg viewBox="0 0 78 78" width="78" height="78"><rect width="78" height="78" fill="#cfe6da"/><circle cx="39" cy="31" r="16" fill="#5b7d6f"/><path d="M14 78 q0 -22 25 -22 q25 0 25 22z" fill="#5b7d6f"/></svg>
+                }
                 <span style="position:absolute;right:3px;bottom:3px;width:20px;height:20px;border-radius:50%;background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center"><ic name="check" [size]="13" [sw]="3"></ic></span>
               </div>
               <div style="min-width:0;flex:1">
@@ -113,11 +118,14 @@ export class PrintPointComponent implements OnInit {
   private api = inject(Api);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  private sanitizer = inject(DomSanitizer);
 
   ref = signal('');
   searched = signal(false);
   loading = signal(false);
   rec = signal<Subscription | null>(null);
+  selfieUrl = signal<SafeUrl | null>(null);
+  private objectUrl: string | null = null;
 
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
@@ -134,15 +142,32 @@ export class PrintPointComponent implements OnInit {
   fetchIt() {
     const r = this.ref().trim();
     if (!r) return;
-    this.searched.set(true); this.loading.set(true); this.rec.set(null);
+    this.searched.set(true); this.loading.set(true); this.clearSelfie(); this.rec.set(null);
     this.api.byRef(r).subscribe({
-      next: (s) => { this.rec.set(s); this.loading.set(false); },
+      next: (s) => { this.setRecord(s); this.loading.set(false); },
       error: () => { this.rec.set(null); this.loading.set(false); },
     });
   }
-  again() { this.ref.set(''); this.searched.set(false); this.rec.set(null); }
+  again() { this.ref.set(''); this.searched.set(false); this.rec.set(null); this.clearSelfie(); }
   doPrint(ref: string) {
     this.api.print(ref).subscribe((s) => this.rec.set(s));
+  }
+
+  private setRecord(s: Subscription) {
+    this.rec.set(s);
+    if (s.hasSelfie) {
+      this.api.selfieBlob(s.ref).subscribe({
+        next: (blob) => {
+          this.objectUrl = URL.createObjectURL(blob);
+          this.selfieUrl.set(this.sanitizer.bypassSecurityTrustUrl(this.objectUrl));
+        },
+        error: () => this.clearSelfie(),
+      });
+    }
+  }
+  private clearSelfie() {
+    if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; }
+    this.selfieUrl.set(null);
   }
   exit() { this.router.navigateByUrl(this.auth.landingPath()); }
 }

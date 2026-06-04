@@ -10,10 +10,16 @@ spring:
       ddl-auto: create-drop
 
 app:
+  admin:
+    email: admin@afrilandfirstbank.com
+    password: promote
+    name: Administrateur Promote
   jwt:
     secret: test-secret-key-that-is-at-least-32-bytes-long-for-hs256
     expiration-hours: 1
   payment:
     provider: simulated
+  storage:
+    provider: memory
   cors:
     allowed-origins: "http://localhost:4200"

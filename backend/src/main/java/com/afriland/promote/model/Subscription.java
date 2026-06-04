@@ -48,6 +48,9 @@ public class Subscription {
     private boolean printed;
     private boolean selfieVerified;
 
+    /** Object-storage key of the captured KYC selfie (null if none / simulated). */
+    private String selfieKey;
+
     @Column(nullable = false)
     private Instant createdAt;
 

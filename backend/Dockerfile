@@ -13,5 +13,5 @@ WORKDIR /app
 RUN useradd -r -u 1001 spring && mkdir -p /app && chown spring:spring /app
 USER spring
 COPY --from=build /app/target/promote-backend-*.jar app.jar
-EXPOSE 8080
+EXPOSE 8390
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

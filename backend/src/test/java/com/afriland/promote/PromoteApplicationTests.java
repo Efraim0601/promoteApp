@@ -1,7 +1,9 @@
 package com.afriland.promote;
 
+import com.afriland.promote.model.Subscription;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.web.dto.Dtos.ClaimResult;
+import com.afriland.promote.web.dto.Dtos.CreateSubscriptionRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -28,11 +30,17 @@ class PromoteApplicationTests {
 
     @Test
     void claimRejectsAndAcceptsCorrectly() {
-        // Régine Atangana (self, paid, unattributed): phone 618641969 / cni 445566778
-        ClaimResult ok = service.claim("a2", "618641969", "445566778");
+        // a paid, unattributed self (QR) subscription can be claimed once
+        CreateSubscriptionRequest req = new CreateSubscriptionRequest(
+                "Test", "Client", "445566778", "01/01/2031", "618641969",
+                "om", "promote", true, null, null);
+        Subscription s = service.create(req, "self", null);
+        service.applyPayment(s.getRef(), "validate");
+
+        ClaimResult ok = service.claim("a1", "618641969", "445566778");
         assertTrue(ok.ok());
         // claiming again is now "taken"
-        ClaimResult again = service.claim("a3", "618641969", "445566778");
+        ClaimResult again = service.claim("a1", "618641969", "445566778");
         assertFalse(again.ok());
         assertEquals("taken", again.reason());
         // unknown -> notfound

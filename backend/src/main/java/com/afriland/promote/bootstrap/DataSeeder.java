@@ -5,6 +5,7 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.service.SubscriptionService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
@@ -28,20 +29,34 @@ public class DataSeeder implements CommandLineRunner {
     private final SubscriptionService service;
     private final PasswordEncoder encoder;
 
+    // Real administrator account — set ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME in production.
+    private final String adminEmail;
+    private final String adminPassword;
+    private final String adminName;
+    private final boolean seedTestAgent;
+
     public DataSeeder(AppUserRepository users, CardConfigRepository configs, SubscriptionRepository subs,
-                      SubscriptionService service, PasswordEncoder encoder) {
+                      SubscriptionService service, PasswordEncoder encoder,
+                      @Value("${app.admin.email}") String adminEmail,
+                      @Value("${app.admin.password}") String adminPassword,
+                      @Value("${app.admin.name:Administrateur Promote}") String adminName,
+                      @Value("${app.seed.test-agent:true}") boolean seedTestAgent) {
         this.users = users;
         this.configs = configs;
         this.subs = subs;
         this.service = service;
         this.encoder = encoder;
+        this.adminEmail = adminEmail;
+        this.adminPassword = adminPassword;
+        this.adminName = adminName;
+        this.seedTestAgent = seedTestAgent;
     }
 
     @Override
     public void run(String... args) {
         seedConfig();
         seedUsers();
-        seedSubscriptions();
+        // No demo client-journey data is seeded: subscriptions start empty.
         service.initSequence();
     }
 
@@ -53,19 +68,15 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedUsers() {
         if (users.count() > 0) return;
-        String pw = encoder.encode("promote");
-        users.saveAll(List.of(
-                AppUser.builder().id("admin").name("Direction Promote").email("admin@afrilandfirstbank.com")
-                        .passwordHash(pw).role(Role.ADMIN).build(),
-                AppUser.builder().id("a1").name("Awa Fall").email("awa.fall@afrilandfirstbank.com")
-                        .passwordHash(pw).role(Role.AGENT).agency("Agence Akwa").phone("699123456").build(),
-                AppUser.builder().id("a2").name("Jean Eyenga").email("jean.eyenga@afrilandfirstbank.com")
-                        .passwordHash(pw).role(Role.AGENT).agency("Agence Bonanjo").phone("677889900").build(),
-                AppUser.builder().id("a3").name("Mariam Bello").email("mariam.bello@afrilandfirstbank.com")
-                        .passwordHash(pw).role(Role.AGENT).agency("Agence Yaoundé Centre").phone("690445566").build(),
-                AppUser.builder().id("print1").name("Point d'impression").email("print@afrilandfirstbank.com")
-                        .passwordHash(pw).role(Role.PRINT_AGENT).agency("Point Promote").build()
-        ));
+        // Real administrator, created from configuration (ADMIN_EMAIL / ADMIN_PASSWORD).
+        users.save(AppUser.builder().id("admin").name(adminName).email(adminEmail)
+                .passwordHash(encoder.encode(adminPassword)).role(Role.ADMIN).build());
+        // Optional test relationship-officer account for acceptance testing.
+        // (The print-point screen is also accessible to ADMIN and AGENT.)
+        if (seedTestAgent) {
+            users.save(AppUser.builder().id("a1").name("Awa Fall").email("awa.fall@afrilandfirstbank.com")
+                    .passwordHash(encoder.encode("promote")).role(Role.AGENT).agency("Agence Akwa").phone("699123456").build());
+        }
     }
 
     /** Builds a demo subscription, mirroring app.jsx:seedTx's mk() helper. */

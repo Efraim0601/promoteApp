@@ -90,10 +90,11 @@ import { PhoneFieldComponent, CniFieldComponent } from '../shared/fields';
     }
   </div>`,
   styles: [`
-    .modal-overlay{ position:absolute; inset:0; z-index:50; display:flex; flex-direction:column; justify-content:flex-end;
+    .modal-overlay{ position:absolute; inset:0; z-index:50; display:flex; flex-direction:column; justify-content:flex-end; align-items:center;
       background:rgba(15,20,18,.5); backdrop-filter:blur(2px); }
-    .modal-sheet{ background:var(--bg2); border-top-left-radius:22px; border-top-right-radius:22px; padding:20px;
+    .modal-sheet{ width:100%; max-width:720px; background:var(--bg2); border-top-left-radius:22px; border-top-right-radius:22px; padding:20px;
       box-shadow:0 -10px 40px rgba(0,0,0,.3); display:flex; flex-direction:column; gap:14px; }
+    @media (min-width:760px){ .modal-sheet{ border-radius:22px; margin-bottom:24px; } }
     .feedback{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:var(--radius); }
     .ok-box{ background:var(--success-soft); color:var(--success); }
     .err-box{ background:var(--accent-soft); color:var(--accent); }

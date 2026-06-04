@@ -116,6 +116,17 @@ html, body { margin: 0; height: 100%; }
 .promote-app h1,.promote-app h2,.promote-app h3{ font-family:var(--font-head); font-weight:var(--head-weight); margin:0; letter-spacing:-0.01em; }
 .promote-app p{ margin:0; }
 
+/* The router renders the routed page as a host element (<page-admin>, …) between
+   .promote-app and .scr. Make that host fill the shell and be a flex column so the
+   flex/overflow chain reaches .scr-body — otherwise the page grows past 100dvh, the
+   document itself scrolls, and the background only paints the first viewport. */
+.promote-app > *:not(router-outlet){
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+}
+
 /* scrollable screen body */
 .scr{
   flex:1;
@@ -295,36 +306,28 @@ html, body { margin: 0; height: 100%; }
 .kpi .kv{ font-size:21px; font-weight:800; font-family:var(--font-head); letter-spacing:-.02em; }
 .kpi .kl{ font-size:11px; color:var(--muted); margin-top:2px; }
 
-/* ---------- responsive web shell (mobile-first) ---------- */
-/* Mobile (default): the app fills the whole viewport. */
+/* ---------- responsive full-bleed web shell (no phone frame) ---------- */
+/* The app always fills the whole browser window, at every screen size. */
+app-root{ display:block; height:100dvh; }
 .app-shell{
-  min-height:100dvh;
-  display:flex;
+  height:100dvh;
+  overflow:hidden;
   background:var(--bg);
 }
-app-root{ display:block; min-height:100dvh; }
 .app-shell > .promote-app{
   width:100%;
-  min-height:100dvh;
   height:100dvh;
 }
 
-/* Tablet / desktop: centre the mobile-width app on a soft branded backdrop. */
-@media (min-width:600px){
-  .app-shell{
-    align-items:center;
-    justify-content:center;
-    padding:24px;
-    background:#1c2622;
-    background-image:radial-gradient(circle at 30% 18%, #283733 0, #161e1b 62%);
+/* Larger screens: a real full-width web layout — full-width header & action bar,
+   content centred in a comfortable reading column (no phone-shaped card). */
+@media (min-width:760px){
+  .appbar{
+    padding-left:calc((100% - 720px) / 2);
+    padding-right:calc((100% - 720px) / 2);
   }
-  .app-shell > .promote-app{
-    width:440px;
-    max-width:100%;
-    height:min(920px, calc(100dvh - 48px));
-    min-height:0;
-    border-radius:26px;
-    overflow:hidden;
-    box-shadow:0 30px 80px rgba(0,0,0,.45);
-  }
+  .scr-body{ align-items:center; }
+  .scr-body > *{ width:100%; max-width:720px; }
+  .scr-foot{ align-items:center; }
+  .scr-foot > *{ width:100%; max-width:720px; }
 }

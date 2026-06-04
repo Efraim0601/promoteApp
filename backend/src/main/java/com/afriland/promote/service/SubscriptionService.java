@@ -99,7 +99,8 @@ public class SubscriptionService {
                         ? "+237 " + req.referrerPhone().replaceAll("\\D", "") : null)
                 .payStatus(cash ? PayStatus.cash : PayStatus.pending)
                 .printed(false)
-                .selfieVerified(req.selfie())
+                .selfieVerified(req.selfie() || req.selfieKey() != null)
+                .selfieKey(req.selfieKey())
                 .createdAt(Instant.now())
                 .build();
 

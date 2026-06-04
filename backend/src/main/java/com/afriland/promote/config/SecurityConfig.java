@@ -44,6 +44,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/agents/resolve").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions/self").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/pay").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/kyc/selfie").permitAll()
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
 
                 // ---- admin only ----
@@ -59,6 +60,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/stats/agent").hasRole("AGENT")
 
                 // ---- print point (also reachable by admin/agent) ----
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/selfie").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/*").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/print").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
 

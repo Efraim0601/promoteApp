@@ -148,8 +148,8 @@
 
       <!-- Step 1: selfie -->
       @else if (step() === 1) {
-        <selfie-capture [captured]="form.selfie" (capture)="set('selfie', true)" (retake)="set('selfie', false)"></selfie-capture>
-        @if (touched() && !form.selfie) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
+        <selfie-capture [imageData]="form.selfieData" (captured)="onSelfie($event)" (retake)="onRetakeSelfie()"></selfie-capture>
+        @if (touched() && !form.selfieData) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }
 
       <!-- Step 2: payment -->

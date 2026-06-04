@@ -2,8 +2,10 @@ package com.afriland.promote.web;
 
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.service.SubscriptionService;
+import com.afriland.promote.storage.ImageStorage;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -15,9 +17,11 @@ import java.util.List;
 public class SubscriptionController {
 
     private final SubscriptionService service;
+    private final ImageStorage storage;
 
-    public SubscriptionController(SubscriptionService service) {
+    public SubscriptionController(SubscriptionService service, ImageStorage storage) {
         this.service = service;
+        this.storage = storage;
     }
 
     /** Assisted subscription — created by an authenticated relationship officer. */
@@ -49,6 +53,17 @@ public class SubscriptionController {
     public ResponseEntity<SubscriptionDto> byRef(@PathVariable String ref) {
         Subscription s = service.byRef(ref);
         return s == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(SubscriptionDto.of(s));
+    }
+
+    /** Stream the captured KYC selfie (staff only). Keeps object storage private. */
+    @GetMapping("/{ref}/selfie")
+    public ResponseEntity<byte[]> selfie(@PathVariable String ref) {
+        Subscription s = service.byRef(ref);
+        if (s == null || s.getSelfieKey() == null) return ResponseEntity.notFound().build();
+        ImageStorage.StoredImage img = storage.load(s.getSelfieKey());
+        if (img == null) return ResponseEntity.notFound().build();
+        MediaType type = "image/png".equalsIgnoreCase(img.contentType()) ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
+        return ResponseEntity.ok().contentType(type).body(img.data());
     }
 
     /** MoMo simulation — public (client validates/declines on their phone). */

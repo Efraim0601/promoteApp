@@ -43,6 +43,7 @@ export interface Subscription {
   payStatus: PayStatus;
   printed: boolean;
   selfieVerified: boolean;
+  hasSelfie: boolean;
   status: string;     // printed | failed | cash | awaiting
   createdAt: string;
 }
@@ -56,6 +57,7 @@ export interface CreateSubscriptionRequest {
   pay: string;
   delivery: string;
   selfie: boolean;
+  selfieKey?: string | null;
   referrerPhone?: string;
 }
 

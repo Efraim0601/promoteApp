@@ -14,5 +14,7 @@ spring:
       enabled: true
 
 app:
+  storage:
+    provider: memory
   cors:
     allowed-origins: "http://localhost:4200,http://localhost"

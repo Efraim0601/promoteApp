@@ -10,15 +10,28 @@ réelle du prototype validé, en **Angular + Spring Boot**, conteneurisée pour 
 ```
 promoteApp/
 ├── backend/          Spring Boot 3 (Java 17) — API REST, JPA/PostgreSQL, sécurité JWT
-├── frontend/         Angular 21 (standalone) — UI mobile, servie par nginx (proxy /api)
-├── docker-compose.yml  postgres + backend + frontend
+├── frontend/         Angular 21 (standalone) — web app responsive mobile-first, servie par nginx (proxy /api)
+├── docker-compose.yml  postgres + minio + backend + frontend
 └── .env.example
 ```
 
 - **Frontend** (nginx) sert l'app et **proxifie `/api`** vers le backend.
-- **Backend** expose l'API sur `:8080`, persiste dans **PostgreSQL**.
+- **Backend** expose l'API en interne sur `:8390`, persiste dans **PostgreSQL**.
+- **MinIO** (stockage objet S3) conserve les **images selfie KYC** ; seule la référence est en base.
 - **Auth** : JWT stateless. Rôles : `ADMIN`, `AGENT` (chargé de clientèle), `PRINT_AGENT`
   (point d'impression). Le **parcours client (QR)** est public (sans compte).
+
+### Schéma de ports (anti-conflit, configurable via `.env`)
+
+| Service | Port hôte | Visibilité |
+|---------|-----------|------------|
+| **Frontend (web)** | `${WEB_PORT:-8973}` | public — à mettre derrière un reverse-proxy TLS (80/443) |
+| **PostgreSQL** | `127.0.0.1:${DB_PORT:-55432}` → 5432 | **localhost uniquement** (admin/SSH) |
+| **Console MinIO** | `127.0.0.1:${MINIO_CONSOLE_PORT:-9011}` → 9001 | **localhost uniquement** (admin) |
+| **Backend API** | *(non publié)* `:8390` | réseau Docker interne uniquement |
+| **MinIO S3 API** | *(non publié)* `:9000` | réseau Docker interne uniquement |
+
+Aucun port commun (80, 3000, 8080, 8081, 8443, 8764, 5432, 9000) n'est exposé sur l'hôte.
 
 ## Rôles & parcours
 
@@ -35,34 +48,37 @@ Prérequis : Docker + Docker Compose.
 
 ```bash
 cp .env.example .env
-# éditez .env : POSTGRES_PASSWORD, JWT_SECRET (>= 32 octets : openssl rand -base64 48)
+# éditez .env : POSTGRES_PASSWORD, MINIO_ROOT_PASSWORD, JWT_SECRET (>= 32 octets : openssl rand -base64 48)
 
 docker compose up -d --build
-docker compose ps          # vérifier que 'db' est healthy
+docker compose ps          # vérifier que 'db' et 'minio' sont healthy
 ```
 
-Ouvrez **http://localhost** (ou `http://IP_DU_VPS`).
+Ouvrez **http://localhost:8973** (ou `http://IP_DU_VPS:8973`).
 
-### Comptes de démonstration (mot de passe : `promote`)
+### Comptes créés au premier démarrage
 
-| Email | Rôle |
-|-------|------|
-| `admin@afrilandfirstbank.com`        | Administrateur |
-| `awa.fall@afrilandfirstbank.com`     | Chargé de clientèle (Agence Akwa) |
-| `jean.eyenga@afrilandfirstbank.com`  | Chargé de clientèle (Agence Bonanjo) |
-| `mariam.bello@afrilandfirstbank.com` | Chargé de clientèle (Yaoundé Centre) |
-| `print@afrilandfirstbank.com`        | Point d'impression |
+Aucune donnée de souscription de démonstration n'est pré-chargée (le parcours client démarre vide).
 
-> ⚠️ **Production** : changez ces comptes/mots de passe et le `JWT_SECRET`. Le mot de passe `promote`
-> et les comptes de démo ne sont là que pour la recette.
+- **Administrateur réel** — créé depuis `.env` : `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `ADMIN_NAME`.
+  Définissez un **mot de passe fort** avant de déployer (jamais en clair dans le code).
+- **Agent de test** (recette) — `awa.fall@afrilandfirstbank.com` / `promote` (tél. 699123456),
+  créé seulement si `SEED_TEST_AGENT=true`. Mettez `SEED_TEST_AGENT=false` en production.
+
+> Le **point d'impression** est accessible avec le compte admin et le compte agent
+> (rôles ADMIN et AGENT autorisés).
+>
+> ⚠️ **Production** : renseignez `ADMIN_PASSWORD` et `JWT_SECRET` forts, et `SEED_TEST_AGENT=false`.
+> Le seeder ne crée ces comptes que sur une **base vide** (idempotent) ; pour changer ensuite,
+> gérez les comptes en base.
 
 ## Développement local (sans Docker)
 
-**Backend** (profil `dev` = base H2 en mémoire, aucun PostgreSQL requis) :
+**Backend** (profil `dev` = base H2 en mémoire + stockage images en mémoire, ni PostgreSQL ni MinIO requis) :
 ```bash
 cd backend
 SPRING_PROFILES_ACTIVE=dev mvn spring-boot:run
-# API sur http://localhost:8080 — ex: curl http://localhost:8080/api/config
+# API sur http://localhost:8390 — ex: curl http://localhost:8390/api/config
 ```
 
 **Frontend** :
@@ -85,6 +101,8 @@ Pour le dev, soit lancer le frontend derrière nginx (Docker), soit ajouter un p
 | `PUT /api/config` | protégé | ADMIN |
 | `POST /api/subscriptions` | protégé | AGENT |
 | `POST /api/subscriptions/self` | public | client QR |
+| `POST /api/kyc/selfie` | public | upload selfie KYC → clé objet |
+| `GET /api/subscriptions/{ref}/selfie` | protégé | PRINT_AGENT/ADMIN/AGENT (image) |
 | `GET /api/subscriptions` | protégé | ADMIN |
 | `GET /api/subscriptions/mine` | protégé | AGENT |
 | `GET /api/subscriptions/{ref}` | protégé | PRINT_AGENT/ADMIN/AGENT |
@@ -94,6 +112,20 @@ Pour le dev, soit lancer le frontend derrière nginx (Docker), soit ajouter un p
 | `GET /api/agents/resolve?phone=` | public | résolution recommandeur |
 | `GET /api/agents` | protégé | ADMIN |
 | `GET /api/stats/admin` · `GET /api/stats/agent` | protégé | ADMIN · AGENT |
+
+## Images KYC (selfies)
+
+Le selfie est capturé via la **caméra du navigateur** (`getUserMedia`), envoyé au backend
+(`POST /api/kyc/selfie`) qui le stocke dans **MinIO** (bucket `kyc-selfies`, créé automatiquement) ;
+seule la **clé objet** est conservée en base sur la souscription. Le point d'impression récupère
+l'image via `GET /api/subscriptions/{ref}/selfie` (image **streamée par le backend**, donc MinIO
+reste privé). Stratégie d'abstraction `ImageStorage` → impl. `S3ImageStorage` (MinIO/AWS S3,
+défaut) ou `InMemoryImageStorage` (dev/test) via `APP_STORAGE_PROVIDER`. Migration vers AWS S3 :
+changez seulement `S3_ENDPOINT` / clés / région.
+
+> ⚠️ La capture caméra exige un **contexte sécurisé** : HTTPS en production (ou `http://localhost`
+> en local). Sans caméra / autorisation refusée, l'app bascule sur un placeholder pour ne pas bloquer
+> le parcours. Console d'admin MinIO : `http://127.0.0.1:9011` (identifiants `MINIO_ROOT_USER/PASSWORD`).
 
 ## Paiement Mobile Money
 
@@ -108,11 +140,13 @@ au moment de l'intégration.
 1. Installez Docker + Compose sur le VPS, clonez le projet.
 2. `cp .env.example .env` puis renseignez un `JWT_SECRET` fort et un mot de passe DB.
 3. `docker compose up -d --build`.
-4. **TLS / nom de domaine** : placez un reverse-proxy (Caddy, Traefik ou nginx) devant le service
-   `frontend` pour HTTPS (Let's Encrypt), et mettez `HTTP_PORT` sur un port interne (ex. 8088) puis
-   exposez 80/443 via le proxy. Mettez à jour `APP_CORS_ALLOWED_ORIGINS` avec votre URL publique.
-5. Sauvegardes : le volume `pgdata` contient la base — sauvegardez-le (`docker run --rm -v
-   promoteapp_pgdata:/data ... ` ou `pg_dump`).
+4. **TLS / nom de domaine (obligatoire)** : placez un reverse-proxy (Caddy, Traefik ou nginx)
+   devant le service `frontend` pour HTTPS (Let's Encrypt) — **requis** pour la capture caméra
+   (`getUserMedia`). Le frontend écoute sur `WEB_PORT` (8973) ; exposez 80/443 via le proxy et
+   mettez à jour `APP_CORS_ALLOWED_ORIGINS` avec votre URL publique (https://...).
+5. Sauvegardes : sauvegardez les volumes `pgdata` (base) **et** `minio_data` (images KYC), p. ex.
+   `docker run --rm -v <projet>_pgdata:/data -v "$PWD":/backup alpine tar czf /backup/pgdata.tgz /data`
+   (idem pour `minio_data`), ou `pg_dump` pour la base.
 
 Mises à jour : `git pull && docker compose up -d --build`.
 

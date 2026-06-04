@@ -20,7 +20,8 @@ const STEP_COUNT = STEP_KEYS.length;
 
 interface WizardForm {
   prenom: string; nom: string; cni: string; cniExp: string; phone: string;
-  selfie: boolean; pay: string; delivery: string; refPhone: string;
+  selfie: boolean; selfieData: string | null; selfieKey: string | null;
+  pay: string; delivery: string; refPhone: string;
 }
 
 function parseExp(d: string): Date | null {
@@ -68,7 +69,7 @@ export class SubscribeComponent implements OnInit {
 
   form: WizardForm = {
     prenom: '', nom: '', cni: '', cniExp: '', phone: '',
-    selfie: false, pay: 'om', delivery: 'promote', refPhone: '',
+    selfie: false, selfieData: null, selfieKey: null, pay: 'om', delivery: 'promote', refPhone: '',
   };
 
   ngOnInit() {
@@ -113,7 +114,7 @@ export class SubscribeComponent implements OnInit {
   }
 
   get step0ok() { const x = this.errs; return !x.prenom && !x.nom && !x.cni && !x.cniExp && !x.phone; }
-  get stepValid() { return [this.step0ok, this.form.selfie, !!this.form.pay, true][this.step()]; }
+  get stepValid() { return [this.step0ok, !!this.form.selfieData, !!this.form.pay, true][this.step()]; }
   get lastStep() { return STEP_COUNT - 1; }
   stepKey(i: number) { return STEP_KEYS[i]; }
 
@@ -142,11 +143,23 @@ export class SubscribeComponent implements OnInit {
   exit() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
   home() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
 
+  /** Selfie captured (real camera or fallback): keep the preview and upload it. */
+  onSelfie(dataUrl: string) {
+    this.form.selfieData = dataUrl;
+    this.form.selfieKey = null;
+    this.api.uploadSelfie(dataUrl).subscribe({
+      next: (r) => (this.form.selfieKey = r.key),
+      error: () => (this.form.selfieKey = null), // proceed; selfieVerified still set server-side
+    });
+  }
+  onRetakeSelfie() { this.form.selfieData = null; this.form.selfieKey = null; }
+
   private payload() {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(),
       cni: this.form.cni, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
-      pay: this.form.pay, delivery: this.form.delivery, selfie: this.form.selfie,
+      pay: this.form.pay, delivery: this.form.delivery,
+      selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       referrerPhone: this.isSelf ? this.form.refPhone : undefined,
     };
   }
@@ -184,7 +197,7 @@ export class SubscribeComponent implements OnInit {
   retry() { this.proc.set(null); }
 
   reset() {
-    this.form = { prenom: '', nom: '', cni: '', cniExp: '', phone: '', selfie: false, pay: 'om', delivery: 'promote', refPhone: '' };
+    this.form = { prenom: '', nom: '', cni: '', cniExp: '', phone: '', selfie: false, selfieData: null, selfieKey: null, pay: 'om', delivery: 'promote', refPhone: '' };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
     this.refAgent.set(null); this.refUnknown.set(false);
   }
