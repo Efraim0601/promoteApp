@@ -25,13 +25,14 @@ promoteApp/
 
 | Service | Port hôte | Visibilité |
 |---------|-----------|------------|
-| **Frontend (web)** | `${WEB_PORT:-8973}` | public — à mettre derrière un reverse-proxy TLS (80/443) |
-| **PostgreSQL** | `127.0.0.1:${DB_PORT:-55432}` → 5432 | **localhost uniquement** (admin/SSH) |
-| **Console MinIO** | `127.0.0.1:${MINIO_CONSOLE_PORT:-9011}` → 9001 | **localhost uniquement** (admin) |
-| **Backend API** | *(non publié)* `:8390` | réseau Docker interne uniquement |
-| **MinIO S3 API** | *(non publié)* `:9000` | réseau Docker interne uniquement |
+| **Frontend (web)** | `${WEB_PORT:-8973}` | **seul port publié** — à mettre derrière un reverse-proxy TLS (80/443) |
+| Backend API | *(non publié)* `:8390` | réseau Docker interne uniquement |
+| PostgreSQL | *(non publié)* `:5432` | réseau Docker interne (admin via `docker compose exec db psql`) |
+| MinIO S3 + console | *(non publié)* `:9000` / `:9001` | réseau Docker interne uniquement |
 
-Aucun port commun (80, 3000, 8080, 8081, 8443, 8764, 5432, 9000) n'est exposé sur l'hôte.
+**Un seul port hôte est utilisé** (`WEB_PORT`, défaut 8973) — choisissez-en un libre, aucun besoin
+d'arrêter vos autres applications. Les mappings DB / console MinIO sont commentés dans
+`docker-compose.yml` (à dé-commenter ponctuellement pour de l'admin, en `127.0.0.1` uniquement).
 
 ## Rôles & parcours
 
