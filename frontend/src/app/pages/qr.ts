@@ -5,7 +5,8 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { QrCodeComponent } from '../shared/qr-code';
 
-/** QR screen shown at a stand; "simulate scan" opens the client self-subscription form. */
+/** Stand QR screen: shows a REAL QR encoding the client subscription URL.
+ *  Scanning it with a phone opens the real /client form on that phone. */
 @Component({
   selector: 'page-qr',
   standalone: true,
@@ -22,21 +23,19 @@ import { QrCodeComponent } from '../shared/qr-code';
       </div>
       <div class="card" style="padding:22px;display:inline-flex;flex-direction:column;align-items:center;gap:14px;margin-top:6px">
         <div style="position:relative;padding:10px;border-radius:18px;background:var(--surface-2)">
-          <qr-code [seed]="seed" [size]="196"></qr-code>
+          <qr-code [data]="clientUrl" [size]="196"></qr-code>
           <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
         </div>
-        <div style="font-size:11px;color:var(--muted);letter-spacing:.05em">
-          {{ i18n.t('qr_or') }}: <b style="color:var(--text);letter-spacing:.12em">{{ seed }}</b>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.05em;word-break:break-all;max-width:240px">
+          {{ clientUrl }}
         </div>
       </div>
       <p class="muted" style="font-size:13px;line-height:1.5;max-width:300px">{{ i18n.t('qr_desc') }}</p>
       <div style="flex:1"></div>
     </div>
     <div class="scr-foot">
-      <button class="btn btn-primary" (click)="scan()"><ic name="scan" [size]="19"></ic> {{ i18n.t('simulate_scan') }}</button>
-      <p class="muted" style="font-size:11px;text-align:center">
-        {{ i18n.lang() === 'en' ? 'Demo: simulates the client opening the form on their phone.' : 'Démo : simule l’ouverture du formulaire par le client sur son téléphone.' }}
-      </p>
+      <button class="btn btn-outline" (click)="openHere()"><ic name="arrowR" [size]="18"></ic> {{ i18n.t('qr_open_here') }}</button>
+      <p class="muted" style="font-size:11px;text-align:center">{{ i18n.t('qr_scan_hint') }}</p>
     </div>
   </div>`,
   styles: [`
@@ -50,8 +49,10 @@ import { QrCodeComponent } from '../shared/qr-code';
 export class QrComponent {
   i18n = inject(I18n);
   private router = inject(Router);
-  seed = 'PRM' + Math.floor(100000 + Math.random() * 899999);
+
+  /** Absolute URL of the public client form — adapts to the deployed origin. */
+  clientUrl = (typeof window !== 'undefined' ? window.location.origin : '') + '/client';
 
   back() { this.router.navigateByUrl('/login'); }
-  scan() { this.router.navigateByUrl('/client'); }
+  openHere() { this.router.navigateByUrl('/client'); }
 }

@@ -123,6 +123,13 @@ export class SubscribeComponent implements OnInit {
   get expDisplay() { return fmtExp(this.form.cniExp); }
   get isCash() { return this.result()?.payStatus === 'cash'; }
 
+  /** Real deep link encoded in the reference QR — opens the print point on that ref. */
+  get refUrl() {
+    const r = this.result();
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    return r ? `${origin}/print?ref=${r.ref}` : '';
+  }
+
   get payTiles(): TileOption[] {
     return PAY_METHODS.map((p) => ({
       id: p.id, bg: p.bg, color: p.fg, icon: p.short,
