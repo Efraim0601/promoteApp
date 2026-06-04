@@ -1,0 +1,18 @@
+# Local development profile — in-memory H2, no external DB needed.
+spring:
+  datasource:
+    url: jdbc:h2:mem:promote;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+  h2:
+    console:
+      enabled: true
+
+app:
+  cors:
+    allowed-origins: "http://localhost:4200,http://localhost"

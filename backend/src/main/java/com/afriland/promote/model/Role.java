@@ -1,0 +1,8 @@
+package com.afriland.promote.model;
+
+/** Staff roles for RBAC. The client (self / QR) path is anonymous, so it has no role. */
+public enum Role {
+    ADMIN,        // Direction Promote — global view, configuration
+    AGENT,        // Chargé de clientèle — assisted subscriptions, own sales, QR claim
+    PRINT_AGENT   // Point d'impression — retrieve KYC file by reference, print/hand over
+}

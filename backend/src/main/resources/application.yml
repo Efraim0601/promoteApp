@@ -1,0 +1,32 @@
+# Default profile = PostgreSQL (docker / VPS). Use SPRING_PROFILES_ACTIVE=dev for local H2.
+spring:
+  application:
+    name: promote-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/promote}
+    username: ${SPRING_DATASOURCE_USERNAME:promote}
+    password: ${SPRING_DATASOURCE_PASSWORD:promote}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-me-in-production-this-secret-must-be-at-least-32-bytes-long}
+    expiration-hours: 12
+  payment:
+    provider: ${APP_PAYMENT_PROVIDER:simulated}
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost}
+
+server:
+  port: 8080
+  forward-headers-strategy: framework
+
+logging:
+  level:
+    org.springframework.security: INFO

@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
+    username: sa
+    password: ""
+    driver-class-name: org.h2.Driver
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+
+app:
+  jwt:
+    secret: test-secret-key-that-is-at-least-32-bytes-long-for-hs256
+    expiration-hours: 1
+  payment:
+    provider: simulated
+  cors:
+    allowed-origins: "http://localhost:4200"

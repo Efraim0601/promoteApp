@@ -1,0 +1,330 @@
+/* Promote subscription — theme tokens + base (ported from the validated prototype).
+   Afriland brand: red primary. Institutional theme is the default. */
+
+html, body { margin: 0; height: 100%; }
+
+/* ---- constant brand (used by the card visual) ---- */
+:root{
+  --af-green:#06703A;
+  --af-green-d:#044A27;
+  --af-red:#D81E2C;
+  --af-gold:#F2B632;
+}
+
+/* ===== Institutionnel (default) — Afriland RED primary ===== */
+.promote-app{
+  --bg:#F2ECEC;
+  --bg2:#ffffff;
+  --surface:#ffffff;
+  --surface-2:#FAF3F3;
+  --border:#E6DADA;
+  --text:#1E1416;
+  --muted:#766164;
+  --primary:#D81E2C;
+  --primary-600:#BD1626;
+  --primary-700:#9B0F1E;
+  --on-primary:#ffffff;
+  --success:#0E7A45;
+  --success-700:#0A5C34;
+  --success-soft:#E4F2EA;
+  --accent:#9B0F1E;
+  --accent-soft:#FBE7E9;
+  --field-bg:#ffffff;
+  --radius:12px;
+  --radius-lg:18px;
+  --radius-pill:999px;
+  --shadow:0 1px 2px rgba(40,16,20,.06), 0 2px 8px rgba(40,16,20,.05);
+  --shadow-lg:0 12px 30px rgba(40,16,20,.14);
+  --font:'Manrope', system-ui, sans-serif;
+  --font-head:'Libre Franklin', Georgia, serif;
+  --head-weight:700;
+  --btn-weight:700;
+}
+
+/* ===== Fintech moderne (dark) — RED primary ===== */
+.promote-app[data-theme="fintech"]{
+  --bg:#120A0B;
+  --bg2:#1C1011;
+  --surface:#231618;
+  --surface-2:#2E1C1E;
+  --border:#3A2528;
+  --text:#F6EAEB;
+  --muted:#C09B9F;
+  --primary:#FF4D5E;
+  --primary-600:#F23446;
+  --primary-700:#D81E2C;
+  --on-primary:#1A0608;
+  --success:#2BD37A;
+  --success-700:#19A861;
+  --success-soft:#13231A;
+  --accent:#FF8A5A;
+  --accent-soft:#2B1616;
+  --field-bg:#1B0F11;
+  --radius:16px;
+  --radius-lg:24px;
+  --radius-pill:999px;
+  --shadow:0 1px 2px rgba(0,0,0,.45);
+  --shadow-lg:0 18px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(255,77,94,.1);
+  --font:'Space Grotesk', system-ui, sans-serif;
+  --font-head:'Space Grotesk', system-ui, sans-serif;
+  --head-weight:600;
+  --btn-weight:600;
+}
+
+/* ===== Chaleureux (warm/cream) — RED primary ===== */
+.promote-app[data-theme="warm"]{
+  --bg:#F6EAD9;
+  --bg2:#FFFDF8;
+  --surface:#FFFDF8;
+  --surface-2:#FBEEE4;
+  --border:#EAD9C6;
+  --text:#2A1A18;
+  --muted:#8A6A5E;
+  --primary:#D8202A;
+  --primary-600:#BC1722;
+  --primary-700:#9C111B;
+  --on-primary:#ffffff;
+  --success:#0E7A45;
+  --success-700:#0A5C34;
+  --success-soft:#E7F2EB;
+  --accent:#9C111B;
+  --accent-soft:#FBE3DC;
+  --field-bg:#ffffff;
+  --radius:18px;
+  --radius-lg:26px;
+  --radius-pill:999px;
+  --shadow:0 2px 6px rgba(80,30,20,.09);
+  --shadow-lg:0 16px 40px rgba(80,30,20,.18);
+  --font:'Poppins', system-ui, sans-serif;
+  --font-head:'Poppins', system-ui, sans-serif;
+  --head-weight:700;
+  --btn-weight:600;
+}
+
+/* ---------- base ---------- */
+*{ box-sizing:border-box; }
+.promote-app{
+  font-family:var(--font);
+  color:var(--text);
+  background:var(--bg);
+  height:100%;
+  min-height:100%;
+  display:flex;
+  flex-direction:column;
+  -webkit-font-smoothing:antialiased;
+}
+.promote-app h1,.promote-app h2,.promote-app h3{ font-family:var(--font-head); font-weight:var(--head-weight); margin:0; letter-spacing:-0.01em; }
+.promote-app p{ margin:0; }
+
+/* scrollable screen body */
+.scr{
+  flex:1;
+  min-height:0;
+  display:flex;
+  flex-direction:column;
+  position:relative;
+}
+.scr-body{
+  flex:1;
+  min-height:0;
+  overflow-y:auto;
+  overflow-x:hidden;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  gap:16px;
+}
+.scr-body > *{ flex-shrink:0; }
+.scr-foot{
+  padding:14px 20px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--border);
+  background:var(--bg2);
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+/* ---------- brand header ---------- */
+.appbar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 18px;
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+}
+.appbar .brand{ display:flex; align-items:center; gap:11px; flex:1; min-width:0; }
+.appbar .brand > div{ min-width:0; }
+.appbar .brand-logo{ height:26px; width:auto; display:block; flex-shrink:0; }
+.appbar .brand-sep{ width:1px; height:22px; background:var(--border); flex-shrink:0; }
+.appbar .brand-name{ font-family:var(--font-head); font-weight:var(--head-weight); font-size:15px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.appbar .brand-sub{ font-size:12px; font-weight:700; color:var(--muted); letter-spacing:.01em; white-space:nowrap; }
+.promote-app[data-theme="fintech"] .appbar .brand-logo{ background:#fff; padding:4px 7px; border-radius:8px; height:24px; box-sizing:content-box; }
+.icon-btn{
+  appearance:none; border:1px solid var(--border); background:var(--surface);
+  color:var(--text); height:34px; min-width:34px; padding:0 10px;
+  border-radius:var(--radius-pill); font-size:12.5px; font-weight:700;
+  display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;
+  font-family:var(--font);
+}
+.icon-btn:active{ transform:scale(.97); }
+.back-link{
+  appearance:none; background:none; border:none; color:var(--muted);
+  font-family:var(--font); font-size:13px; font-weight:600; cursor:pointer;
+  display:inline-flex; align-items:center; gap:6px; padding:0;
+}
+
+/* ---------- buttons ---------- */
+.btn{
+  appearance:none; cursor:pointer; width:100%;
+  border:none; border-radius:var(--radius);
+  padding:15px 18px; font-family:var(--font); font-size:15.5px; font-weight:var(--btn-weight);
+  display:inline-flex; align-items:center; justify-content:center; gap:9px;
+  transition:transform .08s ease, filter .15s ease, background .15s ease;
+}
+.btn:active{ transform:translateY(1px) scale(.995); }
+.btn-primary{ background:var(--primary); color:var(--on-primary); box-shadow:var(--shadow); }
+.btn-primary:hover{ background:var(--primary-600); }
+.btn-primary:disabled{ opacity:.5; cursor:not-allowed; }
+.btn-ghost{ background:var(--surface-2); color:var(--text); }
+.btn-danger-soft{ background:var(--accent-soft); color:var(--accent); }
+.btn-outline{ background:transparent; border:1.5px solid var(--border); color:var(--text); }
+
+/* ---------- cards & fields ---------- */
+.card{
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--radius-lg); box-shadow:var(--shadow);
+}
+.field label{ display:block; font-size:12.5px; font-weight:700; margin-bottom:6px; color:var(--text); }
+.field .hint{ font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.35; }
+.field .err{ font-size:11.5px; color:var(--accent); margin-top:6px; font-weight:600; }
+.input{
+  width:100%; font-family:var(--font); font-size:15px; color:var(--text);
+  background:var(--field-bg); border:1.5px solid var(--border); border-radius:var(--radius);
+  padding:13px 14px; outline:none; transition:border-color .15s ease, box-shadow .15s ease;
+}
+.input::placeholder{ color:var(--muted); opacity:.7; }
+.input:focus{ border-color:var(--primary); box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+.input-prefix{ display:flex; align-items:stretch; border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--field-bg); }
+.input-prefix:focus-within{ border-color:var(--primary); box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+.input-prefix .pfx{ display:flex; align-items:center; gap:6px; padding:0 12px; background:var(--surface-2); font-size:14px; font-weight:700; color:var(--text); border-right:1.5px solid var(--border); }
+.input-prefix input{ flex:1; border:none; background:transparent; outline:none; font-family:var(--font); font-size:15px; padding:13px 12px; color:var(--text); letter-spacing:.02em; }
+
+.kicker{ font-size:11.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--primary); }
+.muted{ color:var(--muted); }
+
+/* progress dots */
+.steps{ display:flex; align-items:center; gap:6px; }
+.steps .dot{ height:5px; border-radius:3px; background:var(--border); flex:1; transition:background .2s ease; }
+.steps .dot.on{ background:var(--primary); }
+.steps .dot.done{ background:var(--primary-700); }
+
+/* operator picker */
+.op-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.op{
+  border:1.5px solid var(--border); background:var(--field-bg); border-radius:var(--radius); color:var(--text);
+  padding:12px; display:flex; align-items:center; gap:10px; cursor:pointer; transition:border-color .15s, background .15s;
+  text-align:left;
+}
+.op .op-logo{ width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; flex-shrink:0; }
+.op .op-name{ font-size:13.5px; font-weight:700; line-height:1.1; }
+.op .op-tag{ font-size:11px; color:var(--muted); }
+.op.sel{ border-color:var(--primary); background:color-mix(in srgb, var(--primary) 8%, var(--field-bg)); }
+.op .op-check{ margin-left:auto; color:var(--primary); opacity:0; transition:opacity .15s; }
+.op.sel .op-check{ opacity:1; }
+.op-logo{ display:flex; align-items:center; justify-content:center; font-weight:800; }
+
+/* generic option tiles (payment / delivery) */
+.tile{
+  display:flex; align-items:center; gap:13px; width:100%; cursor:pointer; color:var(--text);
+  background:var(--field-bg); border:1.5px solid var(--border); border-radius:var(--radius);
+  padding:14px; transition:border-color .15s, background .15s; font-family:var(--font);
+}
+.tile-ic{ width:42px; height:42px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:var(--surface-2); color:var(--primary); font-weight:800; font-size:14px; }
+.tile-title{ display:block; font-size:14.5px; font-weight:700; line-height:1.15; }
+.tile-desc{ display:block; font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.35; }
+.tile-meta{ font-size:12.5px; font-weight:800; color:var(--text); white-space:nowrap; }
+.tile-check{ width:22px; height:22px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; border:1.5px solid var(--border); color:transparent; transition:all .15s; }
+.tile.sel{ border-color:var(--primary); background:color-mix(in srgb, var(--primary) 8%, var(--field-bg)); }
+.tile.sel .tile-check{ background:var(--primary); border-color:var(--primary); color:var(--on-primary); }
+
+/* summary rows */
+.srow{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 0; border-bottom:1px solid var(--border); }
+.srow:last-child{ border-bottom:none; }
+.srow .lbl{ font-size:13px; color:var(--muted); }
+.srow .val{ font-size:14px; font-weight:700; text-align:right; }
+.srow.total .lbl{ color:var(--text); font-weight:700; font-size:14px; }
+.srow.total .val{ font-size:18px; color:var(--primary); }
+
+/* status badge */
+.badge{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; padding:4px 9px; border-radius:var(--radius-pill); }
+.badge .bdot{ width:7px; height:7px; border-radius:50%; }
+.badge.pending{ background:color-mix(in srgb, var(--af-gold) 20%, transparent); color:#8a6400; }
+.badge.success{ background:var(--success-soft); color:var(--success-700); }
+.badge.failed{ background:var(--accent-soft); color:var(--accent); }
+.promote-app[data-theme="fintech"] .badge.pending{ color:var(--af-gold); }
+.promote-app[data-theme="fintech"] .badge.success{ color:var(--success); }
+
+/* big choice cards (home) */
+.choice{
+  display:flex; gap:14px; align-items:center; text-align:left; width:100%; cursor:pointer; color:var(--text);
+  background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-lg);
+  padding:18px; transition:border-color .15s, transform .08s, box-shadow .2s; box-shadow:var(--shadow);
+}
+.choice:hover{ border-color:var(--primary); box-shadow:var(--shadow-lg); }
+.choice:active{ transform:translateY(1px); }
+.choice .ci{ width:50px; height:50px; border-radius:14px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.choice .ci.green{ background:var(--success-soft); color:var(--success); }
+.choice .ci.red{ background:var(--accent-soft); color:var(--accent); }
+.choice .ctitle{ font-size:15.5px; font-weight:800; display:flex; align-items:center; gap:8px; }
+.choice .cdesc{ font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.4; }
+.choice .pill{ font-size:9.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:var(--surface-2); color:var(--muted); border:1px solid var(--border); }
+.choice .arrow{ margin-left:auto; color:var(--muted); align-self:center; }
+
+/* spinner */
+.spinner{ width:22px; height:22px; border-radius:50%; border:2.5px solid color-mix(in srgb, var(--on-primary) 40%, transparent); border-top-color:var(--on-primary); animation:spin .8s linear infinite; }
+.ring{ width:96px; height:96px; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+@keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
+@keyframes ripple{ 0%{ transform:scale(.6); opacity:.55; } 100%{ transform:scale(1.7); opacity:0; } }
+@keyframes pop{ 0%{ transform:scale(.6); } 60%{ transform:scale(1.08); } 100%{ transform:scale(1); } }
+.pop{ animation:pop .4s cubic-bezier(.2,.8,.3,1.2) both; }
+
+/* admin lists */
+.kpi{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:13px 14px; box-shadow:var(--shadow); }
+.kpi .kv{ font-size:21px; font-weight:800; font-family:var(--font-head); letter-spacing:-.02em; }
+.kpi .kl{ font-size:11px; color:var(--muted); margin-top:2px; }
+
+/* ---------- responsive web shell (mobile-first) ---------- */
+/* Mobile (default): the app fills the whole viewport. */
+.app-shell{
+  min-height:100dvh;
+  display:flex;
+  background:var(--bg);
+}
+app-root{ display:block; min-height:100dvh; }
+.app-shell > .promote-app{
+  width:100%;
+  min-height:100dvh;
+  height:100dvh;
+}
+
+/* Tablet / desktop: centre the mobile-width app on a soft branded backdrop. */
+@media (min-width:600px){
+  .app-shell{
+    align-items:center;
+    justify-content:center;
+    padding:24px;
+    background:#1c2622;
+    background-image:radial-gradient(circle at 30% 18%, #283733 0, #161e1b 62%);
+  }
+  .app-shell > .promote-app{
+    width:440px;
+    max-width:100%;
+    height:min(920px, calc(100dvh - 48px));
+    min-height:0;
+    border-radius:26px;
+    overflow:hidden;
+    box-shadow:0 30px 80px rgba(0,0,0,.45);
+  }
+}

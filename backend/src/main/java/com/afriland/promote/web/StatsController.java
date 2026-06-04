@@ -1,0 +1,30 @@
+package com.afriland.promote.web;
+
+import com.afriland.promote.service.StatsService;
+import com.afriland.promote.web.dto.Dtos.AdminStats;
+import com.afriland.promote.web.dto.Dtos.AgentStats;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/stats")
+public class StatsController {
+
+    private final StatsService stats;
+
+    public StatsController(StatsService stats) {
+        this.stats = stats;
+    }
+
+    @GetMapping("/admin")
+    public AdminStats admin() {
+        return stats.adminStats();
+    }
+
+    @GetMapping("/agent")
+    public AgentStats agent(Authentication auth) {
+        return stats.agentStats((String) auth.getPrincipal());
+    }
+}
