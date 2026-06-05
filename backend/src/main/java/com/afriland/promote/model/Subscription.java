@@ -48,8 +48,21 @@ public class Subscription {
     private boolean printed;
     private boolean selfieVerified;
 
-    /** Object-storage key of the captured KYC selfie (null if none / simulated). */
-    private String selfieKey;
+    /** Object-storage keys of the captured KYC images (null if not captured). */
+    private String selfieKey;      // client photo (face)
+    private String cniRectoKey;    // ID card — front
+    private String cniVersoKey;    // ID card — back
+
+    /** Resolve a stored image key by kind. */
+    @Transient
+    public String imageKey(String kind) {
+        return switch (kind) {
+            case "selfie" -> selfieKey;
+            case "cni-recto" -> cniRectoKey;
+            case "cni-verso" -> cniVersoKey;
+            default -> null;
+        };
+    }
 
     @Column(nullable = false)
     private Instant createdAt;

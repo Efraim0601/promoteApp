@@ -45,13 +45,13 @@ export class Api {
     return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/pay`, { outcome });
   }
 
-  /** Upload a captured selfie (data URL) → returns its object-storage key. */
-  uploadSelfie(image: string): Observable<{ key: string }> {
-    return this.http.post<{ key: string }>(`${this.base}/kyc/selfie`, { image });
+  /** Upload a captured KYC image (data URL); kind = selfie | cni-recto | cni-verso. */
+  uploadImage(image: string, kind: string): Observable<{ key: string }> {
+    return this.http.post<{ key: string }>(`${this.base}/kyc/image`, { image, kind });
   }
-  /** Fetch the stored selfie image (staff) as a blob, for display. */
-  selfieBlob(ref: string): Observable<Blob> {
-    return this.http.get(`${this.base}/subscriptions/${ref}/selfie`, { responseType: 'blob' });
+  /** Fetch a stored KYC image (staff) as a blob, for display. */
+  imageBlob(ref: string, kind: string): Observable<Blob> {
+    return this.http.get(`${this.base}/subscriptions/${ref}/image/${kind}`, { responseType: 'blob' });
   }
   print(ref: string): Observable<Subscription> {
     return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/print`, {});

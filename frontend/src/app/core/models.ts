@@ -44,6 +44,8 @@ export interface Subscription {
   printed: boolean;
   selfieVerified: boolean;
   hasSelfie: boolean;
+  hasCniRecto: boolean;
+  hasCniVerso: boolean;
   status: string;     // printed | failed | cash | awaiting
   createdAt: string;
 }
@@ -58,6 +60,8 @@ export interface CreateSubscriptionRequest {
   delivery: string;
   selfie: boolean;
   selfieKey?: string | null;
+  cniRectoKey?: string | null;
+  cniVersoKey?: string | null;
   referrerPhone?: string;
 }
 

@@ -85,6 +85,22 @@ import { StatusBadgeComponent } from '../shared/status-badge';
                 <div style="display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:11.5px;color:var(--success);font-weight:700"><ic name="check" [size]="14" [sw]="2.6"></ic> {{ i18n.t('pp_selfie_ok') }}</div>
               </div>
             </div>
+            @if (rectoUrl() || versoUrl()) {
+              <div style="padding:0 16px 12px;display:flex;gap:10px">
+                @if (rectoUrl()) {
+                  <div style="flex:1;text-align:center">
+                    <img [src]="rectoUrl()" alt="CNI recto" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+                    <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_recto') }}</div>
+                  </div>
+                }
+                @if (versoUrl()) {
+                  <div style="flex:1;text-align:center">
+                    <img [src]="versoUrl()" alt="CNI verso" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+                    <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_verso') }}</div>
+                  </div>
+                }
+              </div>
+            }
             <div style="padding:0 16px 6px">
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm(r).bg" [style.color]="pm(r).fg" style="width:22px;height:22px;font-size:9px;border-radius:6px">{{ pm(r).short }}</span>{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : pm(r).name }}</span></div>
               <div class="srow"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ i18n.t('del_' + r.delivery + '_title') }}</span></div>
@@ -125,7 +141,9 @@ export class PrintPointComponent implements OnInit {
   loading = signal(false);
   rec = signal<Subscription | null>(null);
   selfieUrl = signal<SafeUrl | null>(null);
-  private objectUrl: string | null = null;
+  rectoUrl = signal<SafeUrl | null>(null);
+  versoUrl = signal<SafeUrl | null>(null);
+  private objectUrls: string[] = [];
 
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
@@ -155,19 +173,24 @@ export class PrintPointComponent implements OnInit {
 
   private setRecord(s: Subscription) {
     this.rec.set(s);
-    if (s.hasSelfie) {
-      this.api.selfieBlob(s.ref).subscribe({
-        next: (blob) => {
-          this.objectUrl = URL.createObjectURL(blob);
-          this.selfieUrl.set(this.sanitizer.bypassSecurityTrustUrl(this.objectUrl));
-        },
-        error: () => this.clearSelfie(),
-      });
-    }
+    if (s.hasSelfie) this.loadImage(s.ref, 'selfie', this.selfieUrl);
+    if (s.hasCniRecto) this.loadImage(s.ref, 'cni-recto', this.rectoUrl);
+    if (s.hasCniVerso) this.loadImage(s.ref, 'cni-verso', this.versoUrl);
+  }
+  private loadImage(ref: string, kind: string, target: { set: (v: SafeUrl | null) => void }) {
+    this.api.imageBlob(ref, kind).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        this.objectUrls.push(url);
+        target.set(this.sanitizer.bypassSecurityTrustUrl(url));
+      },
+      error: () => target.set(null),
+    });
   }
   private clearSelfie() {
-    if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; }
-    this.selfieUrl.set(null);
+    this.objectUrls.forEach((u) => URL.revokeObjectURL(u));
+    this.objectUrls = [];
+    this.selfieUrl.set(null); this.rectoUrl.set(null); this.versoUrl.set(null);
   }
   exit() { this.router.navigateByUrl(this.auth.landingPath()); }
 }

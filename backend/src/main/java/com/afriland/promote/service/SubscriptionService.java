@@ -101,6 +101,8 @@ public class SubscriptionService {
                 .printed(false)
                 .selfieVerified(req.selfie() || req.selfieKey() != null)
                 .selfieKey(req.selfieKey())
+                .cniRectoKey(req.cniRectoKey())
+                .cniVersoKey(req.cniVersoKey())
                 .createdAt(Instant.now())
                 .build();
 

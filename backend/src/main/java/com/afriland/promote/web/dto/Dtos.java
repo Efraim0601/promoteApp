@@ -34,7 +34,9 @@ public final class Dtos {
             @NotBlank String pay,        // om | mtn | cash
             String delivery,             // promote | agence | home (defaults to promote)
             boolean selfie,
-            String selfieKey,            // object-storage key returned by /api/kyc/selfie
+            String selfieKey,            // object-storage keys returned by /api/kyc/image
+            String cniRectoKey,
+            String cniVersoKey,
             String referrerPhone) {}     // self path only
 
     public record SubscriptionDto(
@@ -42,7 +44,8 @@ public final class Dtos {
             String cni, String cniExp, String phone,
             String pay, String delivery, int amount, int transport,
             String channel, String agentId, String referrerName, String referrerPhone,
-            String payStatus, boolean printed, boolean selfieVerified, boolean hasSelfie,
+            String payStatus, boolean printed, boolean selfieVerified,
+            boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso,
             String status, String createdAt) {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
@@ -50,7 +53,8 @@ public final class Dtos {
                     s.getCni(), s.getCniExp(), s.getPhone(),
                     s.getPay(), s.getDelivery(), s.getAmount(), s.getTransport(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
-                    s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(), s.getSelfieKey() != null,
+                    s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
+                    s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
                     s.getStatus(), s.getCreatedAt().toString());
         }
     }
@@ -58,10 +62,11 @@ public final class Dtos {
     /** Result of a MoMo simulation. {@code outcome} = "validate" | "fail". */
     public record PayRequest(String outcome) {}
 
-    /** Selfie upload payload — a data URL ("data:image/jpeg;base64,...") or raw base64. */
-    public record SelfieUpload(@NotBlank String image) {}
+    /** KYC image upload — a data URL ("data:image/jpeg;base64,...") or raw base64.
+     *  kind = selfie | cni-recto | cni-verso. */
+    public record ImageUpload(@NotBlank String image, String kind) {}
 
-    public record SelfieKeyResponse(String key) {}
+    public record ImageKeyResponse(String key) {}
 
     /** Agent claims a QR (self) sale by phone + CNI. */
     public record ClaimRequest(@NotBlank String phone, @NotBlank String cni) {}

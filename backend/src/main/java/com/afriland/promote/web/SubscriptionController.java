@@ -55,12 +55,15 @@ public class SubscriptionController {
         return s == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(SubscriptionDto.of(s));
     }
 
-    /** Stream the captured KYC selfie (staff only). Keeps object storage private. */
-    @GetMapping("/{ref}/selfie")
-    public ResponseEntity<byte[]> selfie(@PathVariable String ref) {
+    /** Stream a captured KYC image (staff only); kind = selfie | cni-recto | cni-verso.
+     *  Keeps object storage private — images are proxied through the backend. */
+    @GetMapping("/{ref}/image/{kind}")
+    public ResponseEntity<byte[]> image(@PathVariable String ref, @PathVariable String kind) {
         Subscription s = service.byRef(ref);
-        if (s == null || s.getSelfieKey() == null) return ResponseEntity.notFound().build();
-        ImageStorage.StoredImage img = storage.load(s.getSelfieKey());
+        if (s == null) return ResponseEntity.notFound().build();
+        String key = s.imageKey(kind);
+        if (key == null) return ResponseEntity.notFound().build();
+        ImageStorage.StoredImage img = storage.load(key);
         if (img == null) return ResponseEntity.notFound().build();
         MediaType type = "image/png".equalsIgnoreCase(img.contentType()) ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
         return ResponseEntity.ok().contentType(type).body(img.data());
