@@ -28,7 +28,7 @@ export class FieldComponent {
     <field [label]="label" [hint]="hint" [err]="err">
       <div class="input-prefix">
         <span class="pfx">🇨🇲 +237</span>
-        <input inputmode="numeric" placeholder="6 99 00 00 00" [value]="value"
+        <input inputmode="tel" maxlength="12" placeholder="6 99 00 00 00" [value]="value"
                (input)="onInput($event)" />
       </div>
     </field>`,
@@ -39,10 +39,14 @@ export class PhoneFieldComponent {
   @Input() err: string | null = null;
   @Input() value = '';
   @Output() valueChange = new EventEmitter<string>();
+  /** Cameroon mobile = fixed 9 digits starting with 6. Normalises pasted
+   *  "+237…"/"237…" forms and caps at 9 digits. */
   onInput(e: Event) {
-    const v = (e.target as HTMLInputElement).value.replace(/[^\d]/g, '').slice(0, 9);
-    this.value = v;
-    this.valueChange.emit(v);
+    let d = (e.target as HTMLInputElement).value.replace(/\D/g, '');
+    if (d.startsWith('237')) d = d.slice(3);
+    d = d.slice(0, 9);
+    this.value = d;
+    this.valueChange.emit(d);
   }
 }
 
