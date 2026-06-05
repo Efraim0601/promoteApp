@@ -1,12 +1,14 @@
-# Caddy reverse proxy — automatic HTTPS (Let's Encrypt) in front of the web app.
-# DOMAIN and ACME_EMAIL are injected from .env via docker-compose.tls.yml.
+# Caddy reverse proxy on a CUSTOM HTTPS port (avoids 80/443 if they are taken).
+# Uses Caddy's local CA (`tls internal`) so no port 80 / ACME is required — HTTPS
+# works on any port, enabling the camera (getUserMedia). Browsers show a one-time
+# "untrusted certificate" warning to accept. DOMAIN / CADDY_HTTPS_PORT come from .env.
 {
 	email {$ACME_EMAIL}
 }
 
-{$DOMAIN} {
+{$DOMAIN}:{$CADDY_HTTPS_PORT} {
+	tls internal
 	encode zstd gzip
-	# uploads (KYC photos) can be a few MB
 	request_body {
 		max_size 8MB
 	}

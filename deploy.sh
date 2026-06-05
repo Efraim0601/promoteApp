@@ -95,7 +95,8 @@ else
 fi
 
 if [ "$TLS" = 1 ]; then
-  echo "  Public URL : https://$(envval DOMAIN)   (open 80,443 in the firewall)"
+  CP="$(envval CADDY_HTTPS_PORT)"; CP="${CP:-8443}"
+  echo "  Public URL : https://$(envval DOMAIN):${CP}   (open ${CP} in the firewall; accept the one-time cert warning)"
 else
   echo "  Public URL : http://<server-ip>:${HOST_PORT}   (open ${HOST_PORT} in the firewall)"
   echo "  NOTE: the camera (selfie / ID card) needs HTTPS — deploy with --tls in production."

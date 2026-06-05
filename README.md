@@ -141,17 +141,18 @@ au moment de l'intégration.
 1. Installez Docker + Compose sur le VPS, clonez le projet.
 2. `cp .env.example .env` puis renseignez un `JWT_SECRET` fort et un mot de passe DB.
 3. `docker compose up -d --build`.
-4. **TLS / nom de domaine (obligatoire)** — **requis** pour la capture caméra (`getUserMedia`).
-   Une config **Caddy** (HTTPS Let's Encrypt automatique) est fournie. Faites pointer un
-   enregistrement DNS A vers le serveur, puis dans `.env` : `DOMAIN`, `ACME_EMAIL`,
-   `WEB_PORT=127.0.0.1:8973` (frontend hors interface publique), `APP_CORS_ALLOWED_ORIGINS=https://votre-domaine`.
-   Puis :
+4. **HTTPS (obligatoire pour la caméra `getUserMedia`)** — config **Caddy** fournie, sur un
+   **port personnalisé** (défaut **8443**) pour ne pas entrer en conflit avec un serveur déjà
+   présent sur 80/443. Pas de domaine ? Utilisez **sslip.io** avec votre IP. Dans `.env` :
+   `DOMAIN=<ip>.sslip.io`, `CADDY_HTTPS_PORT=8443`, `WEB_PORT=127.0.0.1:8973`,
+   `APP_CORS_ALLOWED_ORIGINS=https://<ip>.sslip.io:8443`. Puis :
    ```bash
-   sudo ufw allow 80,443/tcp
-   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+   sudo ufw allow 8443/tcp
+   ./deploy.sh --tls --fresh
    ```
-   → l'app est servie en **https://votre-domaine** (certificat obtenu automatiquement). Sans domaine,
-   l'accès direct reste `http://IP:8973` (caméra indisponible car non-HTTPS).
+   → servie en **https://<ip>.sslip.io:8443**. Caddy utilise son CA local (`tls internal`) →
+   le navigateur affiche **un avertissement de certificat à accepter une fois** (HTTPS actif →
+   caméra OK). Avec un vrai domaine + ports 80/443 libres, on peut repasser à Let's Encrypt.
 5. Sauvegardes : sauvegardez les volumes `pgdata` (base) **et** `minio_data` (images KYC), p. ex.
    `docker run --rm -v <projet>_pgdata:/data -v "$PWD":/backup alpine tar czf /backup/pgdata.tgz /data`
    (idem pour `minio_data`), ou `pg_dump` pour la base.

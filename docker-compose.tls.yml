@@ -1,21 +1,25 @@
-# HTTPS overlay — adds a Caddy reverse proxy with automatic Let's Encrypt TLS.
+# HTTPS overlay — Caddy reverse proxy on a CUSTOM port (default 8443), so it does
+# NOT conflict with anything already using 80/443 on the host. Uses Caddy's local CA
+# (`tls internal`), so no port 80 / Let's Encrypt is needed — HTTPS works on any port,
+# which is what the browser camera (getUserMedia) requires.
 #
-# Usage (production, with a real domain pointing to the server):
-#   1) set DOMAIN, ACME_EMAIL in .env (and WEB_PORT=127.0.0.1:8973 to keep the
-#      frontend off the public interface — Caddy reaches it on the internal network)
-#   2) docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
-#   3) open 80 and 443 in the firewall: ufw allow 80,443/tcp
+# Usage:
+#   1) set DOMAIN (e.g. <server-ip>.sslip.io) and optionally CADDY_HTTPS_PORT in .env,
+#      plus WEB_PORT=127.0.0.1:8973 (keep the frontend off the public interface).
+#   2) ./deploy.sh --tls --fresh
+#   3) open the chosen port:  sudo ufw allow ${CADDY_HTTPS_PORT}/tcp   (default 8443)
+#   -> open https://<DOMAIN>:<CADDY_HTTPS_PORT>  (accept the one-time cert warning)
 services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     depends_on: [frontend]
     ports:
-      - "80:80"
-      - "443:443"
+      - "${CADDY_HTTPS_PORT:-8443}:${CADDY_HTTPS_PORT:-8443}"
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. promote.example.com}
-      ACME_EMAIL: ${ACME_EMAIL:-}
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. 62.169.26.178.sslip.io}
+      CADDY_HTTPS_PORT: ${CADDY_HTTPS_PORT:-8443}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
