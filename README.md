@@ -141,10 +141,17 @@ au moment de l'intégration.
 1. Installez Docker + Compose sur le VPS, clonez le projet.
 2. `cp .env.example .env` puis renseignez un `JWT_SECRET` fort et un mot de passe DB.
 3. `docker compose up -d --build`.
-4. **TLS / nom de domaine (obligatoire)** : placez un reverse-proxy (Caddy, Traefik ou nginx)
-   devant le service `frontend` pour HTTPS (Let's Encrypt) — **requis** pour la capture caméra
-   (`getUserMedia`). Le frontend écoute sur `WEB_PORT` (8973) ; exposez 80/443 via le proxy et
-   mettez à jour `APP_CORS_ALLOWED_ORIGINS` avec votre URL publique (https://...).
+4. **TLS / nom de domaine (obligatoire)** — **requis** pour la capture caméra (`getUserMedia`).
+   Une config **Caddy** (HTTPS Let's Encrypt automatique) est fournie. Faites pointer un
+   enregistrement DNS A vers le serveur, puis dans `.env` : `DOMAIN`, `ACME_EMAIL`,
+   `WEB_PORT=127.0.0.1:8973` (frontend hors interface publique), `APP_CORS_ALLOWED_ORIGINS=https://votre-domaine`.
+   Puis :
+   ```bash
+   sudo ufw allow 80,443/tcp
+   docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+   ```
+   → l'app est servie en **https://votre-domaine** (certificat obtenu automatiquement). Sans domaine,
+   l'accès direct reste `http://IP:8973` (caméra indisponible car non-HTTPS).
 5. Sauvegardes : sauvegardez les volumes `pgdata` (base) **et** `minio_data` (images KYC), p. ex.
    `docker run --rm -v <projet>_pgdata:/data -v "$PWD":/backup alpine tar czf /backup/pgdata.tgz /data`
    (idem pour `minio_data`), ou `pg_dump` pour la base.

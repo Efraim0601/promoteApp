@@ -1,0 +1,15 @@
+# Caddy reverse proxy — automatic HTTPS (Let's Encrypt) in front of the web app.
+# DOMAIN and ACME_EMAIL are injected from .env via docker-compose.tls.yml.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	# uploads (KYC photos) can be a few MB
+	request_body {
+		max_size 8MB
+	}
+	# the frontend nginx (which itself proxies /api -> backend) on the internal network
+	reverse_proxy frontend:80
+}

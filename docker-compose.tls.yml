@@ -1,0 +1,27 @@
+# HTTPS overlay — adds a Caddy reverse proxy with automatic Let's Encrypt TLS.
+#
+# Usage (production, with a real domain pointing to the server):
+#   1) set DOMAIN, ACME_EMAIL in .env (and WEB_PORT=127.0.0.1:8973 to keep the
+#      frontend off the public interface — Caddy reaches it on the internal network)
+#   2) docker compose -f docker-compose.yml -f docker-compose.tls.yml up -d --build
+#   3) open 80 and 443 in the firewall: ufw allow 80,443/tcp
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on: [frontend]
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env, e.g. promote.example.com}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [promote]
+
+volumes:
+  caddy_data:
+  caddy_config:
