@@ -53,9 +53,9 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     @Override
     public PaymentRequest requestPayment(Subscription sub, String operator) {
-        String method = method(operator);
+        String network = network(operator);
         ProcessResponse resp = http.post()
-                .uri("/api/{method}/process-payment", method)
+                .uri("/api/{network}/process-payment", network)
                 .header("Authorization", "Bearer " + token())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of(
@@ -71,8 +71,8 @@ public class TrustPayWayGateway implements PaymentGateway {
 
         boolean accepted = resp != null && "success".equalsIgnoreCase(resp.status());
         String txId = resp != null && resp.data() != null ? resp.data().transactionId() : null;
-        log.info("TrustPayWay process-payment ref={} method={} accepted={} txId={}",
-                sub.getRef(), method, accepted, txId);
+        log.info("TrustPayWay process-payment ref={} network={} accepted={} txId={}",
+                sub.getRef(), network, accepted, txId);
         return new PaymentRequest(txId, operator, accepted);
     }
 
@@ -81,7 +81,7 @@ public class TrustPayWayGateway implements PaymentGateway {
         if (sub.getPaymentTxId() == null) return Optional.empty();
         try {
             StatusResponse resp = http.get()
-                    .uri("/api/{method}/get-status/{id}", method(sub.getPay()), sub.getPaymentTxId())
+                    .uri("/api/{network}/get-status/{id}", network(sub.getPay()), sub.getPaymentTxId())
                     .header("Authorization", "Bearer " + token())
                     .retrieve()
                     .body(StatusResponse.class);
@@ -115,8 +115,8 @@ public class TrustPayWayGateway implements PaymentGateway {
         return accessToken;
     }
 
-    /** Map our operator code to the TrustPayWay {payment_method} path segment. */
-    private String method(String operator) {
+    /** Map our operator code to the TrustPayWay {network} path segment (per docs: mtn | orange). */
+    private String network(String operator) {
         return switch (operator == null ? "" : operator.toLowerCase()) {
             case "om", "orange" -> "orange";
             case "mtn", "momo" -> "mtn";
