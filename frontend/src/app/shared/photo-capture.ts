@@ -49,6 +49,9 @@ import { IconComponent } from './icon';
             <button class="btn btn-primary" (click)="start()" [disabled]="starting()" style="width:auto;padding:11px 18px">
               <ic name="camera" [size]="18"></ic> {{ starting() ? i18n.t('selfie_shooting') : i18n.t('cam_open') }}
             </button>
+            <button class="btn btn-outline" (click)="pickFromGallery()" style="width:auto;padding:11px 14px;font-size:13px">
+              <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
+            </button>
           } @else {
             <button class="btn btn-primary" (click)="shoot()" [disabled]="shooting()" style="width:auto;padding:11px 18px">
               <ic name="camera" [size]="18"></ic> {{ i18n.t('cam_take') }}
@@ -62,7 +65,8 @@ import { IconComponent } from './icon';
         </div>
       </div>
     }
-    <canvas #canvas style="display:none"></canvas>`,
+    <canvas #canvas style="display:none"></canvas>
+    <input #file type="file" accept="image/*" (change)="onFileSelected($event)" style="display:none" />`,
 })
 export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   i18n = inject(I18n);
@@ -80,6 +84,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
 
   @ViewChild('video') video?: ElementRef<HTMLVideoElement>;
   @ViewChild('canvas') canvas?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('file') file?: ElementRef<HTMLInputElement>;
 
   streaming = signal(false);
   starting = signal(false);
@@ -127,6 +132,46 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
     const data = c.toDataURL('image/jpeg', 0.82);
     setTimeout(() => { this.shooting.set(false); this.stop(); this.imageData = data; this.captured.emit(data); }, 220);
+  }
+
+  /** Open the device gallery / file picker (no `capture` attr → lets the user pick an existing image). */
+  pickFromGallery() {
+    this.file?.nativeElement.click();
+  }
+
+  /** Load a picked image file, normalise it (cover-fit, JPEG) like a camera shot, and emit it. */
+  onFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const f = input.files?.[0];
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        this.stop(); // release the camera if it was open
+        const data = this.drawCover(img);
+        input.value = ''; // allow re-picking the same file later
+        this.imageData = data;
+        this.captured.emit(data);
+      };
+      img.onerror = () => { input.value = ''; };
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(f);
+  }
+
+  /** Cover-fit an image source into the capture canvas at the same dimensions as shoot(). */
+  private drawCover(img: HTMLImageElement): string {
+    const c = this.canvas?.nativeElement ?? document.createElement('canvas');
+    const w = this.round ? 320 : 640, h = this.round ? 320 : 400;
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d')!;
+    const ir = img.naturalWidth / img.naturalHeight, cr = w / h;
+    let sw = img.naturalWidth, sh = img.naturalHeight, sx = 0, sy = 0;
+    if (ir > cr) { sw = img.naturalHeight * cr; sx = (img.naturalWidth - sw) / 2; }
+    else { sh = img.naturalWidth / cr; sy = (img.naturalHeight - sh) / 2; }
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', 0.82);
   }
 
   /** Neutral placeholder so KYC can proceed when no camera is available. */

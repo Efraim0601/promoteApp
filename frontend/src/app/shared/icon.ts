@@ -31,6 +31,7 @@ export const ICONS: Record<string, string | string[]> = {
   link: ['M9 15l6-6', 'M11 7l1-1a4 4 0 016 6l-1 1', 'M13 17l-1 1a4 4 0 01-6-6l1-1'],
   logout: ['M15 4h3a2 2 0 012 2v12a2 2 0 01-2 2h-3', 'M10 17l5-5-5-5', 'M15 12H3'],
   award: ['M12 15a6 6 0 100-12 6 6 0 000 12z', 'M8.5 13.5L7 21l5-3 5 3-1.5-7.5'],
+  image: ['M3 5h18v14H3z', 'M8.5 11a1.5 1.5 0 100-3 1.5 1.5 0 000 3z', 'M21 16l-5-5L5 19'],
 };
 
 @Component({
