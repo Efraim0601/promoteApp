@@ -110,7 +110,8 @@ public class TrustPayWayGateway implements PaymentGateway {
             throw new IllegalStateException("TrustPayWay login returned no access_token");
         }
         accessToken = login.accessToken();
-        long ttl = login.expiresIn() > 0 ? login.expiresIn() : 3600;
+        // Docs: the token lasts 2h. The response carries no expires_in, so default to 7200s.
+        long ttl = login.expiresIn() > 0 ? login.expiresIn() : 7200;
         tokenExpiry = Instant.now().plusSeconds(ttl);
         return accessToken;
     }
