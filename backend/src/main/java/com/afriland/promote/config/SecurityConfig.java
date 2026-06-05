@@ -44,7 +44,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/agents/resolve").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions/self").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/pay").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/status").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/kyc/image").permitAll()
+                // ---- payment aggregator: webhook (push) + which provider is live ----
+                .requestMatchers(HttpMethod.POST, "/api/payment/webhook/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/payment/provider").permitAll()
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
 
                 // ---- admin only ----

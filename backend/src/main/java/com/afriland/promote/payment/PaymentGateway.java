@@ -1,6 +1,9 @@
 package com.afriland.promote.payment;
 
+import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
+
+import java.util.Optional;
 
 /**
  * Mobile Money payment abstraction. The default implementation is simulated
@@ -18,6 +21,15 @@ public interface PaymentGateway {
      * Returns the operator-side request reference.
      */
     PaymentRequest requestPayment(Subscription sub, String operator);
+
+    /**
+     * Pull the current status from the aggregator (fallback for polling when the
+     * webhook has not arrived yet). Default: unknown — the simulated gateway and
+     * any provider without a status API simply return empty.
+     */
+    default Optional<PayStatus> queryStatus(Subscription sub) {
+        return Optional.empty();
+    }
 
     /** Result of a payment request initiation. */
     record PaymentRequest(String externalRef, String operator, boolean accepted) {}

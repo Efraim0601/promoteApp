@@ -45,6 +45,9 @@ public class Subscription {
     @Column(nullable = false)
     private PayStatus payStatus;
 
+    /** Aggregator-side transaction id (e.g. TrustPayWay "transaction_id"); null for cash/simulated. */
+    private String paymentTxId;
+
     private boolean printed;
     private boolean selfieVerified;
 

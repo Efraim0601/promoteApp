@@ -24,11 +24,17 @@
     </div>
     @if (phase() === 'wait') {
       <div class="scr-foot">
-        <button class="btn btn-primary" (click)="finishOk()"><ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('simulate_validate') }}</button>
-        <div style="display:flex;gap:10px">
-          <button class="btn btn-ghost" (click)="finishFail()" style="font-size:13px">{{ i18n.t('simulate_fail') }}</button>
+        @if (isSimulated) {
+          <!-- Demo only: drive the result manually when no real aggregator is connected. -->
+          <button class="btn btn-primary" (click)="finishOk()"><ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('simulate_validate') }}</button>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-ghost" (click)="finishFail()" style="font-size:13px">{{ i18n.t('simulate_fail') }}</button>
+            <button class="btn btn-ghost" (click)="exit()" style="font-size:13px">{{ i18n.t('cancel') }}</button>
+          </div>
+        } @else {
+          <!-- Real gateway: the result arrives via the webhook; we just wait & poll. -->
           <button class="btn btn-ghost" (click)="exit()" style="font-size:13px">{{ i18n.t('cancel') }}</button>
-        </div>
+        }
       </div>
     }
   </div>

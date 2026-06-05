@@ -108,7 +108,17 @@ public class SubscriptionService {
 
         s = subs.save(s);
         if (!cash) {
-            gateway.requestPayment(s, req.pay()); // push USSD (simulated)
+            try {
+                // Push the USSD prompt via the active gateway (simulated or real aggregator).
+                PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, req.pay());
+                s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
+                if (!pr.accepted()) s.setPayStatus(PayStatus.failed);
+            } catch (RuntimeException ex) {
+                // The aggregator was unreachable / rejected the request: keep the KYC file
+                // but mark the payment failed so the client can retry.
+                s.setPayStatus(PayStatus.failed);
+            }
+            s = subs.save(s);
         }
         return s;
     }
@@ -130,6 +140,43 @@ public class SubscriptionService {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         s.setPayStatus("validate".equalsIgnoreCase(outcome) ? PayStatus.paid : PayStatus.failed);
         return subs.save(s);
+    }
+
+    /**
+     * Apply an aggregator webhook (push). {@code orderId} is the reference we sent
+     * ({@code sub.ref}); {@code newStatus} is the resolved {@link PayStatus} (or null
+     * if the aggregator status was not terminal). Only moves a transaction that is
+     * still {@code pending}, so a late/duplicate webhook can't overturn a final state.
+     */
+    @Transactional
+    public Subscription applyWebhook(String orderId, PayStatus newStatus) {
+        if (orderId == null || newStatus == null) return null;
+        Subscription s = subs.findByRefIgnoreCase(orderId).orElse(null);
+        if (s == null) return null;
+        if (s.getPayStatus() == PayStatus.pending) {
+            s.setPayStatus(newStatus);
+            subs.save(s);
+        }
+        return s;
+    }
+
+    /**
+     * Current payment status for the public polling endpoint. If still pending and the
+     * active gateway can pull a live status (get-status), use it as a fallback for when
+     * the webhook hasn't arrived (e.g. no public URL in dev).
+     */
+    @Transactional
+    public PayStatus statusOf(String ref) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
+        if (s == null) return null;
+        if (s.getPayStatus() == PayStatus.pending) {
+            PayStatus pulled = gateway.queryStatus(s).orElse(null);
+            if (pulled != null && pulled != PayStatus.pending) {
+                s.setPayStatus(pulled);
+                subs.save(s);
+            }
+        }
+        return s.getPayStatus();
     }
 
     @Transactional

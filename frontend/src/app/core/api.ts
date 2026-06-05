@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminStats, Agent, AgentStats, CardConfig, ClaimResult,
-  CreateSubscriptionRequest, LoginResponse, Subscription, User,
+  CreateSubscriptionRequest, LoginResponse, PayStatus, Subscription, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -43,6 +43,14 @@ export class Api {
   }
   pay(ref: string, outcome: 'validate' | 'fail'): Observable<Subscription> {
     return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/pay`, { outcome });
+  }
+  /** Which payment gateway is live (simulated | trustpayway). */
+  paymentProvider(): Observable<{ provider: string }> {
+    return this.http.get<{ provider: string }>(`${this.base}/payment/provider`);
+  }
+  /** Poll the live payment status of a subscription (public, lightweight). */
+  paymentStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus }> {
+    return this.http.get<{ ref: string; payStatus: PayStatus }>(`${this.base}/subscriptions/${ref}/status`);
   }
 
   /** Upload a captured KYC image (data URL); kind = selfie | cni-recto | cni-verso. */

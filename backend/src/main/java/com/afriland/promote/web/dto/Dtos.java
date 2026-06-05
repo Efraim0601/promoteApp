@@ -62,6 +62,24 @@ public final class Dtos {
     /** Result of a MoMo simulation. {@code outcome} = "validate" | "fail". */
     public record PayRequest(String outcome) {}
 
+    /** Lightweight, public payment status for the client polling the result. */
+    public record PaymentStatusDto(String ref, String payStatus) {}
+
+    /** Tells the frontend which gateway is live, so the UI can adapt (e.g. demo buttons). */
+    public record PaymentProviderDto(String provider) {}
+
+    /**
+     * Incoming TrustPayWay webhook (see API doc §5). Field names match the JSON sent by
+     * the aggregator; {@code orderId} is the reference we passed in process-payment.
+     */
+    public record TrustPayWayWebhook(
+            String status,
+            String orderId,
+            @com.fasterxml.jackson.annotation.JsonProperty("transaction_id") String transactionId,
+            String amount,
+            String description,
+            String confirmationStatus) {}
+
     /** KYC image upload — a data URL ("data:image/jpeg;base64,...") or raw base64.
      *  kind = selfie | cni-recto | cni-verso. */
     public record ImageUpload(@NotBlank String image, String kind) {}

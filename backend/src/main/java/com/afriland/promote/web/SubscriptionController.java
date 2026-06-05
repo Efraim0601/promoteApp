@@ -1,5 +1,6 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.storage.ImageStorage;
@@ -73,6 +74,15 @@ public class SubscriptionController {
     @PatchMapping("/{ref}/pay")
     public SubscriptionDto pay(@PathVariable String ref, @RequestBody PayRequest req) {
         return SubscriptionDto.of(service.applyPayment(ref, req.outcome()));
+    }
+
+    /** Public, lightweight payment status — polled by the client while awaiting confirmation.
+     *  Exposes only the status (no KYC data), and pulls a live status as a fallback. */
+    @GetMapping("/{ref}/status")
+    public ResponseEntity<PaymentStatusDto> status(@PathVariable String ref) {
+        PayStatus st = service.statusOf(ref);
+        return st == null ? ResponseEntity.notFound().build()
+                : ResponseEntity.ok(new PaymentStatusDto(ref, st.name()));
     }
 
     /** Print point — mark a card printed & handed over. */

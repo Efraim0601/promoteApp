@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -46,7 +46,7 @@ const fmtExp = (d: string) => (d.length === 8 ? `${d.slice(0, 2)}/${d.slice(2, 4
   ],
   templateUrl: './subscribe.html',
 })
-export class SubscribeComponent implements OnInit {
+export class SubscribeComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   private api = inject(Api);
   private router = inject(Router);
@@ -69,6 +69,12 @@ export class SubscribeComponent implements OnInit {
   copied = signal(false);
   busy = signal(false);
 
+  /** Active payment gateway (simulated | trustpayway) — drives whether demo buttons show. */
+  provider = signal<string>('simulated');
+  get isSimulated() { return this.provider() === 'simulated'; }
+  private pollTimer: ReturnType<typeof setTimeout> | null = null;
+  private polling = false;
+
   form: WizardForm = {
     prenom: '', nom: '', cni: '', cniExp: '', phone: '',
     selfie: false, selfieData: null, selfieKey: null,
@@ -79,7 +85,10 @@ export class SubscribeComponent implements OnInit {
   ngOnInit() {
     this.channel = this.route.snapshot.data['channel'] === 'self' ? 'self' : 'agent';
     this.api.getConfig().subscribe((c) => (this.config = c));
+    this.api.paymentProvider().subscribe({ next: (p) => this.provider.set(p.provider), error: () => {} });
   }
+
+  ngOnDestroy() { this.stopPolling(); }
 
   set<K extends keyof WizardForm>(k: K, v: WizardForm[K]) {
     this.form[k] = v;
@@ -196,7 +205,14 @@ export class SubscribeComponent implements OnInit {
         this.busy.set(false);
         this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount });
         if (this.form.pay === 'cash') { this.proc.set('reference'); }
-        else { this.proc.set('paying'); this.runMomo(); }
+        else if (s.payStatus === 'failed') { this.proc.set('failed'); } // gateway rejected the push
+        else {
+          this.proc.set('paying');
+          this.runMomo();
+          // Real gateway: the customer confirms on their phone and the result arrives via
+          // webhook — poll the backend for it. Simulated mode keeps the manual demo buttons.
+          if (!this.isSimulated) this.startStatusPolling(s.ref);
+        }
       },
       error: () => this.busy.set(false),
     });
@@ -205,6 +221,45 @@ export class SubscribeComponent implements OnInit {
   private runMomo() {
     this.phase.set('send');
     setTimeout(() => this.phase.set('wait'), 1300);
+  }
+
+  /** Poll the live payment status every 3 s until terminal, or give up after ~2 min. */
+  private startStatusPolling(ref: string) {
+    this.stopPolling();
+    this.polling = true;
+    let attempts = 0;
+    const tick = () => {
+      if (!this.polling) return;
+      this.api.paymentStatus(ref).subscribe({
+        next: (s) => {
+          if (!this.polling) return;
+          if (s.payStatus === 'paid') {
+            this.polling = false;
+            this.result.set({ ...(this.result() ?? { ref }), payStatus: 'paid' });
+            this.proc.set('reference');
+          } else if (s.payStatus === 'failed') {
+            this.polling = false;
+            this.proc.set('failed');
+          } else if (++attempts >= 40) {
+            this.polling = false;
+            this.proc.set('failed'); // timed out waiting for the PIN
+          } else {
+            this.pollTimer = setTimeout(tick, 3000);
+          }
+        },
+        error: () => {
+          if (!this.polling) return;
+          if (++attempts >= 40) { this.polling = false; this.proc.set('failed'); }
+          else this.pollTimer = setTimeout(tick, 3000);
+        },
+      });
+    };
+    this.pollTimer = setTimeout(tick, 3000);
+  }
+
+  private stopPolling() {
+    this.polling = false;
+    if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
   }
   finishOk() {
     const r = this.result(); if (!r) return;
@@ -217,9 +272,10 @@ export class SubscribeComponent implements OnInit {
     const r = this.result(); if (!r) return;
     this.api.pay(r.ref, 'fail').subscribe(() => this.proc.set('failed'));
   }
-  retry() { this.proc.set(null); }
+  retry() { this.stopPolling(); this.proc.set(null); }
 
   reset() {
+    this.stopPolling();
     this.form = {
       prenom: '', nom: '', cni: '', cniExp: '', phone: '', selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,

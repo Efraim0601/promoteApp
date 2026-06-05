@@ -25,7 +25,13 @@ app:
     secret: ${JWT_SECRET:change-me-in-production-this-secret-must-be-at-least-32-bytes-long}
     expiration-hours: 12
   payment:
-    provider: ${APP_PAYMENT_PROVIDER:simulated}
+    provider: ${APP_PAYMENT_PROVIDER:simulated}   # simulated | trustpayway
+  trustpayway:
+    base-url: ${TRUSTPAYWAY_BASE_URL:}            # e.g. https://api.trustpayway.com (no trailing /)
+    secret-key: ${TRUSTPAYWAY_SECRET_KEY:}        # long-lived SECRET_KEY (login Bearer)
+    application-id: ${TRUSTPAYWAY_APPLICATION_ID:}
+    notif-url: ${TRUSTPAYWAY_NOTIF_URL:}          # public URL of our webhook (see below)
+    webhook-secret: ${TRUSTPAYWAY_WEBHOOK_SECRET:} # optional: required in X-Webhook-Secret if set
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost,http://localhost:8973}
   storage:
