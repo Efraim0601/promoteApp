@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -67,12 +68,26 @@ public class TrustPayWayGateway implements PaymentGateway {
                         "notifUrl", props.getNotifUrl()
                 ))
                 .retrieve()
+                // The API answers HTTP 417 with a JSON body on failure — don't let RestClient
+                // throw, we want to read data.status / message and the transaction_id.
+                .onStatus(HttpStatusCode::isError, (req, res) -> { })
                 .body(ProcessResponse.class);
 
-        boolean accepted = resp != null && "success".equalsIgnoreCase(resp.status());
+        // Real response shape: { data: { status, transaction_id }, message, status_code }.
+        String dataStatus = resp != null && resp.data() != null ? resp.data().status() : null;
         String txId = resp != null && resp.data() != null ? resp.data().transactionId() : null;
-        log.info("TrustPayWay process-payment ref={} network={} accepted={} txId={}",
-                sub.getRef(), network, accepted, txId);
+        // The USSD push is "accepted" when initiated (PENDING / INITIATED / COMPLETED),
+        // not when it failed up front (FAILED, e.g. "Beneficiaire introuvable").
+        boolean accepted = dataStatus != null
+                && !"FAILED".equalsIgnoreCase(dataStatus)
+                && map(dataStatus).orElse(null) != PayStatus.failed;
+        if (accepted) {
+            log.info("TrustPayWay process-payment ref={} network={} status={} txId={}",
+                    sub.getRef(), network, dataStatus, txId);
+        } else {
+            log.warn("TrustPayWay process-payment REJECTED ref={} network={} status={} msg={}",
+                    sub.getRef(), network, dataStatus, resp != null ? resp.message() : "no/invalid response");
+        }
         return new PaymentRequest(txId, operator, accepted);
     }
 
@@ -149,10 +164,11 @@ public class TrustPayWayGateway implements PaymentGateway {
                          @JsonProperty("expires_in") long expiresIn) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record ProcessResponse(String status, String message, ProcessData data) {}
+    record ProcessResponse(String message, @JsonProperty("status_code") Integer statusCode, ProcessData data) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record ProcessData(@JsonProperty("transaction_id") String transactionId, String reference) {}
+    record ProcessData(String status, @JsonProperty("transaction_id") String transactionId,
+                       String orderId, String subscriberMsisdn) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record StatusResponse(String status) {}
