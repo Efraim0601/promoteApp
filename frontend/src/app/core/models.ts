@@ -69,6 +69,7 @@ export interface CreateSubscriptionRequest {
   quartier: string;
   region: string;
   pay: string;
+  payPhone?: string | null;
   delivery: string;
   selfie: boolean;
   selfieKey?: string | null;

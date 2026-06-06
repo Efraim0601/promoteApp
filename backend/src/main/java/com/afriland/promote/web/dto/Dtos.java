@@ -46,6 +46,7 @@ public final class Dtos {
             @NotBlank String quartier,
             @NotBlank String region,
             @NotBlank String pay,        // om | mtn | cash | sara
+            String payPhone,             // MoMo number used for payment (om/mtn) — may differ from phone
             String delivery,             // promote | agence | home (defaults to promote)
             boolean selfie,
             String selfieKey,            // object-storage keys returned by /api/kyc/image
@@ -57,7 +58,7 @@ public final class Dtos {
     public record SubscriptionDto(
             String ref, String prenom, String nom, String fullName, String sexe, String email,
             String cni, String niu, String cniExp, String phone, String quartier, String region,
-            String pay, String delivery, int amount, int transport,
+            String pay, String payPhone, String delivery, int amount, int transport,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
@@ -66,7 +67,7 @@ public final class Dtos {
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
                     s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(),
-                    s.getPay(), s.getDelivery(), s.getAmount(), s.getTransport(),
+                    s.getPay(), s.getPayPhone(), s.getDelivery(), s.getAmount(), s.getTransport(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,

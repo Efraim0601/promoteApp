@@ -35,6 +35,7 @@ public class Subscription {
     private String region;          // administrative region
 
     private String pay;             // om | mtn | cash | sara
+    private String payPhone;        // "+237 6XXXXXXXX" — MoMo number used for payment (may differ from phone)
     private String delivery;        // promote | agence | home
 
     private int amount;             // total paid/due

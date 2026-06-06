@@ -89,10 +89,14 @@ public class SubscriptionService {
         AppUser referrer = resolveAgentByPhone(req.referrerPhone());
         boolean cash = "cash".equals(req.pay());
         boolean sara = "sara".equals(req.pay());
+        boolean momo = "om".equals(req.pay()) || "mtn".equals(req.pay());
         // SARA money requires the receipt to have been uploaded first (key returned by /api/kyc/image).
         if (sara && (req.saraReceiptKey() == null || req.saraReceiptKey().isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sara_receipt_required");
         }
+        // MoMo: the payment number may differ from the KYC phone. Require it, fall back to phone.
+        String payRaw = req.payPhone() != null && !req.payPhone().isBlank() ? req.payPhone() : req.phone();
+        String payPhone = momo ? "+237 " + payRaw.replaceAll("\\D", "") : null;
 
         Subscription s = Subscription.builder()
                 .ref(newRef())
@@ -108,6 +112,7 @@ public class SubscriptionService {
                 .quartier(req.quartier() == null ? null : req.quartier().trim())
                 .region(req.region())
                 .pay(req.pay())
+                .payPhone(payPhone)
                 .delivery(delivery)
                 .amount(amount)
                 .transport(transport)

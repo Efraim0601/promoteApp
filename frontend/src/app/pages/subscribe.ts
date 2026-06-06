@@ -26,7 +26,7 @@ interface WizardForm {
   cniRectoData: string | null; cniRectoKey: string | null;
   cniVersoData: string | null; cniVersoKey: string | null;
   saraReceiptData: string | null; saraReceiptKey: string | null;
-  pay: string; delivery: string; refPhone: string;
+  pay: string; payPhone: string; delivery: string; refPhone: string;
 }
 
 /** Cameroon administrative regions (for the Région dropdown). */
@@ -89,7 +89,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
     saraReceiptData: null, saraReceiptKey: null,
-    pay: 'om', delivery: 'promote', refPhone: '',
+    pay: 'om', payPhone: '', delivery: 'promote', refPhone: '',
   };
 
   ngOnInit() {
@@ -102,6 +102,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   set<K extends keyof WizardForm>(k: K, v: WizardForm[K]) {
     this.form[k] = v;
     if (k === 'refPhone') this.onRefPhone(v as string);
+    // When a MoMo method is picked, default the payment number to the KYC phone (still editable):
+    // the client confirms or changes the number that will actually receive the prompt.
+    if (k === 'pay' && (v === 'om' || v === 'mtn') && !this.form.payPhone) this.form.payPhone = this.form.phone;
   }
 
   private onRefPhone(v: string) {
@@ -148,8 +151,16 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.region;
   }
   get docsOk() { return !!this.form.cniRectoData && !!this.form.cniVersoData; }
-  /** Payment step: a method is chosen, and if SARA money, its receipt has been uploaded. */
-  get payStepOk() { return !!this.form.pay && (this.form.pay !== 'sara' || !!this.form.saraReceiptKey); }
+  /** Mobile Money methods that need a payment number + USSD push. */
+  get isMomo() { return this.form.pay === 'om' || this.form.pay === 'mtn'; }
+  get payPhoneOk() { return /^6\d{8}$/.test(this.form.payPhone); }
+  /** Payment step: a method is chosen; MoMo needs a valid payment number, SARA needs a receipt. */
+  get payStepOk() {
+    if (!this.form.pay) return false;
+    if (this.isMomo) return this.payPhoneOk;
+    if (this.form.pay === 'sara') return !!this.form.saraReceiptKey;
+    return true;
+  }
   get stepValid() {
     return [this.step0ok, this.docsOk, !!this.form.selfieData, this.payStepOk, true][this.step()];
   }
@@ -184,7 +195,13 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   // ---- navigation ----
   next() {
     this.touched.set(true);
-    if (this.stepValid) { this.touched.set(false); this.step.set(Math.min(this.lastStep, this.step() + 1)); }
+    if (this.stepValid) {
+      this.touched.set(false);
+      this.step.set(Math.min(this.lastStep, this.step() + 1));
+      // Entering the payment step with a MoMo method: default the payment number to the
+      // KYC phone (still editable) so the client just confirms it or types the right one.
+      if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
+    }
   }
   prev() {
     if (this.step() === 0) this.exit();
@@ -223,7 +240,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
       cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
       email: this.form.email.trim(), quartier: this.form.quartier.trim(), region: this.form.region,
-      pay: this.form.pay, delivery: this.form.delivery,
+      pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
       saraReceiptKey: this.form.saraReceiptKey,
@@ -306,7 +323,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null,
-      pay: 'om', delivery: 'promote', refPhone: '',
+      pay: 'om', payPhone: '', delivery: 'promote', refPhone: '',
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
     this.refAgent.set(null); this.refUnknown.set(false);

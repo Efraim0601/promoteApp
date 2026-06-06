@@ -14,7 +14,7 @@
       } @else {
         <h1 style="font-size:21px">{{ i18n.t('waiting_title') }}</h1>
         <p class="muted" style="font-size:13.5px;line-height:1.55;max-width:290px">
-          {{ waitBefore() }}<b style="color:var(--text)">+237 {{ form.phone }}</b>{{ waitAfter() }}
+          {{ waitBefore() }}<b style="color:var(--text)">+237 {{ form.payPhone }}</b>{{ waitAfter() }}
         </p>
         <div class="card" style="padding:11px 14px;display:flex;gap:9px;align-items:center;max-width:300px;text-align:left">
           <ic name="clock" [size]="18" style="color:var(--muted);flex-shrink:0"></ic>
@@ -181,6 +181,12 @@
       <!-- Step 3: payment -->
       @else if (step() === 3) {
         <tile-choice [options]="payTiles" [value]="form.pay" (valueChange)="set('pay', $event)"></tile-choice>
+        @if (isMomo) {
+          <div style="margin-top:10px">
+            <phone-field [label]="i18n.t('pay_phone_label')" [value]="form.payPhone" (valueChange)="set('payPhone', $event)"
+              [hint]="i18n.t('pay_phone_hint')" [err]="touched() && !payPhoneOk ? i18n.t('invalid_phone') : null"></phone-field>
+          </div>
+        }
         @if (form.pay === 'sara') {
           <div style="font-size:13px;font-weight:700;margin-top:10px">{{ i18n.t('sara_receipt_label') }}</div>
           <receipt-upload [imageData]="form.saraReceiptData" [guide]="i18n.t('sara_receipt_guide')" (captured)="onSaraReceipt($event)"></receipt-upload>
@@ -202,6 +208,7 @@
           <div class="srow"><span class="lbl">{{ i18n.t('quartier') }}</span><span class="val">{{ form.quartier }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('region_label') }}</span><span class="val">{{ form.region }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:22px;height:22px;font-size:9px;border-radius:6px">{{ pm.short }}</span>{{ form.pay === 'cash' ? i18n.t('pay_cash_name') : pm.name }}</span></div>
+          @if (isMomo) { <div class="srow"><span class="lbl">{{ i18n.t('pay_phone_label') }}</span><span class="val">+237 {{ form.payPhone }}</span></div> }
           @if (refAgent()) { <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ refAgent()!.name }}</span></div> }
         </div>
         <div class="card" style="padding:4px 16px">

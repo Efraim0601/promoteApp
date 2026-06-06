@@ -180,9 +180,11 @@ public class TrustPayWayGateway implements PaymentGateway {
         };
     }
 
-    /** Phone stored as "+237 6XXXXXXXX" → digits "2376XXXXXXXX" expected by the API. */
+    /** MoMo number to charge → digits "2376XXXXXXXX" expected by the API. Uses the payment
+     *  number the client gave for this operator (payPhone), falling back to the KYC phone. */
     private String msisdn(Subscription sub) {
-        String digits = sub.getPhone() == null ? "" : sub.getPhone().replaceAll("\\D", "");
+        String raw = sub.getPayPhone() != null && !sub.getPayPhone().isBlank() ? sub.getPayPhone() : sub.getPhone();
+        String digits = raw == null ? "" : raw.replaceAll("\\D", "");
         return digits.startsWith("237") ? digits : "237" + digits;
     }
 
