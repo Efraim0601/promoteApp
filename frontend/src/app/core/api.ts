@@ -61,6 +61,10 @@ export class Api {
   print(ref: string): Observable<Subscription> {
     return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/print`, {});
   }
+  /** Point of sale (staff) — validate or reject a SARA money receipt. */
+  validateSara(ref: string, outcome: 'validate' | 'reject', reason?: string): Observable<Subscription> {
+    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/sara-validate`, { outcome, reason });
+  }
   claim(phone: string, cni: string): Observable<ClaimResult> {
     return this.http.post<ClaimResult>(`${this.base}/subscriptions/claim`, { phone, cni });
   }

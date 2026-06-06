@@ -11,6 +11,7 @@ import { StepsComponent } from '../shared/steps';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { AvatarComponent } from '../shared/avatar';
 import { PhotoCaptureComponent } from '../shared/photo-capture';
+import { ReceiptUploadComponent } from '../shared/receipt-upload';
 import { TileChoiceComponent, TileOption } from '../shared/tile-choice';
 import { PromoteCardComponent } from '../shared/promote-card';
 import { QrCodeComponent } from '../shared/qr-code';
@@ -24,6 +25,7 @@ interface WizardForm {
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
   cniVersoData: string | null; cniVersoKey: string | null;
+  saraReceiptData: string | null; saraReceiptKey: string | null;
   pay: string; delivery: string; refPhone: string;
 }
 
@@ -49,7 +51,7 @@ const fmtExp = (d: string) => (d.length === 8 ? `${d.slice(0, 2)}/${d.slice(2, 4
   imports: [
     AppBarComponent, IconComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent,
     ExpiryFieldComponent, StepsComponent, StatusBadgeComponent, AvatarComponent,
-    PhotoCaptureComponent, TileChoiceComponent, PromoteCardComponent, QrCodeComponent,
+    PhotoCaptureComponent, ReceiptUploadComponent, TileChoiceComponent, PromoteCardComponent, QrCodeComponent,
   ],
   templateUrl: './subscribe.html',
 })
@@ -86,6 +88,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     email: '', quartier: '', region: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
+    saraReceiptData: null, saraReceiptKey: null,
     pay: 'om', delivery: 'promote', refPhone: '',
   };
 
@@ -144,8 +147,10 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.region;
   }
   get docsOk() { return !!this.form.cniRectoData && !!this.form.cniVersoData; }
+  /** Payment step: a method is chosen, and if SARA money, its receipt has been uploaded. */
+  get payStepOk() { return !!this.form.pay && (this.form.pay !== 'sara' || !!this.form.saraReceiptKey); }
   get stepValid() {
-    return [this.step0ok, this.docsOk, !!this.form.selfieData, !!this.form.pay, true][this.step()];
+    return [this.step0ok, this.docsOk, !!this.form.selfieData, this.payStepOk, true][this.step()];
   }
   get lastStep() { return STEP_COUNT - 1; }
   stepKey(i: number) { return STEP_KEYS[i]; }
@@ -154,6 +159,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get headSub() { return ['identity_sub', 'doc_sub', 'photo_sub', 'payment_sub', 'recap_sub2'][this.step()]; }
   get expDisplay() { return fmtExp(this.form.cniExp); }
   get isCash() { return this.result()?.payStatus === 'cash'; }
+  get isSaraPending() { return this.result()?.payStatus === 'sara_pending'; }
 
   /** Real deep link encoded in the reference QR — opens the print point on that ref. */
   get refUrl() {
@@ -163,10 +169,14 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   }
 
   get payTiles(): TileOption[] {
+    const desc: Record<string, string> = {
+      om: this.i18n.t('pay_om_desc'), mtn: this.i18n.t('pay_mtn_desc'),
+      sara: this.i18n.t('pay_sara_desc'), cash: this.i18n.t('pay_cash_desc'),
+    };
     return PAY_METHODS.map((p) => ({
       id: p.id, bg: p.bg, color: p.fg, icon: p.short,
       title: p.id === 'cash' ? this.i18n.t('pay_cash_name') : p.name,
-      desc: p.id === 'om' ? this.i18n.t('pay_om_desc') : p.id === 'mtn' ? this.i18n.t('pay_mtn_desc') : this.i18n.t('pay_cash_desc'),
+      desc: desc[p.id] ?? '',
     }));
   }
 
@@ -201,6 +211,12 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   }
   onRetakeVerso() { this.form.cniVersoData = null; this.form.cniVersoKey = null; }
 
+  /** SARA money receipt picked (image or PDF): keep preview + upload, store its key. */
+  onSaraReceipt(dataUrl: string) {
+    this.form.saraReceiptData = dataUrl; this.form.saraReceiptKey = null;
+    this.api.uploadImage(dataUrl, 'sara-receipt').subscribe({ next: (r) => (this.form.saraReceiptKey = r.key), error: () => {} });
+  }
+
   private payload() {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
@@ -209,6 +225,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       pay: this.form.pay, delivery: this.form.delivery,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
+      saraReceiptKey: this.form.saraReceiptKey,
       referrerPhone: this.form.refPhone || undefined,
     };
   }
@@ -221,7 +238,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       next: (s: Subscription) => {
         this.busy.set(false);
         this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage });
-        if (this.form.pay === 'cash') { this.proc.set('reference'); }
+        // cash and SARA money are settled off-platform → straight to the reference screen, no polling.
+        if (this.form.pay === 'cash' || this.form.pay === 'sara') { this.proc.set('reference'); }
         else if (s.payStatus === 'failed') { this.proc.set('failed'); } // gateway rejected the push
         else {
           this.proc.set('paying');
@@ -286,6 +304,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       prenom: '', nom: '', sexe: '', cni: '', cniExp: '', phone: '', email: '', quartier: '', region: '',
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
+      saraReceiptData: null, saraReceiptKey: null,
       pay: 'om', delivery: 'promote', refPhone: '',
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);

@@ -23,9 +23,13 @@ import java.util.regex.Pattern;
 @RequestMapping("/api/kyc")
 public class KycController {
 
-    private static final long MAX_BYTES = 6 * 1024 * 1024; // 6 MB
-    private static final Set<String> KINDS = Set.of("selfie", "cni-recto", "cni-verso");
-    private static final Pattern DATA_URL = Pattern.compile("^data:(image/(?:jpeg|png));base64,(.+)$", Pattern.DOTALL);
+    private static final long MAX_IMAGE_BYTES = 6 * 1024 * 1024;    // 6 MB for KYC images
+    private static final long MAX_RECEIPT_BYTES = 10 * 1024 * 1024; // 10 MB for SARA receipts (PDFs are heavier)
+    private static final Set<String> KINDS = Set.of("selfie", "cni-recto", "cni-verso", "sara-receipt");
+    private static final String RECEIPT_KIND = "sara-receipt";
+    // SARA receipts may be a PDF; KYC images stay image-only.
+    private static final Pattern DATA_URL =
+            Pattern.compile("^data:(image/(?:jpeg|png)|application/pdf);base64,(.+)$", Pattern.DOTALL);
 
     private final ImageStorage storage;
 
@@ -46,13 +50,19 @@ public class KycController {
             contentType = m.group(1);
             b64 = m.group(2);
         }
+        // PDF is allowed only for the SARA receipt; KYC images must stay images.
+        boolean isReceipt = RECEIPT_KIND.equals(kind);
+        if ("application/pdf".equals(contentType) && !isReceipt) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pdf_not_allowed");
+        }
         byte[] data;
         try {
             data = Base64.getDecoder().decode(b64.replaceAll("\\s", ""));
         } catch (IllegalArgumentException e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_image");
         }
-        if (data.length == 0 || data.length > MAX_BYTES) {
+        long max = isReceipt ? MAX_RECEIPT_BYTES : MAX_IMAGE_BYTES;
+        if (data.length == 0 || data.length > max) {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "image_too_large");
         }
         String key = storage.store(data, contentType, kind);

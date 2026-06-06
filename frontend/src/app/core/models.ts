@@ -22,7 +22,7 @@ export interface CardConfig {
   transport: number;
 }
 
-export type PayStatus = 'pending' | 'paid' | 'cash' | 'failed';
+export type PayStatus = 'pending' | 'paid' | 'cash' | 'sara_pending' | 'failed';
 
 export interface Subscription {
   ref: string;
@@ -36,7 +36,7 @@ export interface Subscription {
   phone: string;
   quartier: string;
   region: string;
-  pay: string;        // om | mtn | cash
+  pay: string;        // om | mtn | cash | sara
   delivery: string;   // promote | agence | home
   amount: number;
   transport: number;
@@ -50,7 +50,8 @@ export interface Subscription {
   hasSelfie: boolean;
   hasCniRecto: boolean;
   hasCniVerso: boolean;
-  status: string;     // printed | failed | cash | awaiting
+  hasSaraReceipt: boolean;
+  status: string;     // printed | failed | cash | sara_pending | awaiting
   createdAt: string;
   paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")
 }
@@ -71,6 +72,7 @@ export interface CreateSubscriptionRequest {
   selfieKey?: string | null;
   cniRectoKey?: string | null;
   cniVersoKey?: string | null;
+  saraReceiptKey?: string | null;
   referrerPhone?: string;
 }
 

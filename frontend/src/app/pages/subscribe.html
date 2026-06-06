@@ -62,14 +62,14 @@
     <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t(isSelf ? 'badge_self' : 'badge_agent') }}</span></app-bar>
     <div class="scr-body">
       <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px">
-        <div [style.background]="isCash ? 'color-mix(in srgb, var(--af-gold) 22%, transparent)' : 'var(--success)'"
-             [style.color]="isCash ? '#8a6400' : '#fff'"
+        <div [style.background]="(isCash || isSaraPending) ? 'color-mix(in srgb, var(--af-gold) 22%, transparent)' : 'var(--success)'"
+             [style.color]="(isCash || isSaraPending) ? '#8a6400' : '#fff'"
              style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:pop .45s cubic-bezier(.2,.8,.3,1.2)">
-          <ic [name]="isCash ? 'clock' : 'check'" [size]="32" [sw]="2.5"></ic>
+          <ic [name]="(isCash || isSaraPending) ? 'clock' : 'check'" [size]="32" [sw]="2.5"></ic>
         </div>
         <div>
           <h1 style="font-size:22px">{{ i18n.t('ref_done_title') }}</h1>
-          <p class="muted" style="font-size:13px;line-height:1.5;max-width:300px;margin-top:7px">{{ i18n.t(isCash ? 'ref_done_cash' : 'ref_done_paid') }}</p>
+          <p class="muted" style="font-size:13px;line-height:1.5;max-width:300px;margin-top:7px">{{ i18n.t(isSaraPending ? 'ref_done_sara' : isCash ? 'ref_done_cash' : 'ref_done_paid') }}</p>
         </div>
 
         <div class="card" style="padding:18px;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px">
@@ -84,10 +84,10 @@
           </div>
         </div>
 
-        <p class="muted" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t('ref_instr') }}</p>
+        <p class="muted" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t(isSaraPending ? 'ref_instr_sara' : 'ref_instr') }}</p>
 
         <div class="card" style="padding:4px 16px;width:100%">
-          <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isCash ? 'cash' : 'paid'"></status-badge></span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid'"></status-badge></span></div>
           <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>
         </div>
       </div>
@@ -180,6 +180,11 @@
       <!-- Step 3: payment -->
       @else if (step() === 3) {
         <tile-choice [options]="payTiles" [value]="form.pay" (valueChange)="set('pay', $event)"></tile-choice>
+        @if (form.pay === 'sara') {
+          <div style="font-size:13px;font-weight:700;margin-top:10px">{{ i18n.t('sara_receipt_label') }}</div>
+          <receipt-upload [imageData]="form.saraReceiptData" [guide]="i18n.t('sara_receipt_guide')" (captured)="onSaraReceipt($event)"></receipt-upload>
+          @if (touched() && !form.saraReceiptKey) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('sara_receipt_required') }}</div> }
+        }
       }
 
       <!-- Step 4: recap -->
@@ -211,6 +216,7 @@
       } @else {
         <button class="btn btn-primary" (click)="confirm()" [disabled]="busy()">
           @if (form.pay === 'cash') { <ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('confirm_cash') }} }
+          @else if (form.pay === 'sara') { <ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('confirm_sara') }} }
           @else { <ic name="phone" [size]="18"></ic> {{ i18n.t('pay_now') }} }
         </button>
       }

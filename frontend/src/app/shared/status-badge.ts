@@ -1,7 +1,7 @@
 import { Component, Input, inject } from '@angular/core';
 import { I18n } from '../core/i18n';
 
-/** Status pill — status: paid | awaiting | cash | failed | printed. */
+/** Status pill — status: paid | awaiting | cash | sara_pending | failed | printed. */
 @Component({
   selector: 'status-badge',
   standalone: true,
@@ -15,6 +15,7 @@ export class StatusBadgeComponent {
     paid: { cls: 'success', key: 'st_paid' },
     awaiting: { cls: 'pending', key: 'st_awaiting' },
     cash: { cls: 'pending', key: 'st_cash' },
+    sara_pending: { cls: 'pending', key: 'st_sara_pending' },
     failed: { cls: 'failed', key: 'st_failed' },
     printed: { cls: 'success', key: 'st_printed' },
   };

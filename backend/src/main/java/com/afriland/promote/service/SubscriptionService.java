@@ -8,8 +8,10 @@ import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
@@ -86,6 +88,11 @@ public class SubscriptionService {
         // the seller stays the logged-in agent and the referrer is recorded for tracking only.
         AppUser referrer = resolveAgentByPhone(req.referrerPhone());
         boolean cash = "cash".equals(req.pay());
+        boolean sara = "sara".equals(req.pay());
+        // SARA money requires the receipt to have been uploaded first (key returned by /api/kyc/image).
+        if (sara && (req.saraReceiptKey() == null || req.saraReceiptKey().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sara_receipt_required");
+        }
 
         Subscription s = Subscription.builder()
                 .ref(newRef())
@@ -108,17 +115,19 @@ public class SubscriptionService {
                 .referrerName(referrer != null ? referrer.getName() : null)
                 .referrerPhone(req.referrerPhone() != null && !req.referrerPhone().isBlank()
                         ? "+237 " + req.referrerPhone().replaceAll("\\D", "") : null)
-                .payStatus(cash ? PayStatus.cash : PayStatus.pending)
+                .payStatus(cash ? PayStatus.cash : sara ? PayStatus.sara_pending : PayStatus.pending)
                 .printed(false)
                 .selfieVerified(req.selfie() || req.selfieKey() != null)
                 .selfieKey(req.selfieKey())
                 .cniRectoKey(req.cniRectoKey())
                 .cniVersoKey(req.cniVersoKey())
+                .saraReceiptKey(sara ? req.saraReceiptKey() : null)
                 .createdAt(Instant.now())
                 .build();
 
         s = subs.save(s);
-        if (!cash) {
+        // cash and SARA are settled off-platform (in person / external app) — no gateway push.
+        if (!cash && !sara) {
             try {
                 // Push the USSD prompt via the active gateway (simulated or real aggregator).
                 PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, req.pay());
@@ -215,6 +224,25 @@ public class SubscriptionService {
     public Subscription markPrinted(String ref) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         s.setPrinted(true);
+        return subs.save(s);
+    }
+
+    /**
+     * Point-of-sale decision on a SARA money receipt. Idempotent: only acts while the record is
+     * still {@code sara_pending}, so a payment can't be validated twice or overturned once final.
+     * {@code validate} → {@code paid} (printable); {@code reject} → {@code failed} (+ reason).
+     */
+    @Transactional
+    public Subscription validateSara(String ref, String outcome, String reason) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
+        if (s.getPayStatus() != PayStatus.sara_pending) return s;
+        if ("validate".equalsIgnoreCase(outcome)) {
+            s.setPayStatus(PayStatus.paid);
+            s.setPaymentMessage(null);
+        } else {
+            s.setPayStatus(PayStatus.failed);
+            s.setPaymentMessage(reason == null || reason.isBlank() ? "Reçu SARA non conforme" : reason.trim());
+        }
         return subs.save(s);
     }
 

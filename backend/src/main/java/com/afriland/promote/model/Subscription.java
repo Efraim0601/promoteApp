@@ -33,7 +33,7 @@ public class Subscription {
     private String quartier;        // neighborhood
     private String region;          // administrative region
 
-    private String pay;             // om | mtn | cash
+    private String pay;             // om | mtn | cash | sara
     private String delivery;        // promote | agence | home
 
     private int amount;             // total paid/due
@@ -64,6 +64,9 @@ public class Subscription {
     private String cniRectoKey;    // ID card — front
     private String cniVersoKey;    // ID card — back
 
+    /** Object-storage key of the SARA money receipt (image or PDF); null unless pay == sara. */
+    private String saraReceiptKey;
+
     /** Resolve a stored image key by kind. */
     @Transient
     public String imageKey(String kind) {
@@ -71,6 +74,7 @@ public class Subscription {
             case "selfie" -> selfieKey;
             case "cni-recto" -> cniRectoKey;
             case "cni-verso" -> cniVersoKey;
+            case "sara-receipt" -> saraReceiptKey;
             default -> null;
         };
     }
@@ -84,6 +88,7 @@ public class Subscription {
         if (printed) return "printed";
         if (payStatus == PayStatus.failed) return "failed";
         if (payStatus == PayStatus.cash) return "cash";
+        if (payStatus == PayStatus.sara_pending) return "sara_pending";
         return "awaiting"; // paid (awaiting print) or pending
     }
 }

@@ -62,8 +62,9 @@ public class SubscriptionController {
         return s == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(SubscriptionDto.of(s));
     }
 
-    /** Stream a captured KYC image (staff only); kind = selfie | cni-recto | cni-verso.
-     *  Keeps object storage private — images are proxied through the backend. */
+    /** Stream a captured document (staff only); kind = selfie | cni-recto | cni-verso | sara-receipt.
+     *  Keeps object storage private — files are proxied through the backend. The SARA receipt may
+     *  be a PDF, so the response content-type is taken from what was stored. */
     @GetMapping("/{ref}/image/{kind}")
     public ResponseEntity<byte[]> image(@PathVariable String ref, @PathVariable String kind) {
         Subscription s = service.byRef(ref);
@@ -72,7 +73,12 @@ public class SubscriptionController {
         if (key == null) return ResponseEntity.notFound().build();
         ImageStorage.StoredImage img = storage.load(key);
         if (img == null) return ResponseEntity.notFound().build();
-        MediaType type = "image/png".equalsIgnoreCase(img.contentType()) ? MediaType.IMAGE_PNG : MediaType.IMAGE_JPEG;
+        MediaType type;
+        try {
+            type = MediaType.parseMediaType(img.contentType() == null ? "image/jpeg" : img.contentType());
+        } catch (RuntimeException ex) {
+            type = MediaType.IMAGE_JPEG;
+        }
         return ResponseEntity.ok().contentType(type).body(img.data());
     }
 
@@ -95,6 +101,13 @@ public class SubscriptionController {
     @PatchMapping("/{ref}/print")
     public SubscriptionDto print(@PathVariable String ref) {
         return SubscriptionDto.of(service.markPrinted(ref));
+    }
+
+    /** Point of sale (staff) — validate or reject a SARA money receipt.
+     *  outcome = validate (→ paid) | reject (→ failed, with an optional reason). */
+    @PatchMapping("/{ref}/sara-validate")
+    public SubscriptionDto saraValidate(@PathVariable String ref, @RequestBody SaraValidateRequest req) {
+        return SubscriptionDto.of(service.validateSara(ref, req.outcome(), req.reason()));
     }
 
     /** Agent claims a paid, unattributed QR sale. */

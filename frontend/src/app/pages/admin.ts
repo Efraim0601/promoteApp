@@ -154,6 +154,7 @@ import { TxRowComponent } from '../shared/tx-row';
               <option value="paid">{{ i18n.t('st_paid') }}</option>
               <option value="pending">{{ i18n.t('st_awaiting') }}</option>
               <option value="cash">{{ i18n.t('st_cash') }}</option>
+              <option value="sara_pending">{{ i18n.t('st_sara_pending') }}</option>
               <option value="failed">{{ i18n.t('st_failed') }}</option>
               <option value="printed">{{ i18n.t('st_printed') }}</option>
             </select>

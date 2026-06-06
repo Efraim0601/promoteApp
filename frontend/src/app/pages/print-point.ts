@@ -1,5 +1,5 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
-import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
+import { DomSanitizer, SafeResourceUrl, SafeUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -125,10 +125,30 @@ import { StatusBadgeComponent } from '../shared/status-badge';
               <div class="srow"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ i18n.t('del_' + r.delivery + '_title') }}</span></div>
               @if (r.payStatus === 'cash') {
                 <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--accent)">{{ i18n.money(r.amount) }}</span></div>
+              } @else if (r.payStatus === 'sara_pending') {
+                <div class="srow total"><span class="lbl">{{ i18n.t('pp_sara_amount') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
               } @else {
                 <div class="srow total"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
               }
+              @if (r.payStatus === 'failed' && r.paymentMessage) {
+                <div class="srow"><span class="lbl">{{ i18n.t('pp_sara_rejected') }}</span><span class="val" style="color:var(--accent)">{{ r.paymentMessage }}</span></div>
+              }
             </div>
+
+            <!-- SARA money: show the uploaded receipt so the agent can check conformity -->
+            @if (r.hasSaraReceipt && (receiptImg() || receiptPdf())) {
+              <div style="padding:0 16px 14px">
+                <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pp_sara_receipt') }}</div>
+                @if (receiptPdf()) {
+                  <iframe [src]="receiptPdf()" style="width:100%;height:360px;border:1px solid var(--border);border-radius:10px"></iframe>
+                } @else if (receiptImg()) {
+                  <img [src]="receiptImg()" alt="reçu SARA" style="width:100%;max-height:380px;object-fit:contain;background:var(--surface-2);border:1px solid var(--border);border-radius:10px" />
+                }
+                @if (receiptOpenUrl()) {
+                  <a [href]="receiptOpenUrl()" target="_blank" rel="noopener" class="btn btn-ghost" style="margin-top:8px;width:auto;padding:8px 12px;font-size:12.5px;text-decoration:none"><ic name="scan" [size]="15"></ic> {{ i18n.t('pp_sara_open') }}</a>
+                }
+              </div>
+            }
           </div>
         }
       }
@@ -136,13 +156,22 @@ import { StatusBadgeComponent } from '../shared/status-badge';
     </div>
 
     @if (rec(); as r) {
-      @if (!r.printed) {
+      @if (r.printed) {
+        <div class="scr-foot"><button class="btn btn-ghost" (click)="again()">{{ i18n.t('pp_again') }}</button></div>
+      } @else if (r.payStatus === 'sara_pending') {
+        <!-- Payment not yet confirmed: validate or reject the receipt before printing. -->
+        <div class="scr-foot">
+          <button class="btn btn-primary" (click)="doValidateSara(r.ref)" [disabled]="validating()"><ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('pp_sara_validate') }}</button>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-ghost" (click)="doRejectSara(r.ref)" [disabled]="validating()" style="font-size:13px;color:var(--accent)"><ic name="x" [size]="16"></ic> {{ i18n.t('pp_sara_reject') }}</button>
+            <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
+          </div>
+        </div>
+      } @else {
         <div class="scr-foot">
           <button class="btn btn-primary" (click)="doPrint(r.ref)"><ic name="printer" [size]="18"></ic> {{ i18n.t('pp_print') }}</button>
           <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
         </div>
-      } @else {
-        <div class="scr-foot"><button class="btn btn-ghost" (click)="again()">{{ i18n.t('pp_again') }}</button></div>
       }
     }
   </div>`,
@@ -163,6 +192,10 @@ export class PrintPointComponent implements OnInit {
   selfieUrl = signal<SafeUrl | null>(null);
   rectoUrl = signal<SafeUrl | null>(null);
   versoUrl = signal<SafeUrl | null>(null);
+  receiptImg = signal<SafeUrl | null>(null);          // SARA receipt when it is an image
+  receiptPdf = signal<SafeResourceUrl | null>(null);  // SARA receipt when it is a PDF (iframe)
+  receiptOpenUrl = signal<string | null>(null);       // raw object URL, to open in a new tab
+  validating = signal(false);
   private objectUrls: string[] = [];
 
   pm = (r: Subscription) => payById(r.pay);
@@ -206,11 +239,50 @@ export class PrintPointComponent implements OnInit {
     this.api.print(ref).subscribe((s) => this.rec.set(s));
   }
 
+  /** Validate the SARA money receipt → marks the subscription paid (then printable). */
+  doValidateSara(ref: string) {
+    if (this.validating()) return;
+    this.validating.set(true);
+    this.api.validateSara(ref, 'validate').subscribe({
+      next: (s) => { this.rec.set(s); this.validating.set(false); },
+      error: () => this.validating.set(false),
+    });
+  }
+  /** Reject the SARA money receipt (not conforming) → marks it failed, with a reason. */
+  doRejectSara(ref: string) {
+    if (this.validating()) return;
+    const reason = window.prompt(this.i18n.t('pp_sara_reject_reason')) ?? '';
+    if (reason === null) return; // cancelled
+    this.validating.set(true);
+    this.api.validateSara(ref, 'reject', reason || undefined).subscribe({
+      next: (s) => { this.rec.set(s); this.validating.set(false); },
+      error: () => this.validating.set(false),
+    });
+  }
+
   private setRecord(s: Subscription) {
     this.rec.set(s);
     if (s.hasSelfie) this.loadImage(s.ref, 'selfie', this.selfieUrl);
     if (s.hasCniRecto) this.loadImage(s.ref, 'cni-recto', this.rectoUrl);
     if (s.hasCniVerso) this.loadImage(s.ref, 'cni-verso', this.versoUrl);
+    if (s.hasSaraReceipt) this.loadReceipt(s.ref);
+  }
+
+  /** Load the SARA receipt blob and route it to an <img> (image) or an <iframe> (PDF). */
+  private loadReceipt(ref: string) {
+    this.api.imageBlob(ref, 'sara-receipt').subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        this.objectUrls.push(url);
+        this.receiptOpenUrl.set(url);
+        if (blob.type === 'application/pdf') {
+          this.receiptPdf.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
+        } else {
+          this.receiptImg.set(this.sanitizer.bypassSecurityTrustUrl(url));
+        }
+      },
+      error: () => { this.receiptImg.set(null); this.receiptPdf.set(null); this.receiptOpenUrl.set(null); },
+    });
   }
   private loadImage(ref: string, kind: string, target: { set: (v: SafeUrl | null) => void }) {
     this.api.imageBlob(ref, kind).subscribe({
@@ -226,6 +298,7 @@ export class PrintPointComponent implements OnInit {
     this.objectUrls.forEach((u) => URL.revokeObjectURL(u));
     this.objectUrls = [];
     this.selfieUrl.set(null); this.rectoUrl.set(null); this.versoUrl.set(null);
+    this.receiptImg.set(null); this.receiptPdf.set(null); this.receiptOpenUrl.set(null);
   }
   exit() { this.router.navigateByUrl(this.auth.landingPath()); }
 }

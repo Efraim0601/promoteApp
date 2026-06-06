@@ -5,6 +5,7 @@ export interface PayMethod { id: string; name: string; short: string; bg: string
 export const PAY_METHODS: PayMethod[] = [
   { id: 'om', name: 'Orange Money', short: 'OM', bg: '#FF7900', fg: '#fff', momo: true },
   { id: 'mtn', name: 'MTN MoMo', short: 'MTN', bg: '#FFCB05', fg: '#1a1a1a', momo: true },
+  { id: 'sara', name: 'SARA Money', short: 'SARA', bg: '#1E3A8A', fg: '#fff', momo: false },
   { id: 'cash', name: 'Espèces', short: '₣', bg: '#0E7A45', fg: '#fff', momo: false },
 ];
 export const payById = (id: string): PayMethod => PAY_METHODS.find((p) => p.id === id) ?? PAY_METHODS[0];
@@ -16,6 +17,7 @@ export function recordStatus(r: Subscription): string {
   if (r.printed) return 'printed';
   if (r.payStatus === 'failed') return 'failed';
   if (r.payStatus === 'cash') return 'cash';
+  if (r.payStatus === 'sara_pending') return 'sara_pending';
   return 'awaiting';
 }
 
