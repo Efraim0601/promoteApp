@@ -32,19 +32,21 @@ class PromoteApplicationTests {
     void claimRejectsAndAcceptsCorrectly() {
         // a paid, unattributed self (QR) subscription can be claimed once
         CreateSubscriptionRequest req = new CreateSubscriptionRequest(
-                "Test", "Client", "M", "445566778", "01/01/2031", "618641969",
+                "Test", "Client", "M", "445566778", null, "01/01/2031", "618641969",
                 "test@client.cm", "Bonamoussadi", "Littoral",
-                "om", "promote", true, null, null, null, null);
+                "om", "promote", true, null, null, null, null, null);
         Subscription s = service.create(req, "self", null);
         service.applyPayment(s.getRef(), "validate");
 
-        ClaimResult ok = service.claim("a1", "618641969", "445566778");
+        // claiming captures the optional NIU on the linked record
+        ClaimResult ok = service.claim("a1", "618641969", "445566778", "P099887766001X");
         assertTrue(ok.ok());
+        assertEquals("P099887766001X", ok.record().niu());
         // claiming again is now "taken"
-        ClaimResult again = service.claim("a1", "618641969", "445566778");
+        ClaimResult again = service.claim("a1", "618641969", "445566778", null);
         assertFalse(again.ok());
         assertEquals("taken", again.reason());
         // unknown -> notfound
-        assertEquals("notfound", service.claim("a1", "600000000", "000000").reason());
+        assertEquals("notfound", service.claim("a1", "600000000", "000000", null).reason());
     }
 }

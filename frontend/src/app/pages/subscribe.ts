@@ -20,7 +20,7 @@ const STEP_KEYS = ['step_identity', 'step_documents', 'step_photo', 'step_paymen
 const STEP_COUNT = STEP_KEYS.length;
 
 interface WizardForm {
-  prenom: string; nom: string; sexe: string; cni: string; cniExp: string; phone: string;
+  prenom: string; nom: string; sexe: string; cni: string; niu: string; cniExp: string; phone: string;
   email: string; quartier: string; region: string;
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
@@ -84,7 +84,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly REGIONS = REGIONS;
 
   form: WizardForm = {
-    prenom: '', nom: '', sexe: '', cni: '', cniExp: '', phone: '',
+    prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '',
     email: '', quartier: '', region: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
@@ -125,11 +125,12 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     const expDate = parseExp(f.cniExp);
     const phoneOk = /^6\d{8}$/.test(f.phone);
     const emailOk = /^\S+@\S+\.\S+$/.test(f.email);
+    const cniOk = /^[0-9A-F]{6,}$/.test(f.cni); // hexadecimal, at least 6 chars
     return {
       prenom: !f.prenom.trim() ? this.i18n.t('required') : null,
       nom: !f.nom.trim() ? this.i18n.t('required') : null,
       sexe: !f.sexe ? this.i18n.t('required') : null,
-      cni: !f.cni ? this.i18n.t('required') : f.cni.length < 6 ? this.i18n.t('cni_invalid') : null,
+      cni: !f.cni ? this.i18n.t('required') : !cniOk ? this.i18n.t('cni_invalid') : null,
       cniExp: !f.cniExp ? this.i18n.t('required') : !expDate ? this.i18n.t('exp_invalid')
         : expDate < new Date() ? this.i18n.t('exp_expired') : null,
       phone: !f.phone ? this.i18n.t('required') : !phoneOk ? this.i18n.t('invalid_phone') : null,
@@ -220,7 +221,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   private payload() {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
-      cni: this.form.cni, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
+      cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
       email: this.form.email.trim(), quartier: this.form.quartier.trim(), region: this.form.region,
       pay: this.form.pay, delivery: this.form.delivery,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
@@ -301,7 +302,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   reset() {
     this.stopPolling();
     this.form = {
-      prenom: '', nom: '', sexe: '', cni: '', cniExp: '', phone: '', email: '', quartier: '', region: '',
+      prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', region: '',
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null,

@@ -130,6 +130,7 @@
           </select>
         </field>
         <cni-field [label]="i18n.t('cni')" [hint]="i18n.t('cni_hint')" [value]="form.cni" (valueChange)="set('cni', $event)" [err]="e('cni')"></cni-field>
+        <field [label]="i18n.t('niu_label')" [hint]="i18n.t('niu_hint')"><input class="input" [placeholder]="i18n.t('niu_ph')" [value]="form.niu" (input)="set('niu', $any($event.target).value)" /></field>
         <expiry-field [label]="i18n.t('cni_exp')" [value]="form.cniExp" (valueChange)="set('cniExp', $event)" [err]="e('cniExp')"></expiry-field>
         <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
         <field [label]="i18n.t('email_label')" [err]="e('email')"><input class="input" type="email" [placeholder]="i18n.t('email_ph')" [value]="form.email" (input)="set('email', $any($event.target).value)" /></field>
@@ -194,6 +195,7 @@
           <div class="srow"><span class="lbl">{{ i18n.t('client') }}</span><span class="val">{{ fullName }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('sexe') }}</span><span class="val">{{ form.sexe === 'M' ? i18n.t('sexe_m') : i18n.t('sexe_f') }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('cni_short') }}</span><span class="val">{{ form.cni }}</span></div>
+          @if (form.niu.trim()) { <div class="srow"><span class="lbl">{{ i18n.t('niu_short') }}</span><span class="val">{{ form.niu }}</span></div> }
           <div class="srow"><span class="lbl">{{ i18n.t('validity') }}</span><span class="val">{{ expDisplay }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('phone') }}</span><span class="val">+237 {{ form.phone }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('email_label') }}</span><span class="val">{{ form.email }}</span></div>

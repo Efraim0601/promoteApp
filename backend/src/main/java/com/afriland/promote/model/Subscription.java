@@ -28,6 +28,7 @@ public class Subscription {
     private String email;
 
     private String cni;             // ID card number
+    private String niu;             // Numéro d'Identification Unique (taxpayer id) — optional
     private String cniExp;          // expiry, displayed dd/MM/yyyy
     private String phone;           // "+237 6XXXXXXXX"
     private String quartier;        // neighborhood

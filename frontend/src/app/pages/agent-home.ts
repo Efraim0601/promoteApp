@@ -8,12 +8,12 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
 import { TxRowComponent } from '../shared/tx-row';
-import { PhoneFieldComponent, CniFieldComponent } from '../shared/fields';
+import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../shared/fields';
 
 @Component({
   selector: 'page-agent-home',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, PhoneFieldComponent, CniFieldComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -74,6 +74,7 @@ import { PhoneFieldComponent, CniFieldComponent } from '../shared/fields';
           @if (!res() || !res()!.ok) {
             <phone-field [label]="i18n.t('tel')" [value]="phone()" (valueChange)="phone.set($event); res.set(null)"></phone-field>
             <cni-field [label]="i18n.t('cni')" [value]="cni()" (valueChange)="cni.set($event); res.set(null)"></cni-field>
+            <field [label]="i18n.t('niu_label')" [hint]="i18n.t('claim_niu_hint')"><input class="input" [placeholder]="i18n.t('niu_ph')" [value]="niu()" (input)="niu.set($any($event.target).value)" /></field>
             @if (res()) {
               <div class="feedback err-box"><ic name="alert" [size]="20" style="flex-shrink:0"></ic><div style="font-size:12px;font-weight:600;line-height:1.35">{{ i18n.t(failKey) }}</div></div>
             }
@@ -111,6 +112,7 @@ export class AgentHomeComponent implements OnInit {
   claiming = signal(false);
   phone = signal('');
   cni = signal('');
+  niu = signal('');
   res = signal<ClaimResult | null>(null);
 
   ngOnInit() { this.refresh(); }
@@ -131,10 +133,10 @@ export class AgentHomeComponent implements OnInit {
 
   submit() {
     if (!this.canSubmit) return;
-    this.api.claim(this.phone(), this.cni()).subscribe((r) => {
+    this.api.claim(this.phone(), this.cni(), this.niu().trim() || undefined).subscribe((r) => {
       this.res.set(r);
       if (r.ok) this.refresh();
     });
   }
-  close() { this.claiming.set(false); this.phone.set(''); this.cni.set(''); this.res.set(null); }
+  close() { this.claiming.set(false); this.phone.set(''); this.cni.set(''); this.niu.set(''); this.res.set(null); }
 }

@@ -65,8 +65,12 @@ export class Api {
   validateSara(ref: string, outcome: 'validate' | 'reject', reason?: string): Observable<Subscription> {
     return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/sara-validate`, { outcome, reason });
   }
-  claim(phone: string, cni: string): Observable<ClaimResult> {
-    return this.http.post<ClaimResult>(`${this.base}/subscriptions/claim`, { phone, cni });
+  claim(phone: string, cni: string, niu?: string): Observable<ClaimResult> {
+    return this.http.post<ClaimResult>(`${this.base}/subscriptions/claim`, { phone, cni, niu });
+  }
+  /** Agent/admin — add or correct a client's NIU on an existing subscription. */
+  updateNiu(ref: string, niu: string): Observable<Subscription> {
+    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/niu`, { niu });
   }
 
   agents(): Observable<Agent[]> {

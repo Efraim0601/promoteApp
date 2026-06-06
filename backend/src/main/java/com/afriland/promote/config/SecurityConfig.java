@@ -62,6 +62,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions").hasRole("AGENT")
                 .requestMatchers("/api/subscriptions/mine").hasRole("AGENT")
                 .requestMatchers("/api/subscriptions/claim").hasRole("AGENT")
+                .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/niu").hasAnyRole("AGENT", "ADMIN")
                 .requestMatchers("/api/stats/agent").hasRole("AGENT")
 
                 // ---- print point (also reachable by admin/agent) ----

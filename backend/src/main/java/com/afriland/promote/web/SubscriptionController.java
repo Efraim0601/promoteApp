@@ -110,9 +110,15 @@ public class SubscriptionController {
         return SubscriptionDto.of(service.validateSara(ref, req.outcome(), req.reason()));
     }
 
-    /** Agent claims a paid, unattributed QR sale. */
+    /** Agent claims a paid, unattributed QR sale (optionally capturing the client's NIU). */
     @PostMapping("/claim")
     public ClaimResult claim(@Valid @RequestBody ClaimRequest req, Authentication auth) {
-        return service.claim((String) auth.getPrincipal(), req.phone(), req.cni());
+        return service.claim((String) auth.getPrincipal(), req.phone(), req.cni(), req.niu());
+    }
+
+    /** Agent/admin — add or correct a client's NIU on an existing subscription. */
+    @PatchMapping("/{ref}/niu")
+    public SubscriptionDto updateNiu(@PathVariable String ref, @RequestBody NiuUpdateRequest req) {
+        return SubscriptionDto.of(service.updateNiu(ref, req.niu()));
     }
 }

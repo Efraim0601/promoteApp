@@ -102,6 +102,7 @@ public class SubscriptionService {
                 .sexe(req.sexe())
                 .email(req.email() == null ? null : req.email().trim())
                 .cni(req.cni())
+                .niu(normNiu(req.niu()))
                 .cniExp(req.cniExp())
                 .phone("+237 " + req.phone().replaceAll("\\D", ""))
                 .quartier(req.quartier() == null ? null : req.quartier().trim())
@@ -246,9 +247,10 @@ public class SubscriptionService {
         return subs.save(s);
     }
 
-    /** Agent claims a paid, unattributed QR sale — ports app.jsx:claimQrSale. */
+    /** Agent claims a paid, unattributed QR sale — ports app.jsx:claimQrSale.
+     *  {@code niu} is optionally captured at claim time and stored on the matched record. */
     @Transactional
-    public ClaimResult claim(String agentId, String phone, String cni) {
+    public ClaimResult claim(String agentId, String phone, String cni, String niu) {
         String ph = phone.replaceAll("\\D", "");
         String last9 = ph.length() > 9 ? ph.substring(ph.length() - 9) : ph;
         String cn = cni.replaceAll("\\D", "");
@@ -268,7 +270,27 @@ public class SubscriptionService {
         if (match.getAgentId() != null) return new ClaimResult(false, "taken", SubscriptionDto.of(match));
 
         match.setAgentId(agentId);
+        String niuNorm = normNiu(niu);
+        if (niuNorm != null) match.setNiu(niuNorm);   // capture/correct the NIU while linking the sale
         subs.save(match);
         return new ClaimResult(true, null, SubscriptionDto.of(match));
+    }
+
+    /**
+     * Add or correct a client's NIU on an existing subscription (agent/admin). A blank value
+     * clears it. Used when the client did not provide the NIU at subscription time.
+     */
+    @Transactional
+    public Subscription updateNiu(String ref, String niu) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
+        s.setNiu(normNiu(niu));
+        return subs.save(s);
+    }
+
+    /** Normalise a NIU: trim + uppercase, null when blank. */
+    private static String normNiu(String niu) {
+        if (niu == null) return null;
+        String t = niu.trim().toUpperCase();
+        return t.isEmpty() ? null : t;
     }
 }

@@ -59,7 +59,8 @@ export class PhoneFieldComponent {
     <field [label]="label" [hint]="hint" [err]="err">
       <div class="input-prefix">
         <span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-        <input inputmode="numeric" placeholder="123 456 789" [value]="value" (input)="onInput($event)" />
+        <input inputmode="text" autocapitalize="characters" placeholder="1A2B3C4D" style="text-transform:uppercase"
+               [value]="value" (input)="onInput($event)" />
       </div>
     </field>`,
 })
@@ -70,7 +71,8 @@ export class CniFieldComponent {
   @Input() value = '';
   @Output() valueChange = new EventEmitter<string>();
   onInput(e: Event) {
-    const v = (e.target as HTMLInputElement).value.replace(/[^\d]/g, '').slice(0, 12);
+    // CNI number is hexadecimal: keep only 0-9 / A-F, upper-cased.
+    const v = (e.target as HTMLInputElement).value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 12);
     this.value = v;
     this.valueChange.emit(v);
   }

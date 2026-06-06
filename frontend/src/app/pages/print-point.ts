@@ -121,6 +121,23 @@ import { StatusBadgeComponent } from '../shared/status-badge';
               </div>
             }
             <div style="padding:0 16px 6px">
+              <!-- NIU: shown to staff; agent/admin can add or correct it when the client didn't provide it -->
+              <div class="srow">
+                <span class="lbl">{{ i18n.t('niu_short') }}</span>
+                @if (editingNiu()) {
+                  <span class="val" style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
+                    <input class="input" style="height:30px;padding:4px 9px;font-size:12.5px;max-width:160px" [placeholder]="i18n.t('niu_ph')"
+                           [value]="niuDraft()" (input)="niuDraft.set($any($event.target).value)" (keydown.enter)="saveNiu(r.ref)" />
+                    <button class="icon-btn" (click)="saveNiu(r.ref)" [disabled]="savingNiu()" [title]="i18n.t('save')"><ic name="check" [size]="15" [sw]="2.4"></ic></button>
+                    <button class="icon-btn" (click)="cancelNiu()" [title]="i18n.t('cancel')"><ic name="x" [size]="15"></ic></button>
+                  </span>
+                } @else {
+                  <span class="val" style="display:inline-flex;align-items:center;gap:8px">
+                    @if (r.niu) { {{ r.niu }} } @else { <span class="muted">{{ i18n.t('niu_none') }}</span> }
+                    @if (canEditNiu) { <button (click)="startEditNiu(r)" style="border:none;background:none;color:var(--primary);font-weight:700;font-size:11.5px;cursor:pointer;padding:0">{{ r.niu ? i18n.t('niu_edit') : i18n.t('niu_add') }}</button> }
+                  </span>
+                }
+              </div>
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm(r).bg" [style.color]="pm(r).fg" style="width:22px;height:22px;font-size:9px;border-radius:6px">{{ pm(r).short }}</span>{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : pm(r).name }}</span></div>
               <div class="srow"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ i18n.t('del_' + r.delivery + '_title') }}</span></div>
               @if (r.payStatus === 'cash') {
@@ -196,10 +213,15 @@ export class PrintPointComponent implements OnInit {
   receiptPdf = signal<SafeResourceUrl | null>(null);  // SARA receipt when it is a PDF (iframe)
   receiptOpenUrl = signal<string | null>(null);       // raw object URL, to open in a new tab
   validating = signal(false);
+  editingNiu = signal(false);
+  niuDraft = signal('');
+  savingNiu = signal(false);
   private objectUrls: string[] = [];
 
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
+  /** Only relationship officers / admins may add or correct a NIU (print agents view only). */
+  get canEditNiu() { return this.auth.hasRole('AGENT', 'ADMIN'); }
 
   ngOnInit() {
     const prefill = this.route.snapshot.queryParamMap.get('ref');
@@ -260,8 +282,22 @@ export class PrintPointComponent implements OnInit {
     });
   }
 
+  /** Begin editing the NIU (prefilled with the current value). */
+  startEditNiu(r: Subscription) { this.niuDraft.set(r.niu ?? ''); this.editingNiu.set(true); }
+  cancelNiu() { this.editingNiu.set(false); this.niuDraft.set(''); }
+  /** Persist the added/corrected NIU, then refresh the displayed record. */
+  saveNiu(ref: string) {
+    if (this.savingNiu()) return;
+    this.savingNiu.set(true);
+    this.api.updateNiu(ref, this.niuDraft().trim()).subscribe({
+      next: (s) => { this.rec.set(s); this.savingNiu.set(false); this.editingNiu.set(false); },
+      error: () => this.savingNiu.set(false),
+    });
+  }
+
   private setRecord(s: Subscription) {
     this.rec.set(s);
+    this.editingNiu.set(false); this.niuDraft.set('');
     if (s.hasSelfie) this.loadImage(s.ref, 'selfie', this.selfieUrl);
     if (s.hasCniRecto) this.loadImage(s.ref, 'cni-recto', this.rectoUrl);
     if (s.hasCniVerso) this.loadImage(s.ref, 'cni-verso', this.versoUrl);

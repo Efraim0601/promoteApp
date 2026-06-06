@@ -32,6 +32,7 @@ export interface Subscription {
   sexe: string;
   email: string;
   cni: string;
+  niu: string | null;   // unique taxpayer id (NIU) — optional
   cniExp: string;
   phone: string;
   quartier: string;
@@ -61,6 +62,7 @@ export interface CreateSubscriptionRequest {
   nom: string;
   sexe: string;       // M | F
   cni: string;
+  niu?: string | null;   // NIU (taxpayer id) — optional
   cniExp: string;     // dd/MM/yyyy
   phone: string;      // 9 digits
   email: string;

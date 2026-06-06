@@ -39,6 +39,7 @@ public final class Dtos {
             @NotBlank String nom,
             @NotBlank String sexe,       // M | F
             @NotBlank String cni,
+            String niu,                  // NIU (taxpayer id) — optional, may be added later by the agent
             @NotBlank String cniExp,
             @NotBlank String phone,
             @NotBlank String email,
@@ -55,7 +56,7 @@ public final class Dtos {
 
     public record SubscriptionDto(
             String ref, String prenom, String nom, String fullName, String sexe, String email,
-            String cni, String cniExp, String phone, String quartier, String region,
+            String cni, String niu, String cniExp, String phone, String quartier, String region,
             String pay, String delivery, int amount, int transport,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
@@ -64,7 +65,7 @@ public final class Dtos {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
-                    s.getCni(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(),
+                    s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(),
                     s.getPay(), s.getDelivery(), s.getAmount(), s.getTransport(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
@@ -104,8 +105,11 @@ public final class Dtos {
 
     public record ImageKeyResponse(String key) {}
 
-    /** Agent claims a QR (self) sale by phone + CNI. */
-    public record ClaimRequest(@NotBlank String phone, @NotBlank String cni) {}
+    /** Agent claims a QR (self) sale by phone + CNI; {@code niu} is optionally captured at claim time. */
+    public record ClaimRequest(@NotBlank String phone, @NotBlank String cni, String niu) {}
+
+    /** Agent/admin adds or corrects a client's NIU on an existing subscription. */
+    public record NiuUpdateRequest(String niu) {}
 
     public record ClaimResult(boolean ok, String reason, SubscriptionDto record) {}
 
