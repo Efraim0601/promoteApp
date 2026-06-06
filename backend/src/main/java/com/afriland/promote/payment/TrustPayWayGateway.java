@@ -85,16 +85,22 @@ public class TrustPayWayGateway implements PaymentGateway {
         // Real success shape: { data: { status, transaction_id }, message, status_code }.
         String dataStatus = resp != null && resp.data() != null ? resp.data().status() : null;
         String txId = resp != null && resp.data() != null ? resp.data().transactionId() : null;
-        // The USSD push is "accepted" when initiated (PENDING / INITIATED / COMPLETED),
-        // not when it failed up front (FAILED, e.g. "Beneficiaire introuvable").
-        boolean accepted = dataStatus != null
-                && !"FAILED".equalsIgnoreCase(dataStatus)
-                && map(dataStatus).orElse(null) != PayStatus.failed;
-        // Prefer the API's message; fall back to a top-level {"error": "..."} or the raw body.
-        String message = resp != null && resp.message() != null ? resp.message() : errorField(raw);
+        // A USSD push is "accepted" once it is *initiated* — TrustPayWay answers 2xx (202
+        // "Payment request successful") with a transaction_id and NO terminal data.status.
+        // It is only rejected up front on a non-2xx answer or an explicit FAILED status
+        // (e.g. "Beneficiaire introuvable"). The final outcome (client PIN) arrives later
+        // via the webhook or get-status polling, so an accepted push stays PENDING — it is
+        // never marked failed here, otherwise a successful push would surface as an error.
+        boolean httpOk = entity.getStatusCode().is2xxSuccessful();
+        boolean explicitlyFailed = "FAILED".equalsIgnoreCase(dataStatus)
+                || map(dataStatus).orElse(null) == PayStatus.failed;
+        boolean accepted = httpOk && !explicitlyFailed;
+        // Surface the aggregator's reason only on rejection; fall back to {"error": "..."} / raw body.
+        String message = accepted ? null
+                : (resp != null && resp.message() != null ? resp.message() : errorField(raw));
         if (accepted) {
-            log.info("TrustPayWay process-payment ref={} network={} status={} txId={}",
-                    sub.getRef(), network, dataStatus, txId);
+            log.info("TrustPayWay process-payment ACCEPTED ref={} network={} http={} status={} txId={}",
+                    sub.getRef(), network, entity.getStatusCode().value(), dataStatus, txId);
         } else {
             // Log the HTTP status + raw body so the real reason is never hidden again.
             log.warn("TrustPayWay process-payment REJECTED ref={} network={} msisdn={} http={} status={} msg={} body={}",
