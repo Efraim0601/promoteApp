@@ -24,6 +24,6 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     @Override
     public PaymentRequest requestPayment(Subscription sub, String operator) {
         // In a real gateway this would call the aggregator API and return its reference.
-        return new PaymentRequest("SIM-" + UUID.randomUUID(), operator, true);
+        return new PaymentRequest("SIM-" + UUID.randomUUID(), operator, true, null);
     }
 }

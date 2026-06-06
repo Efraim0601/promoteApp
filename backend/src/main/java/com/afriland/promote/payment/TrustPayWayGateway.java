@@ -81,14 +81,15 @@ public class TrustPayWayGateway implements PaymentGateway {
         boolean accepted = dataStatus != null
                 && !"FAILED".equalsIgnoreCase(dataStatus)
                 && map(dataStatus).orElse(null) != PayStatus.failed;
+        String message = resp != null ? resp.message() : null;
         if (accepted) {
             log.info("TrustPayWay process-payment ref={} network={} status={} txId={}",
                     sub.getRef(), network, dataStatus, txId);
         } else {
             log.warn("TrustPayWay process-payment REJECTED ref={} network={} status={} msg={}",
-                    sub.getRef(), network, dataStatus, resp != null ? resp.message() : "no/invalid response");
+                    sub.getRef(), network, dataStatus, message);
         }
-        return new PaymentRequest(txId, operator, accepted);
+        return new PaymentRequest(txId, operator, accepted, message);
     }
 
     @Override

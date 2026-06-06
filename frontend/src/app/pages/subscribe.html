@@ -43,6 +43,9 @@
         <div>
           <h1 style="font-size:22px">{{ i18n.t('failed_title') }}</h1>
           <p class="muted" style="font-size:13.5px;line-height:1.5;max-width:290px;margin-top:8px">{{ i18n.t('failed_desc') }}</p>
+          @if (result()?.message) {
+            <p style="font-size:13px;line-height:1.45;max-width:290px;margin-top:10px;color:var(--accent);font-weight:600">{{ result()!.message }}</p>
+          }
         </div>
       </div>
     </div>

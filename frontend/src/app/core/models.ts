@@ -48,6 +48,7 @@ export interface Subscription {
   hasCniVerso: boolean;
   status: string;     // printed | failed | cash | awaiting
   createdAt: string;
+  paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")
 }
 
 export interface CreateSubscriptionRequest {

@@ -31,6 +31,7 @@ public interface PaymentGateway {
         return Optional.empty();
     }
 
-    /** Result of a payment request initiation. */
-    record PaymentRequest(String externalRef, String operator, boolean accepted) {}
+    /** Result of a payment request initiation. {@code message} carries the aggregator's
+     *  reason on rejection (e.g. "Solde insuffisant"), null/empty when accepted. */
+    record PaymentRequest(String externalRef, String operator, boolean accepted, String message) {}
 }

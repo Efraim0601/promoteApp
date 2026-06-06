@@ -65,7 +65,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   touched = signal(false);
   refAgent = signal<Agent | null>(null);
   refUnknown = signal(false);
-  result = signal<{ ref: string; payStatus?: string; amount?: number } | null>(null);
+  result = signal<{ ref: string; payStatus?: string; amount?: number; message?: string | null } | null>(null);
   copied = signal(false);
   busy = signal(false);
 
@@ -199,7 +199,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     obs.subscribe({
       next: (s: Subscription) => {
         this.busy.set(false);
-        this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount });
+        this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage });
         if (this.form.pay === 'cash') { this.proc.set('reference'); }
         else if (s.payStatus === 'failed') { this.proc.set('failed'); } // gateway rejected the push
         else {

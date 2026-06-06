@@ -46,7 +46,7 @@ public final class Dtos {
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso,
-            String status, String createdAt) {
+            String status, String createdAt, String paymentMessage) {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(),
@@ -55,7 +55,7 @@ public final class Dtos {
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
-                    s.getStatus(), s.getCreatedAt().toString());
+                    s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage());
         }
     }
 

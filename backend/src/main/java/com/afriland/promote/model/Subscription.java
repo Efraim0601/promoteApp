@@ -48,6 +48,10 @@ public class Subscription {
     /** Aggregator-side transaction id (e.g. TrustPayWay "transaction_id"); null for cash/simulated. */
     private String paymentTxId;
 
+    /** Last aggregator message — the reason shown to the client on failure (e.g. "Solde insuffisant"). */
+    @Column(length = 500)
+    private String paymentMessage;
+
     private boolean printed;
     private boolean selfieVerified;
 

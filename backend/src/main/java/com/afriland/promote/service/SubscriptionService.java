@@ -115,6 +115,7 @@ public class SubscriptionService {
                 // Push the USSD prompt via the active gateway (simulated or real aggregator).
                 PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, req.pay());
                 s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
+                s.setPaymentMessage(pr.message());           // reason to surface on failure
                 if (!pr.accepted()) s.setPayStatus(PayStatus.failed);
             } catch (RuntimeException ex) {
                 // The aggregator was unreachable / rejected the request: keep the KYC file
