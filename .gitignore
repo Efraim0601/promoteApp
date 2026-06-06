@@ -14,3 +14,6 @@ frontend/.angular/
 .DS_Store
 .idea/
 *.iml
+
+# Claude Code runtime locks
+.claude/scheduled_tasks.lock
