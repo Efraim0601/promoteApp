@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminStats, Agent, AgentStats, CardConfig, ClaimResult,
-  CreateSubscriptionRequest, LoginResponse, PayStatus, Subscription, User,
+  CreateSubscriptionRequest, CreateUserRequest, LoginResponse, PayStatus, Subscription, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -67,6 +67,14 @@ export class Api {
 
   agents(): Observable<Agent[]> {
     return this.http.get<Agent[]>(`${this.base}/agents`);
+  }
+  /** Admin — list all staff accounts (any role). */
+  users(): Observable<User[]> {
+    return this.http.get<User[]>(`${this.base}/users`);
+  }
+  /** Admin — create a staff account. */
+  createUser(req: CreateUserRequest): Observable<User> {
+    return this.http.post<User>(`${this.base}/users`, req);
   }
   resolveAgent(phone: string): Observable<Agent | null> {
     return this.http.get<Agent | null>(`${this.base}/agents/resolve`, { params: { phone } });

@@ -20,6 +20,15 @@ public final class Dtos {
 
     public record LoginResponse(String token, UserDto user) {}
 
+    /** Admin creates a staff account. role = ADMIN | AGENT | PRINT_AGENT. */
+    public record CreateUserRequest(
+            @NotBlank String name,
+            @NotBlank String email,
+            @NotBlank String role,
+            @NotBlank String password,
+            String agency,
+            String phone) {}
+
     // ---- config ----
     public record ConfigDto(int price, int fees, int transport) {}
 

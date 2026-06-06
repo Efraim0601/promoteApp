@@ -66,6 +66,15 @@ export interface CreateSubscriptionRequest {
   referrerPhone?: string;
 }
 
+export interface CreateUserRequest {
+  name: string;
+  email: string;
+  role: Role;
+  password: string;
+  agency?: string | null;
+  phone?: string | null;
+}
+
 export interface Agent {
   id: string;
   name: string;
