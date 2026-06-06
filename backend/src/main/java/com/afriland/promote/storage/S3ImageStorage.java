@@ -82,7 +82,8 @@ public class S3ImageStorage implements ImageStorage {
 
     @Override
     public String store(byte[] data, String contentType, String prefix) {
-        String ext = "image/png".equalsIgnoreCase(contentType) ? "png" : "jpg";
+        String ext = "image/png".equalsIgnoreCase(contentType) ? "png"
+                : "application/pdf".equalsIgnoreCase(contentType) ? "pdf" : "jpg";
         String key = "%s/%s/%s.%s".formatted(prefix, DAY.format(Instant.now()), UUID.randomUUID(), ext);
         s3.putObject(PutObjectRequest.builder().bucket(bucket).key(key).contentType(contentType).build(),
                 RequestBody.fromBytes(data));
