@@ -62,7 +62,7 @@ public final class Dtos {
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
-            String saraRef, String saraPayerPhone, Integer saraAmount,
+            String saraRef, String saraPayerPhone, Integer saraAmount, String cardNumber,
             String status, String createdAt, String paymentMessage) {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
@@ -73,10 +73,17 @@ public final class Dtos {
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
                     s.getSaraReceiptKey() != null,
-                    s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(),
+                    s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(), s.getCardNumber(),
                     s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage());
         }
     }
+
+    /** Print point — physical card number entered before printing (required). */
+    public record PrintRequest(String cardNumber) {}
+
+    /** Print point — replace a captured KYC image (re-uploaded via /api/kyc/image).
+     *  kind = selfie | cni-recto | cni-verso; key is the new object-storage key. */
+    public record PhotoUpdateRequest(String kind, String key) {}
 
     /** Result of a MoMo simulation. {@code outcome} = "validate" | "fail". */
     public record PayRequest(String outcome) {}

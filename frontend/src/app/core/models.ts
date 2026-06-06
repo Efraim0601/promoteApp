@@ -56,6 +56,7 @@ export interface Subscription {
   saraRef?: string | null;         // extracted from the SARA receipt — agent confirms at point of sale
   saraPayerPhone?: string | null;  // payer ("Émetteur") phone extracted from the receipt
   saraAmount?: number | null;      // total amount extracted from the receipt (XAF)
+  cardNumber?: string | null;      // physical card number, entered at the print point
   status: string;     // printed | failed | cash | sara_pending | awaiting
   createdAt: string;
   paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")

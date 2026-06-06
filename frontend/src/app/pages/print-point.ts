@@ -9,13 +9,14 @@ import { payById, recordStatus } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
+import { PhotoCaptureComponent } from '../shared/photo-capture';
 import { StatusBadgeComponent } from '../shared/status-badge';
 
 /** Print point — retrieve a KYC file by reference, then print & hand over the card. */
 @Component({
   selector: 'page-print-point',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -77,6 +78,9 @@ import { StatusBadgeComponent } from '../shared/status-badge';
             <span style="width:64px;height:64px;border-radius:50%;background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center;animation:pop .45s cubic-bezier(.2,.8,.3,1.2)"><ic name="check" [size]="32" [sw]="2.5"></ic></span>
             <h2 style="font-size:18px">{{ i18n.t('pp_printed_ok') }}</h2>
             <div style="font-weight:800;letter-spacing:.06em;white-space:nowrap">{{ r.ref }}</div>
+            @if (r.cardNumber) {
+              <div class="muted" style="font-size:12.5px"><ic name="idcard" [size]="13" style="vertical-align:-2px;margin-right:3px"></ic>{{ i18n.t('pp_card_number') }} : <b style="color:var(--text)">{{ r.cardNumber }}</b></div>
+            }
           </div>
         } @else {
           <div class="card" style="overflow:hidden">
@@ -104,6 +108,20 @@ import { StatusBadgeComponent } from '../shared/status-badge';
                 <div style="display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:11.5px;color:var(--success);font-weight:700"><ic name="check" [size]="14" [sw]="2.6"></ic> {{ i18n.t('pp_selfie_ok') }}</div>
               </div>
             </div>
+
+            <!-- Retake a badly-shot client photo before printing -->
+            @if (retaking()) {
+              <div style="padding:0 16px 14px">
+                <photo-capture facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
+                  [guide]="i18n.t('pp_retake_guide')" (captured)="onRetakeSelfie(r.ref, $event)" (retake)="retaking.set(false)"></photo-capture>
+                <button class="btn btn-ghost" (click)="retaking.set(false)" style="font-size:13px;margin-top:6px">{{ i18n.t('cancel') }}</button>
+              </div>
+            } @else {
+              <div style="padding:0 16px 12px;display:flex;align-items:center;gap:10px">
+                <button class="btn btn-outline" (click)="retaking.set(true)" [disabled]="photoBusy()" style="width:auto;padding:8px 12px;font-size:12.5px"><ic name="camera" [size]="15"></ic> {{ i18n.t('pp_retake_photo') }}</button>
+                @if (photoBusy()) { <span class="muted" style="font-size:11.5px">{{ i18n.t('pp_photo_saving') }}</span> }
+              </div>
+            }
             @if (rectoUrl() || versoUrl()) {
               <div style="padding:0 16px 12px;display:flex;gap:10px">
                 @if (rectoUrl()) {
@@ -177,6 +195,20 @@ import { StatusBadgeComponent } from '../shared/status-badge';
                 <p class="muted" style="font-size:11px;line-height:1.4;margin-top:2px;display:flex;gap:5px;align-items:flex-start"><ic name="alert" [size]="13" style="flex-shrink:0;margin-top:1px"></ic>{{ i18n.t('pp_sara_extracted_hint') }}</p>
               </div>
             }
+
+            <!-- Card number — required before printing the activated card -->
+            @if (r.payStatus !== 'sara_pending') {
+              <div style="padding:0 16px 16px;border-top:1px solid var(--border);padding-top:14px">
+                <field [label]="i18n.t('pp_card_number')" [hint]="i18n.t('pp_card_number_hint')"
+                       [err]="cardTouched() && !cardNumberOk ? i18n.t('pp_card_number_required') : null">
+                  <div class="input-prefix">
+                    <span class="pfx"><ic name="idcard" [size]="16"></ic></span>
+                    <input [placeholder]="i18n.t('pp_card_number_ph')" [value]="cardNumber()"
+                           (input)="cardNumber.set($any($event.target).value)" style="letter-spacing:.04em;font-weight:600" />
+                  </div>
+                </field>
+              </div>
+            }
           </div>
         }
       }
@@ -197,7 +229,7 @@ import { StatusBadgeComponent } from '../shared/status-badge';
         </div>
       } @else {
         <div class="scr-foot">
-          <button class="btn btn-primary" (click)="doPrint(r.ref)"><ic name="printer" [size]="18"></ic> {{ i18n.t('pp_print') }}</button>
+          <button class="btn btn-primary" (click)="doPrint(r.ref)" [disabled]="printing()"><ic name="printer" [size]="18"></ic> {{ i18n.t('pp_print') }}</button>
           <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
         </div>
       }
@@ -231,7 +263,16 @@ export class PrintPointComponent implements OnInit {
   saraRefDraft = signal('');
   saraPhoneDraft = signal('');
   saraAmountDraft = signal('');
+  // Print point: retake photo + mandatory card number before printing.
+  retaking = signal(false);
+  photoBusy = signal(false);
+  printing = signal(false);
+  cardNumber = signal('');
+  cardTouched = signal(false);
   private objectUrls: string[] = [];
+
+  /** Card number is mandatory before printing (light sanity check on length). */
+  get cardNumberOk() { return this.cardNumber().trim().length >= 4; }
 
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
@@ -271,9 +312,36 @@ export class PrintPointComponent implements OnInit {
       error: () => { this.rec.set(null); this.loading.set(false); },
     });
   }
-  again() { this.ref.set(''); this.searched.set(false); this.rec.set(null); this.results.set([]); this.clearSelfie(); }
+  again() {
+    this.ref.set(''); this.searched.set(false); this.rec.set(null); this.results.set([]); this.clearSelfie();
+    this.cardNumber.set(''); this.cardTouched.set(false); this.retaking.set(false);
+  }
+  /** Validate the print — card number is required and stored with the record. */
   doPrint(ref: string) {
-    this.api.print(ref).subscribe((s) => this.rec.set(s));
+    this.cardTouched.set(true);
+    if (!this.cardNumberOk || this.printing()) return;
+    this.printing.set(true);
+    this.api.print(ref, this.cardNumber().trim()).subscribe({
+      next: (s) => { this.rec.set(s); this.printing.set(false); },
+      error: () => this.printing.set(false),
+    });
+  }
+
+  /** Retake the client photo (badly shot): upload the new shot, point the record at it, refresh. */
+  onRetakeSelfie(ref: string, dataUrl: string) {
+    this.retaking.set(false);
+    this.photoBusy.set(true);
+    this.api.uploadImage(dataUrl, 'selfie').subscribe({
+      next: (u) => this.api.updatePhoto(ref, 'selfie', u.key).subscribe({
+        next: (s) => { this.rec.set(s); this.reloadSelfie(s.ref); this.photoBusy.set(false); },
+        error: () => this.photoBusy.set(false),
+      }),
+      error: () => this.photoBusy.set(false),
+    });
+  }
+  private reloadSelfie(ref: string) {
+    this.selfieUrl.set(null);
+    this.loadImage(ref, 'selfie', this.selfieUrl);
   }
 
   /** The agent's confirmed/corrected receipt values, sent alongside the validate/reject decision. */
@@ -323,6 +391,8 @@ export class PrintPointComponent implements OnInit {
   private setRecord(s: Subscription) {
     this.rec.set(s);
     this.editingNiu.set(false); this.niuDraft.set('');
+    this.retaking.set(false); this.photoBusy.set(false);
+    this.cardTouched.set(false); this.cardNumber.set(s.cardNumber ?? '');
     // Prefill the editable SARA receipt fields with what was auto-extracted.
     this.saraRefDraft.set(s.saraRef ?? '');
     this.saraPhoneDraft.set(s.saraPayerPhone ?? '');

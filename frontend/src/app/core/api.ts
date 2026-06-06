@@ -58,8 +58,13 @@ export class Api {
   imageBlob(ref: string, kind: string): Observable<Blob> {
     return this.http.get(`${this.base}/subscriptions/${ref}/image/${kind}`, { responseType: 'blob' });
   }
-  print(ref: string): Observable<Subscription> {
-    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/print`, {});
+  /** Print point — mark printed; the physical card number is required. */
+  print(ref: string, cardNumber: string): Observable<Subscription> {
+    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/print`, { cardNumber });
+  }
+  /** Print point — replace a captured KYC image (key from a fresh /kyc/image upload). */
+  updatePhoto(ref: string, kind: string, key: string): Observable<Subscription> {
+    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/photo`, { kind, key });
   }
   /** Point of sale (staff) — validate or reject a SARA money receipt. The opts carry the agent's
    *  confirmed/corrected receipt values (reference, payer phone, amount) prefilled from extraction. */

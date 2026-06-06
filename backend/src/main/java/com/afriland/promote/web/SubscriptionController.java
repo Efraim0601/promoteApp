@@ -99,8 +99,14 @@ public class SubscriptionController {
 
     /** Print point — mark a card printed & handed over. */
     @PatchMapping("/{ref}/print")
-    public SubscriptionDto print(@PathVariable String ref) {
-        return SubscriptionDto.of(service.markPrinted(ref));
+    public SubscriptionDto print(@PathVariable String ref, @RequestBody PrintRequest req) {
+        return SubscriptionDto.of(service.markPrinted(ref, req.cardNumber()));
+    }
+
+    /** Print point — replace a captured KYC image (e.g. retake a badly-shot photo) before printing. */
+    @PatchMapping("/{ref}/photo")
+    public SubscriptionDto updatePhoto(@PathVariable String ref, @RequestBody PhotoUpdateRequest req) {
+        return SubscriptionDto.of(service.updatePhoto(ref, req.kind(), req.key()));
     }
 
     /** Point of sale (staff) — validate or reject a SARA money receipt.

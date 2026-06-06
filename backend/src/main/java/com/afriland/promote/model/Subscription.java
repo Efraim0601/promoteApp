@@ -59,6 +59,7 @@ public class Subscription {
     private String paymentMessage;
 
     private boolean printed;
+    private String cardNumber;      // physical card number, entered at the print point before printing
     private boolean selfieVerified;
 
     /** Object-storage keys of the captured KYC images (null if not captured). */

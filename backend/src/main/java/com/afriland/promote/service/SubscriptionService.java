@@ -253,9 +253,28 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public Subscription markPrinted(String ref) {
+    public Subscription markPrinted(String ref, String cardNumber) {
+        // The physical card number is mandatory: it ties the printed card to the subscription.
+        if (cardNumber == null || cardNumber.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "card_number_required");
+        }
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
+        s.setCardNumber(cardNumber.trim());
         s.setPrinted(true);
+        return subs.save(s);
+    }
+
+    /** Replace a captured KYC image (key already uploaded via /api/kyc/image) — used at the print
+     *  point to retake a badly-shot photo before printing. */
+    @Transactional
+    public Subscription updatePhoto(String ref, String kind, String key) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
+        switch (kind == null ? "" : kind) {
+            case "selfie" -> s.setSelfieKey(key);
+            case "cni-recto" -> s.setCniRectoKey(key);
+            case "cni-verso" -> s.setCniVersoKey(key);
+            default -> throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_kind");
+        }
         return subs.save(s);
     }
 

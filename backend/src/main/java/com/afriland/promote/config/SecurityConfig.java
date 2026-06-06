@@ -69,6 +69,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/image/*").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/*").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/print").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/photo").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/sara-validate").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
 
                 .anyRequest().authenticated())
