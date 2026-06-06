@@ -41,6 +41,10 @@ export class Api {
   byRef(ref: string): Observable<Subscription> {
     return this.http.get<Subscription>(`${this.base}/subscriptions/${ref}`);
   }
+  /** Print point — search records by reference, client name, or phone. */
+  searchSubscriptions(q: string): Observable<Subscription[]> {
+    return this.http.get<Subscription[]>(`${this.base}/subscriptions/search`, { params: { q } });
+  }
   /** Poll the live payment status of a subscription (public, lightweight). */
   paymentStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus }> {
     return this.http.get<{ ref: string; payStatus: PayStatus }>(`${this.base}/subscriptions/${ref}/status`);

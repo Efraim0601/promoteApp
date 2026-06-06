@@ -32,13 +32,29 @@ import { StatusBadgeComponent } from '../shared/status-badge';
       <field [label]="i18n.t('pp_input')">
         <div style="display:flex;gap:8px">
           <div class="input-prefix" style="flex:1">
-            <span class="pfx"><ic name="hash" [size]="16"></ic></span>
-            <input placeholder="PRM-1001" [value]="ref()" style="text-transform:uppercase;letter-spacing:.06em;font-weight:700"
-                   (input)="onRef($event)" (keydown.enter)="fetchIt()" />
+            <span class="pfx"><ic name="search" [size]="16"></ic></span>
+            <input [placeholder]="i18n.t('pp_search_ph')" [value]="ref()" style="letter-spacing:.02em;font-weight:600"
+                   (input)="onRef($event)" (keydown.enter)="doSearch()" />
           </div>
-          <button class="btn btn-primary" (click)="fetchIt()" style="width:auto;padding:0 16px"><ic name="search" [size]="18"></ic></button>
+          <button class="btn btn-primary" (click)="doSearch()" style="width:auto;padding:0 16px"><ic name="search" [size]="18"></ic></button>
         </div>
       </field>
+
+      @if (!rec() && results().length) {
+        <div class="card" style="overflow:hidden">
+          <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px">{{ results().length }} {{ i18n.t('pp_results') }}</div>
+          @for (s of results(); track s.ref) {
+            <button (click)="open(s.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:12px 14px;border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:14px;font-weight:700">{{ s.fullName }}</div>
+                <div class="muted" style="font-size:11.5px">{{ s.ref }} · {{ s.phone }}</div>
+              </div>
+              <status-badge [status]="status(s)"></status-badge>
+              <ic name="chevR" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
+            </button>
+          }
+        </div>
+      }
 
       @if (!searched()) {
         <div class="card" style="padding:14px;display:flex;gap:9px;align-items:center">
@@ -47,7 +63,7 @@ import { StatusBadgeComponent } from '../shared/status-badge';
         </div>
       }
 
-      @if (searched() && !rec() && !loading()) {
+      @if (searched() && !rec() && !loading() && !results().length) {
         <div class="card" style="padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
           <span style="width:48px;height:48px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center"><ic name="alert" [size]="24"></ic></span>
           <p style="font-size:13.5px;font-weight:700">{{ i18n.t('pp_notfound') }}</p>
@@ -139,6 +155,7 @@ export class PrintPointComponent implements OnInit {
   ref = signal('');
   searched = signal(false);
   loading = signal(false);
+  results = signal<Subscription[]>([]);
   rec = signal<Subscription | null>(null);
   selfieUrl = signal<SafeUrl | null>(null);
   rectoUrl = signal<SafeUrl | null>(null);
@@ -150,23 +167,38 @@ export class PrintPointComponent implements OnInit {
 
   ngOnInit() {
     const prefill = this.route.snapshot.queryParamMap.get('ref');
-    if (prefill) { this.ref.set(prefill.toUpperCase()); this.fetchIt(); }
+    if (prefill) { this.ref.set(prefill.toUpperCase()); this.open(prefill); }
   }
 
   onRef(e: Event) {
-    this.ref.set((e.target as HTMLInputElement).value.toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 10));
+    // Accept reference, name or phone: letters, digits, spaces, + and -.
+    this.ref.set((e.target as HTMLInputElement).value.replace(/[^a-zA-Z0-9 +-]/g, '').slice(0, 40));
   }
 
-  fetchIt() {
-    const r = this.ref().trim();
-    if (!r) return;
-    this.searched.set(true); this.loading.set(true); this.clearSelfie(); this.rec.set(null);
-    this.api.byRef(r).subscribe({
+  /** Search by reference, name or phone. One match opens directly; several show a list. */
+  doSearch() {
+    const q = this.ref().trim();
+    if (!q) return;
+    this.searched.set(true); this.loading.set(true); this.clearSelfie(); this.rec.set(null); this.results.set([]);
+    this.api.searchSubscriptions(q).subscribe({
+      next: (list) => {
+        this.loading.set(false);
+        if (list.length === 1) this.open(list[0].ref);
+        else this.results.set(list);
+      },
+      error: () => { this.loading.set(false); this.results.set([]); },
+    });
+  }
+
+  /** Load the full record (incl. images) for a chosen reference. */
+  open(ref: string) {
+    this.searched.set(true); this.loading.set(true); this.results.set([]); this.clearSelfie(); this.rec.set(null);
+    this.api.byRef(ref).subscribe({
       next: (s) => { this.setRecord(s); this.loading.set(false); },
       error: () => { this.rec.set(null); this.loading.set(false); },
     });
   }
-  again() { this.ref.set(''); this.searched.set(false); this.rec.set(null); this.clearSelfie(); }
+  again() { this.ref.set(''); this.searched.set(false); this.rec.set(null); this.results.set([]); this.clearSelfie(); }
   doPrint(ref: string) {
     this.api.print(ref).subscribe((s) => this.rec.set(s));
   }

@@ -139,6 +139,24 @@ public class SubscriptionService {
         return subs.findByRefIgnoreCase(ref).orElse(null);
     }
 
+    /** Print-point search: match a record by reference, client name, or phone (most recent first). */
+    public List<Subscription> search(String q) {
+        if (q == null || q.isBlank()) return List.of();
+        String needle = q.trim().toLowerCase();
+        String digits = q.replaceAll("\\D", "");
+        return subs.findAll().stream()
+                .filter(s -> {
+                    boolean byRef = s.getRef() != null && s.getRef().toLowerCase().contains(needle);
+                    boolean byName = s.getFullName() != null && s.getFullName().toLowerCase().contains(needle);
+                    boolean byPhone = !digits.isEmpty() && s.getPhone() != null
+                            && s.getPhone().replaceAll("\\D", "").contains(digits);
+                    return byRef || byName || byPhone;
+                })
+                .sorted(java.util.Comparator.comparing(Subscription::getCreatedAt).reversed())
+                .limit(30)
+                .toList();
+    }
+
     @Transactional
     public Subscription applyPayment(String ref, String outcome) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();

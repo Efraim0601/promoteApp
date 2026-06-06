@@ -49,6 +49,12 @@ public class SubscriptionController {
         return service.mine((String) auth.getPrincipal()).stream().map(SubscriptionDto::of).toList();
     }
 
+    /** Print point — search records by reference, client name, or phone. */
+    @GetMapping("/search")
+    public List<SubscriptionDto> search(@RequestParam String q) {
+        return service.search(q).stream().map(SubscriptionDto::of).toList();
+    }
+
     /** Print point — retrieve a KYC file by reference. */
     @GetMapping("/{ref}")
     public ResponseEntity<SubscriptionDto> byRef(@PathVariable String ref) {
