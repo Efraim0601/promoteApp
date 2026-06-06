@@ -19,12 +19,19 @@ const STEP_KEYS = ['step_identity', 'step_documents', 'step_photo', 'step_paymen
 const STEP_COUNT = STEP_KEYS.length;
 
 interface WizardForm {
-  prenom: string; nom: string; cni: string; cniExp: string; phone: string;
+  prenom: string; nom: string; sexe: string; cni: string; cniExp: string; phone: string;
+  email: string; quartier: string; region: string;
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
   cniVersoData: string | null; cniVersoKey: string | null;
   pay: string; delivery: string; refPhone: string;
 }
+
+/** Cameroon administrative regions (for the Région dropdown). */
+const REGIONS = [
+  'Adamaoua', 'Centre', 'Est', 'Extrême-Nord', 'Littoral',
+  'Nord', 'Nord-Ouest', 'Ouest', 'Sud', 'Sud-Ouest',
+];
 
 function parseExp(d: string): Date | null {
   if (d.length !== 8) return null;
@@ -72,8 +79,11 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
 
+  readonly REGIONS = REGIONS;
+
   form: WizardForm = {
-    prenom: '', nom: '', cni: '', cniExp: '', phone: '',
+    prenom: '', nom: '', sexe: '', cni: '', cniExp: '', phone: '',
+    email: '', quartier: '', region: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
     pay: 'om', delivery: 'promote', refPhone: '',
@@ -111,20 +121,28 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     const f = this.form;
     const expDate = parseExp(f.cniExp);
     const phoneOk = /^6\d{8}$/.test(f.phone);
+    const emailOk = /^\S+@\S+\.\S+$/.test(f.email);
     return {
       prenom: !f.prenom.trim() ? this.i18n.t('required') : null,
       nom: !f.nom.trim() ? this.i18n.t('required') : null,
+      sexe: !f.sexe ? this.i18n.t('required') : null,
       cni: !f.cni ? this.i18n.t('required') : f.cni.length < 6 ? this.i18n.t('cni_invalid') : null,
       cniExp: !f.cniExp ? this.i18n.t('required') : !expDate ? this.i18n.t('exp_invalid')
         : expDate < new Date() ? this.i18n.t('exp_expired') : null,
       phone: !f.phone ? this.i18n.t('required') : !phoneOk ? this.i18n.t('invalid_phone') : null,
+      email: !f.email.trim() ? this.i18n.t('required') : !emailOk ? this.i18n.t('email_invalid') : null,
+      quartier: !f.quartier.trim() ? this.i18n.t('required') : null,
+      region: !f.region ? this.i18n.t('required') : null,
     };
   }
-  e(key: 'prenom' | 'nom' | 'cni' | 'cniExp' | 'phone'): string | null {
+  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'phone' | 'email' | 'quartier' | 'region'): string | null {
     return this.touched() ? this.errs[key] : null;
   }
 
-  get step0ok() { const x = this.errs; return !x.prenom && !x.nom && !x.cni && !x.cniExp && !x.phone; }
+  get step0ok() {
+    const x = this.errs;
+    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.region;
+  }
   get docsOk() { return !!this.form.cniRectoData && !!this.form.cniVersoData; }
   get stepValid() {
     return [this.step0ok, this.docsOk, !!this.form.selfieData, !!this.form.pay, true][this.step()];
@@ -185,8 +203,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   private payload() {
     return {
-      prenom: this.form.prenom.trim(), nom: this.form.nom.trim(),
+      prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
       cni: this.form.cni, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
+      email: this.form.email.trim(), quartier: this.form.quartier.trim(), region: this.form.region,
       pay: this.form.pay, delivery: this.form.delivery,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
@@ -264,7 +283,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   reset() {
     this.stopPolling();
     this.form = {
-      prenom: '', nom: '', cni: '', cniExp: '', phone: '', selfie: false, selfieData: null, selfieKey: null,
+      prenom: '', nom: '', sexe: '', cni: '', cniExp: '', phone: '', email: '', quartier: '', region: '',
+      selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       pay: 'om', delivery: 'promote', refPhone: '',
     };

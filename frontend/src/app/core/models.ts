@@ -29,9 +29,13 @@ export interface Subscription {
   prenom: string;
   nom: string;
   fullName: string;
+  sexe: string;
+  email: string;
   cni: string;
   cniExp: string;
   phone: string;
+  quartier: string;
+  region: string;
   pay: string;        // om | mtn | cash
   delivery: string;   // promote | agence | home
   amount: number;
@@ -54,9 +58,13 @@ export interface Subscription {
 export interface CreateSubscriptionRequest {
   prenom: string;
   nom: string;
+  sexe: string;       // M | F
   cni: string;
   cniExp: string;     // dd/MM/yyyy
   phone: string;      // 9 digits
+  email: string;
+  quartier: string;
+  region: string;
   pay: string;
   delivery: string;
   selfie: boolean;

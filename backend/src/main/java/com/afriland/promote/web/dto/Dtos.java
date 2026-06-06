@@ -37,9 +37,13 @@ public final class Dtos {
     public record CreateSubscriptionRequest(
             @NotBlank String prenom,
             @NotBlank String nom,
+            @NotBlank String sexe,       // M | F
             @NotBlank String cni,
             @NotBlank String cniExp,
             @NotBlank String phone,
+            @NotBlank String email,
+            @NotBlank String quartier,
+            @NotBlank String region,
             @NotBlank String pay,        // om | mtn | cash
             String delivery,             // promote | agence | home (defaults to promote)
             boolean selfie,
@@ -49,8 +53,8 @@ public final class Dtos {
             String referrerPhone) {}     // self path only
 
     public record SubscriptionDto(
-            String ref, String prenom, String nom, String fullName,
-            String cni, String cniExp, String phone,
+            String ref, String prenom, String nom, String fullName, String sexe, String email,
+            String cni, String cniExp, String phone, String quartier, String region,
             String pay, String delivery, int amount, int transport,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
@@ -58,8 +62,8 @@ public final class Dtos {
             String status, String createdAt, String paymentMessage) {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
-                    s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(),
-                    s.getCni(), s.getCniExp(), s.getPhone(),
+                    s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
+                    s.getCni(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(),
                     s.getPay(), s.getDelivery(), s.getAmount(), s.getTransport(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),

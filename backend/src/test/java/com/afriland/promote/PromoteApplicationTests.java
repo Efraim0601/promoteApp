@@ -32,7 +32,8 @@ class PromoteApplicationTests {
     void claimRejectsAndAcceptsCorrectly() {
         // a paid, unattributed self (QR) subscription can be claimed once
         CreateSubscriptionRequest req = new CreateSubscriptionRequest(
-                "Test", "Client", "445566778", "01/01/2031", "618641969",
+                "Test", "Client", "M", "445566778", "01/01/2031", "618641969",
+                "test@client.cm", "Bonamoussadi", "Littoral",
                 "om", "promote", true, null, null, null, null);
         Subscription s = service.create(req, "self", null);
         service.applyPayment(s.getRef(), "validate");

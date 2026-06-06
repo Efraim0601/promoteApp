@@ -24,10 +24,14 @@ public class Subscription {
     private String prenom;
     private String nom;
     private String fullName;
+    private String sexe;            // M | F
+    private String email;
 
     private String cni;             // ID card number
     private String cniExp;          // expiry, displayed dd/MM/yyyy
     private String phone;           // "+237 6XXXXXXXX"
+    private String quartier;        // neighborhood
+    private String region;          // administrative region
 
     private String pay;             // om | mtn | cash
     private String delivery;        // promote | agence | home

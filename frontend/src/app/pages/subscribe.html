@@ -122,9 +122,24 @@
       @if (step() === 0) {
         <field [label]="i18n.t('prenom')" [err]="e('prenom')"><input class="input" [placeholder]="i18n.t('prenom_ph')" [value]="form.prenom" (input)="set('prenom', $any($event.target).value)" /></field>
         <field [label]="i18n.t('nom')" [err]="e('nom')"><input class="input" [placeholder]="i18n.t('nom_ph')" [value]="form.nom" (input)="set('nom', $any($event.target).value)" /></field>
+        <field [label]="i18n.t('sexe')" [err]="e('sexe')">
+          <select class="input" [value]="form.sexe" (change)="set('sexe', $any($event.target).value)">
+            <option value="" disabled>{{ i18n.t('sexe_ph') }}</option>
+            <option value="M">{{ i18n.t('sexe_m') }}</option>
+            <option value="F">{{ i18n.t('sexe_f') }}</option>
+          </select>
+        </field>
         <cni-field [label]="i18n.t('cni')" [hint]="i18n.t('cni_hint')" [value]="form.cni" (valueChange)="set('cni', $event)" [err]="e('cni')"></cni-field>
         <expiry-field [label]="i18n.t('cni_exp')" [value]="form.cniExp" (valueChange)="set('cniExp', $event)" [err]="e('cniExp')"></expiry-field>
         <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
+        <field [label]="i18n.t('email_label')" [err]="e('email')"><input class="input" type="email" [placeholder]="i18n.t('email_ph')" [value]="form.email" (input)="set('email', $any($event.target).value)" /></field>
+        <field [label]="i18n.t('quartier')" [err]="e('quartier')"><input class="input" [placeholder]="i18n.t('quartier_ph')" [value]="form.quartier" (input)="set('quartier', $any($event.target).value)" /></field>
+        <field [label]="i18n.t('region_label')" [err]="e('region')">
+          <select class="input" [value]="form.region" (change)="set('region', $any($event.target).value)">
+            <option value="" disabled>{{ i18n.t('region_ph') }}</option>
+            @for (r of REGIONS; track r) { <option [value]="r">{{ r }}</option> }
+          </select>
+        </field>
 
         <div style="border-top:1px solid var(--border);padding-top:16px">
           <phone-field [label]="i18n.t('ref_phone_label3')" [value]="form.refPhone" (valueChange)="set('refPhone', $event)" [hint]="i18n.t('ref_phone_hint3')"></phone-field>
@@ -172,9 +187,13 @@
         <promote-card [holder]="fullName"></promote-card>
         <div class="card" style="padding:4px 16px">
           <div class="srow"><span class="lbl">{{ i18n.t('client') }}</span><span class="val">{{ fullName }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('sexe') }}</span><span class="val">{{ form.sexe === 'M' ? i18n.t('sexe_m') : i18n.t('sexe_f') }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('cni_short') }}</span><span class="val">{{ form.cni }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('validity') }}</span><span class="val">{{ expDisplay }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('phone') }}</span><span class="val">+237 {{ form.phone }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('email_label') }}</span><span class="val">{{ form.email }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('quartier') }}</span><span class="val">{{ form.quartier }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('region_label') }}</span><span class="val">{{ form.region }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:22px;height:22px;font-size:9px;border-radius:6px">{{ pm.short }}</span>{{ form.pay === 'cash' ? i18n.t('pay_cash_name') : pm.name }}</span></div>
           @if (refAgent()) { <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ refAgent()!.name }}</span></div> }
         </div>
