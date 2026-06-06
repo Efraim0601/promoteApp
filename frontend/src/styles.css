@@ -331,7 +331,7 @@ app-root{ display:block; height:100dvh; }
   .scr-foot{ align-items:center; }
   .scr-foot > *{ width:100%; max-width:720px; }
   /* The admin console spans full width (sidebar + content), not the 720px reading column. */
-  .appbar.appbar-wide{ padding-left:18px; padding-right:18px; }
+  app-bar.appbar-wide .appbar{ padding-left:18px; padding-right:18px; }
 }
 
 /* ---------- admin console: sidebar layout ---------- */
