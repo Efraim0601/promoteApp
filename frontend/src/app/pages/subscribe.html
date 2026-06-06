@@ -1,5 +1,30 @@
+<!-- ===== Welcome (client / QR flow only) ===== -->
+@if (showWelcome) {
+  <div class="scr">
+    <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t('badge_self') }}</span></app-bar>
+    <div class="scr-body">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="kicker">{{ i18n.t('home_kicker') }}</div>
+        <promote-card></promote-card>
+        <div>
+          <h1 style="font-size:23px">{{ i18n.t('welcome_title') }}</h1>
+          <p class="muted" style="font-size:13.5px;line-height:1.55;margin-top:8px">{{ i18n.t('welcome_desc') }}</p>
+        </div>
+        <div class="card" style="padding:6px 14px">
+          <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="idcard" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('welcome_step1') }}</span></div>
+          <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="phone" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('welcome_step2') }}</span></div>
+          <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="printer" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('welcome_step3') }}</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="scr-foot">
+      <button class="btn btn-primary" (click)="begin()">{{ i18n.t('start') }} <ic name="arrowR" [size]="19"></ic></button>
+    </div>
+  </div>
+}
+
 <!-- ===== MoMo processing ===== -->
-@if (proc() === 'paying') {
+@else if (proc() === 'paying') {
   <div class="scr">
     <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t(isSelf ? 'badge_self' : 'badge_agent') }}</span></app-bar>
     <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;padding:10px 0">

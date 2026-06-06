@@ -69,6 +69,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   config: CardConfig = { price: 5000, fees: 500, transport: 1000 };
 
   step = signal(0);
+  /** Self (QR) flow opens on a welcome screen; the agent flow starts straight on the form. */
+  started = signal(false);
   proc = signal<null | 'paying' | 'reference' | 'failed'>(null);
   phase = signal<'send' | 'wait'>('send');
   touched = signal(false);
@@ -95,9 +97,16 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.channel = this.route.snapshot.data['channel'] === 'self' ? 'self' : 'agent';
     this.restore();                                   // bring back any in-progress entry
+    // Agent flow starts on the form; the client (QR) flow opens on the welcome screen — unless a
+    // draft is being resumed mid-way, in which case skip straight back to where they were.
+    this.started.set(!this.isSelf || this.step() > 0);
     this.api.getConfig().subscribe((c) => (this.config = c));
     if (this.isSelf && this.form.refPhone) this.onRefPhone(this.form.refPhone);
   }
+
+  /** Leave the welcome screen and begin the wizard (client/QR flow). */
+  begin() { this.started.set(true); }
+  get showWelcome() { return this.isSelf && !this.started() && !this.proc(); }
 
   ngOnDestroy() { this.stopPolling(); }
 
@@ -258,8 +267,10 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     }
   }
   prev() {
-    if (this.step() === 0) this.exit();
-    else { this.touched.set(false); this.step.set(this.step() - 1); this.persist(); }
+    if (this.step() === 0) {
+      if (this.isSelf) this.started.set(false); // client returns to the welcome screen
+      else this.exit();
+    } else { this.touched.set(false); this.step.set(this.step() - 1); this.persist(); }
   }
   exit() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
   home() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
@@ -383,6 +394,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
     this.refAgent.set(null); this.refUnknown.set(false);
+    this.started.set(!this.isSelf); // client returns to the welcome screen
   }
 
   copyRef() {
