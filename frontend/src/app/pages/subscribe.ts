@@ -226,8 +226,30 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get stepValid() {
     return [this.step0ok, this.docsOk, this.selfieOk, this.payStepOk, true][this.step()];
   }
+  /** All steps satisfied — required before the final confirmation can fire. */
+  get formComplete() { return this.step0ok && this.docsOk && this.selfieOk && this.payStepOk; }
+  /** First step still missing something (used to route the client there on confirm). */
+  private firstInvalidStep() {
+    if (!this.step0ok) return 0;
+    if (!this.docsOk) return 1;
+    if (!this.selfieOk) return 2;
+    if (!this.payStepOk) return 3;
+    return this.lastStep;
+  }
   get lastStep() { return STEP_COUNT - 1; }
   stepKey(i: number) { return STEP_KEYS[i]; }
+  /** Localised step names for the clickable progress bar. */
+  get stepLabels() { return STEP_KEYS.map((k) => this.i18n.t(k)); }
+
+  /** Free navigation: jump straight to any step via the progress bar. Going forward surfaces
+   *  any missing fields (touched) so the client sees what's left; the final confirm stays guarded. */
+  goToStep(i: number) {
+    if (i === this.step()) return;
+    this.touched.set(i > this.step());
+    this.step.set(Math.min(this.lastStep, Math.max(0, i)));
+    if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
+    this.persist();
+  }
 
   get headTitle() { return ['identity_title', 'doc_title', 'photo_title', 'payment_title', 'recap_title'][this.step()]; }
   get headSub() { return ['identity_sub', 'doc_sub', 'photo_sub', 'payment_sub', 'recap_sub2'][this.step()]; }
@@ -315,6 +337,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   confirm() {
     if (this.busy()) return;
+    // Free navigation lets the client reach the recap with gaps — route them to the first
+    // incomplete step instead of submitting an invalid file.
+    if (!this.formComplete) { this.touched.set(true); this.step.set(this.firstInvalidStep()); return; }
     this.busy.set(true);
     const obs = this.isSelf ? this.api.createSelf(this.payload()) : this.api.createAssisted(this.payload());
     obs.subscribe({

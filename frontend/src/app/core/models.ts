@@ -38,6 +38,7 @@ export interface Subscription {
   quartier: string;
   region: string;
   pay: string;        // om | mtn | cash | sara
+  payPhone?: string | null;  // MoMo number used for payment (may differ from contact phone)
   delivery: string;   // promote | agence | home
   amount: number;
   transport: number;

@@ -1,9 +1,10 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { AgentStats, ClaimResult, Subscription } from '../core/models';
+import { PAY_METHODS } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -43,14 +44,49 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('my_sales') }}</h3>
-          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ mine().length }}</span>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filtered().length }} {{ i18n.t('tx_count') }}</span>
         </div>
-        <div style="padding:0 6px 6px">
+
+        <!-- multi-level filters + advanced search over my own sales -->
+        <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
+          <div class="input-prefix">
+            <span class="pfx"><ic name="search" [size]="15"></ic></span>
+            <input [placeholder]="i18n.t('tx_search_adv_ph')" [value]="txSearch()" (input)="txSearch.set($any($event.target).value)" />
+          </div>
+          <div style="display:flex;gap:8px">
+            <select class="input" [value]="txStatus()" (change)="txStatus.set($any($event.target).value)" style="flex:1">
+              <option value="all">{{ i18n.t('tx_all_status') }}</option>
+              <option value="paid">{{ i18n.t('st_paid') }}</option>
+              <option value="pending">{{ i18n.t('st_awaiting') }}</option>
+              <option value="cash">{{ i18n.t('st_cash') }}</option>
+              <option value="sara_pending">{{ i18n.t('st_sara_pending') }}</option>
+              <option value="failed">{{ i18n.t('st_failed') }}</option>
+              <option value="printed">{{ i18n.t('st_printed') }}</option>
+            </select>
+            <select class="input" [value]="txPay()" (change)="txPay.set($any($event.target).value)" style="flex:1">
+              <option value="all">{{ i18n.t('tx_all_pay') }}</option>
+              @for (p of payMethods; track p.id) { <option [value]="p.id">{{ p.name }}</option> }
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="input" type="date" [value]="txFrom()" (change)="txFrom.set($any($event.target).value)" style="flex:1" />
+            <span class="muted" style="font-size:12px">→</span>
+            <input class="input" type="date" [value]="txTo()" (change)="txTo.set($any($event.target).value)" style="flex:1" />
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" (click)="exportCsv()" [disabled]="!filtered().length" style="flex:1;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('tx_export') }}</button>
+            <button class="btn btn-ghost" (click)="clearFilters()" style="flex:1;padding:9px;font-size:13px">{{ i18n.t('tx_clear') }}</button>
+          </div>
+        </div>
+
+        <div style="max-height:360px;overflow-y:auto;padding:0 6px 6px">
           @if (mine().length === 0) {
             <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_empty') }}</p>
+          } @else if (filtered().length === 0) {
+            <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_no_match') }}</p>
           } @else {
             <div style="display:flex;flex-direction:column">
-              @for (t of reversed; track t.ref) { <tx-row [t]="t" (open)="openRef(t.ref)"></tx-row> }
+              @for (t of filtered(); track t.ref) { <tx-row [t]="t" (open)="openRef(t.ref)"></tx-row> }
             </div>
           }
         </div>
@@ -115,13 +151,58 @@ export class AgentHomeComponent implements OnInit {
   niu = signal('');
   res = signal<ClaimResult | null>(null);
 
+  readonly payMethods = PAY_METHODS;
+
+  // --- multi-level filters + advanced search over my sales ---
+  txSearch = signal('');
+  txStatus = signal('all');   // all | paid | pending | cash | sara_pending | failed | printed
+  txPay = signal('all');      // all | om | mtn | sara | cash
+  txFrom = signal('');        // yyyy-mm-dd
+  txTo = signal('');
+  filtered = computed(() => {
+    const q = this.txSearch().trim().toLowerCase();
+    const digits = this.txSearch().replace(/\D/g, '');
+    const st = this.txStatus(), pay = this.txPay(), from = this.txFrom(), to = this.txTo();
+    return this.mine().slice().reverse().filter((t) => {
+      if (st !== 'all' && t.status !== st && t.payStatus !== st) return false;
+      if (pay !== 'all' && t.pay !== pay) return false;
+      if (from && t.createdAt.slice(0, 10) < from) return false;
+      if (to && t.createdAt.slice(0, 10) > to) return false;
+      if (q) {
+        // Advanced search: reference, name, NIU, SARA reference, and any phone (contact / payment / payer).
+        const hay = `${t.ref} ${t.fullName} ${t.niu ?? ''} ${t.saraRef ?? ''}`.toLowerCase();
+        const phones = `${t.phone ?? ''} ${t.payPhone ?? ''} ${t.saraPayerPhone ?? ''}`.replace(/\D/g, '');
+        if (!hay.includes(q) && !(digits && phones.includes(digits))) return false;
+      }
+      return true;
+    });
+  });
+
   ngOnInit() { this.refresh(); }
   private refresh() {
     this.api.agentStats().subscribe((s) => this.stats.set(s));
     this.api.mySubscriptions().subscribe((m) => this.mine.set(m));
   }
 
-  get reversed() { return this.mine().slice().reverse(); }
+  clearFilters() {
+    this.txSearch.set(''); this.txStatus.set('all'); this.txPay.set('all'); this.txFrom.set(''); this.txTo.set('');
+  }
+
+  /** Export the currently filtered sales as CSV (reference + key details). */
+  exportCsv() {
+    const rows = this.filtered();
+    const head = ['Reference', 'Nom', 'NIU', 'Telephone', 'Paiement', 'Statut', 'Montant', 'Ref SARA', 'Date'];
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [head.join(',')].concat(
+      rows.map((t) => [t.ref, t.fullName, t.niu ?? '', t.phone, t.pay, t.status,
+        String(t.amount), t.saraRef ?? '', t.createdAt].map((v) => esc(String(v))).join(',')),
+    );
+    const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'mes-ventes.csv'; a.click();
+    URL.revokeObjectURL(url);
+  }
   get canSubmit() { return /^6\d{8}$/.test(this.phone()) && this.cni().length >= 6; }
   get failKey() {
     const r = this.res();
