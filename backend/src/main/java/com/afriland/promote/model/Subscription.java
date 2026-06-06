@@ -69,6 +69,12 @@ public class Subscription {
     /** Object-storage key of the SARA money receipt (image or PDF); null unless pay == sara. */
     private String saraReceiptKey;
 
+    /** Fields extracted from the SARA receipt (PDF text / OCR) — prefilled for the agent to
+     *  confirm at the point of sale; any may be null when extraction failed. */
+    private String saraRef;          // transaction reference, e.g. W2026051112422763
+    private String saraPayerPhone;   // sender ("Émetteur") account, "+237 XXXXXXXXX"
+    private Integer saraAmount;      // total amount on the receipt, in XAF
+
     /** Resolve a stored image key by kind. */
     @Transient
     public String imageKey(String kind) {

@@ -62,6 +62,7 @@ public final class Dtos {
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
+            String saraRef, String saraPayerPhone, Integer saraAmount,
             String status, String createdAt, String paymentMessage) {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
@@ -72,6 +73,7 @@ public final class Dtos {
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
                     s.getSaraReceiptKey() != null,
+                    s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(),
                     s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage());
         }
     }
@@ -79,8 +81,10 @@ public final class Dtos {
     /** Result of a MoMo simulation. {@code outcome} = "validate" | "fail". */
     public record PayRequest(String outcome) {}
 
-    /** Staff decision on a SARA money receipt. {@code outcome} = "validate" | "reject". */
-    public record SaraValidateRequest(String outcome, String reason) {}
+    /** Staff decision on a SARA money receipt. {@code outcome} = "validate" | "reject".
+     *  The sara* fields carry the agent's confirmed/corrected receipt values (prefilled from extraction). */
+    public record SaraValidateRequest(String outcome, String reason,
+                                      String saraRef, String saraPayerPhone, Integer saraAmount) {}
 
     /** Lightweight, public payment status for the client polling the result. */
     public record PaymentStatusDto(String ref, String payStatus) {}

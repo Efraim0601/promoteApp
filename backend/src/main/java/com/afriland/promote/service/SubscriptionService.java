@@ -2,6 +2,9 @@ package com.afriland.promote.service;
 
 import com.afriland.promote.model.*;
 import com.afriland.promote.payment.PaymentGateway;
+import com.afriland.promote.receipt.SaraReceipt;
+import com.afriland.promote.receipt.SaraReceiptExtractor;
+import com.afriland.promote.storage.ImageStorage;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
@@ -27,16 +30,21 @@ public class SubscriptionService {
     private final CardConfigRepository configs;
     private final AppUserRepository users;
     private final PaymentGateway gateway;
+    private final ImageStorage storage;
+    private final SaraReceiptExtractor receiptExtractor;
 
     // PRM-#### sequence (prototype starts at 1008, demo data uses 1000..1008)
     private final AtomicInteger seq = new AtomicInteger(1008);
 
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
-                               AppUserRepository users, PaymentGateway gateway) {
+                               AppUserRepository users, PaymentGateway gateway,
+                               ImageStorage storage, SaraReceiptExtractor receiptExtractor) {
         this.subs = subs;
         this.configs = configs;
         this.users = users;
         this.gateway = gateway;
+        this.storage = storage;
+        this.receiptExtractor = receiptExtractor;
     }
 
     /** Initialise the sequence above the highest existing reference (after seeding). */
@@ -148,8 +156,26 @@ public class SubscriptionService {
                 s.setPaymentMessage("Service de paiement indisponible");
             }
             s = subs.save(s);
+        } else if (sara) {
+            // Parse the uploaded receipt (PDF text / OCR) and prefill the reference, payer phone
+            // and amount for the point-of-sale agent to confirm. Best-effort — never blocks.
+            applyReceiptExtraction(s);
+            s = subs.save(s);
         }
         return s;
+    }
+
+    /** Extract reference / payer / amount from the stored SARA receipt onto the subscription. */
+    private void applyReceiptExtraction(Subscription s) {
+        if (s.getSaraReceiptKey() == null) return;
+        ImageStorage.StoredImage img = storage.load(s.getSaraReceiptKey());
+        if (img == null) return;
+        SaraReceipt r = receiptExtractor.extract(img.data(), img.contentType());
+        s.setSaraRef(r.reference());
+        s.setSaraPayerPhone(r.payerPhone());
+        s.setSaraAmount(r.amount());
+        log.info("SARA receipt parsed for {}: ref={} payer={} amount={}",
+                s.getRef(), r.reference(), r.payerPhone(), r.amount());
     }
 
     public List<Subscription> all() {
@@ -239,17 +265,26 @@ public class SubscriptionService {
      * {@code validate} → {@code paid} (printable); {@code reject} → {@code failed} (+ reason).
      */
     @Transactional
-    public Subscription validateSara(String ref, String outcome, String reason) {
+    public Subscription validateSara(String ref, SaraValidateRequest req) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         if (s.getPayStatus() != PayStatus.sara_pending) return s;
-        if ("validate".equalsIgnoreCase(outcome)) {
+        // Persist the agent's confirmed/corrected receipt values (prefilled from extraction).
+        if (req.saraRef() != null) s.setSaraRef(blankToNull(req.saraRef()));
+        if (req.saraPayerPhone() != null) s.setSaraPayerPhone(blankToNull(req.saraPayerPhone()));
+        if (req.saraAmount() != null) s.setSaraAmount(req.saraAmount());
+        if ("validate".equalsIgnoreCase(req.outcome())) {
             s.setPayStatus(PayStatus.paid);
             s.setPaymentMessage(null);
         } else {
             s.setPayStatus(PayStatus.failed);
+            String reason = req.reason();
             s.setPaymentMessage(reason == null || reason.isBlank() ? "Reçu SARA non conforme" : reason.trim());
         }
         return subs.save(s);
+    }
+
+    private static String blankToNull(String v) {
+        return v == null || v.trim().isEmpty() ? null : v.trim();
     }
 
     /** Agent claims a paid, unattributed QR sale — ports app.jsx:claimQrSale.

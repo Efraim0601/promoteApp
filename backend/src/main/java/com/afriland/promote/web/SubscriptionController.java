@@ -107,7 +107,7 @@ public class SubscriptionController {
      *  outcome = validate (→ paid) | reject (→ failed, with an optional reason). */
     @PatchMapping("/{ref}/sara-validate")
     public SubscriptionDto saraValidate(@PathVariable String ref, @RequestBody SaraValidateRequest req) {
-        return SubscriptionDto.of(service.validateSara(ref, req.outcome(), req.reason()));
+        return SubscriptionDto.of(service.validateSara(ref, req));
     }
 
     /** Agent claims a paid, unattributed QR sale (optionally capturing the client's NIU). */
