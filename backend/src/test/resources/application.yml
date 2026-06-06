@@ -1,4 +1,6 @@
 spring:
+  profiles:
+    active: test          # marks this as a test run so the H2 database is allowed
   datasource:
     url: jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL
     username: sa
