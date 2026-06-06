@@ -330,4 +330,38 @@ app-root{ display:block; height:100dvh; }
   .scr-body > *{ width:100%; max-width:720px; }
   .scr-foot{ align-items:center; }
   .scr-foot > *{ width:100%; max-width:720px; }
+  /* The admin console spans full width (sidebar + content), not the 720px reading column. */
+  .appbar.appbar-wide{ padding-left:18px; padding-right:18px; }
+}
+
+/* ---------- admin console: sidebar layout ---------- */
+.admin-layout{ flex:1; min-height:0; display:flex; }
+.admin-side{
+  width:236px; flex-shrink:0; border-right:1px solid var(--border); background:var(--bg2);
+  display:flex; flex-direction:column; gap:14px; padding:16px 12px; overflow-y:auto;
+}
+.admin-userbox{ display:flex; align-items:center; gap:11px; padding:4px 6px; min-width:0; }
+.admin-nav{ display:flex; flex-direction:column; gap:4px; }
+.admin-nav button{
+  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
+  padding:11px 13px; border:none; background:transparent; border-radius:12px;
+  color:var(--text); font-size:13.5px; font-weight:700; cursor:pointer; transition:background .15s;
+}
+.admin-nav button:hover{ background:var(--surface-2); }
+.admin-nav button.active{ background:var(--accent-soft); color:var(--accent); }
+.admin-nav button ic{ flex-shrink:0; }
+.admin-spacer{ flex:1; }
+.admin-main{ flex:1; min-height:0; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
+.admin-main > *{ width:100%; max-width:760px; margin-inline:auto; }
+.admin-main > *{ flex-shrink:0; }
+
+@media (max-width:759px){
+  .admin-layout{ flex-direction:column; }
+  .admin-side{
+    width:auto; flex-direction:row; align-items:center; gap:6px; padding:10px 12px;
+    border-right:none; border-bottom:1px solid var(--border); overflow-x:auto; overflow-y:hidden;
+  }
+  .admin-userbox, .admin-spacer, .admin-logout{ display:none; }
+  .admin-nav{ flex-direction:row; gap:6px; }
+  .admin-nav button{ width:auto; white-space:nowrap; padding:9px 14px; }
 }

@@ -16,18 +16,38 @@ import { TxRowComponent } from '../shared/tx-row';
   imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxRowComponent],
   template: `
   <div class="scr">
-    <app-bar>
+    <app-bar class="appbar-wide">
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div style="display:flex;align-items:center;gap:12px">
-        <avatar [name]="auth.user()!.name" role="admin" [size]="46"></avatar>
-        <div style="min-width:0">
-          <div class="kicker">{{ i18n.t('view_global') }}</div>
-          <div style="font-size:20px;font-weight:800;font-family:var(--font-head);line-height:1.1;margin-top:2px">{{ i18n.t('admin_title') }}</div>
-        </div>
-      </div>
 
+    <div class="admin-layout">
+      <!-- ===== Sidebar ===== -->
+      <aside class="admin-side">
+        <div class="admin-userbox">
+          <avatar [name]="auth.user()!.name" role="admin" [size]="40"></avatar>
+          <div style="min-width:0">
+            <div style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ auth.user()!.name }}</div>
+            <div class="muted" style="font-size:11px">{{ i18n.t('role_admin') }}</div>
+          </div>
+        </div>
+        <nav class="admin-nav">
+          <button [class.active]="section() === 'overview'" (click)="section.set('overview')"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_overview') }}</button>
+          <button [class.active]="section() === 'config'" (click)="section.set('config')"><ic name="gear" [size]="18"></ic> {{ i18n.t('nav_config') }}</button>
+          <button [class.active]="section() === 'users'" (click)="section.set('users')"><ic name="user" [size]="18"></ic> {{ i18n.t('nav_users') }}</button>
+          <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
+        </nav>
+        <div class="admin-spacer"></div>
+        <nav class="admin-nav admin-logout">
+          <button (click)="auth.logout()"><ic name="logout" [size]="18"></ic> {{ i18n.t('logout') }}</button>
+        </nav>
+      </aside>
+
+      <!-- ===== Main content ===== -->
+      <main class="admin-main">
+
+      <!-- ========== OVERVIEW ========== -->
+      @if (section() === 'overview') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_overview') }}</h1>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
@@ -63,7 +83,11 @@ import { TxRowComponent } from '../shared/tx-row';
         </div>
       </div>
 
-      <!-- config -->
+      }
+
+      <!-- ========== CONFIG ========== -->
+      @if (section() === 'config') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_config') }}</h1>
       <div class="card" style="padding:16px">
         <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:14px">
           <ic name="gear" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
@@ -89,7 +113,11 @@ import { TxRowComponent } from '../shared/tx-row';
         </div>
       </div>
 
-      <!-- user management -->
+      }
+
+      <!-- ========== USERS ========== -->
+      @if (section() === 'users') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_users') }}</h1>
       <div class="card" style="padding:16px">
         <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:14px">
           <ic name="user" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
@@ -136,7 +164,11 @@ import { TxRowComponent } from '../shared/tx-row';
         </div>
       </div>
 
-      <!-- transactions with filters -->
+      }
+
+      <!-- ========== TRANSACTIONS ========== -->
+      @if (section() === 'transactions') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_transactions') }}</h1>
       <div class="card" style="overflow:hidden">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
@@ -184,8 +216,9 @@ import { TxRowComponent } from '../shared/tx-row';
           }
         </div>
       </div>
+      }
 
-      <button class="btn btn-ghost" (click)="auth.logout()" style="font-size:13.5px"><ic name="logout" [size]="16"></ic> {{ i18n.t('logout') }}</button>
+      </main>
     </div>
   </div>`,
 })
@@ -194,6 +227,9 @@ export class AdminComponent implements OnInit {
   auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
+
+  /** Active sidebar section. */
+  section = signal<'overview' | 'config' | 'users' | 'transactions'>('overview');
 
   stats = signal<AdminStats | null>(null);
   txs = signal<Subscription[]>([]);
