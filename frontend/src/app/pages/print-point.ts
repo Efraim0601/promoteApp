@@ -166,6 +166,17 @@ import { StatusBadgeComponent } from '../shared/status-badge';
                 }
               </div>
             }
+
+            <!-- Receipt fields auto-extracted (reference / payer / amount) — prefilled; the agent confirms or corrects before validating. -->
+            @if (r.payStatus === 'sara_pending') {
+              <div style="padding:0 16px 16px;border-top:1px solid var(--border);padding-top:14px">
+                <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:8px">{{ i18n.t('pp_sara_extracted') }}</div>
+                <field [label]="i18n.t('pp_sara_ref')"><input class="input" [placeholder]="i18n.t('pp_sara_ref_ph')" [value]="saraRefDraft()" (input)="saraRefDraft.set($any($event.target).value)" /></field>
+                <field [label]="i18n.t('pp_sara_payer')"><input class="input" inputmode="tel" [placeholder]="i18n.t('pp_sara_payer_ph')" [value]="saraPhoneDraft()" (input)="saraPhoneDraft.set($any($event.target).value)" /></field>
+                <field [label]="i18n.t('pp_sara_amount_field')"><input class="input" inputmode="numeric" [placeholder]="i18n.t('pp_sara_amount_ph')" [value]="saraAmountDraft()" (input)="saraAmountDraft.set($any($event.target).value)" /></field>
+                <p class="muted" style="font-size:11px;line-height:1.4;margin-top:2px;display:flex;gap:5px;align-items:flex-start"><ic name="alert" [size]="13" style="flex-shrink:0;margin-top:1px"></ic>{{ i18n.t('pp_sara_extracted_hint') }}</p>
+              </div>
+            }
           </div>
         }
       }
@@ -216,6 +227,10 @@ export class PrintPointComponent implements OnInit {
   editingNiu = signal(false);
   niuDraft = signal('');
   savingNiu = signal(false);
+  // SARA receipt fields prefilled from extraction; the agent confirms/corrects them before validating.
+  saraRefDraft = signal('');
+  saraPhoneDraft = signal('');
+  saraAmountDraft = signal('');
   private objectUrls: string[] = [];
 
   pm = (r: Subscription) => payById(r.pay);
@@ -261,11 +276,21 @@ export class PrintPointComponent implements OnInit {
     this.api.print(ref).subscribe((s) => this.rec.set(s));
   }
 
+  /** The agent's confirmed/corrected receipt values, sent alongside the validate/reject decision. */
+  private saraOpts() {
+    const amt = parseInt(this.saraAmountDraft().replace(/\D/g, ''), 10);
+    return {
+      saraRef: this.saraRefDraft().trim() || undefined,
+      saraPayerPhone: this.saraPhoneDraft().trim() || undefined,
+      saraAmount: Number.isNaN(amt) ? undefined : amt,
+    };
+  }
+
   /** Validate the SARA money receipt → marks the subscription paid (then printable). */
   doValidateSara(ref: string) {
     if (this.validating()) return;
     this.validating.set(true);
-    this.api.validateSara(ref, 'validate').subscribe({
+    this.api.validateSara(ref, 'validate', this.saraOpts()).subscribe({
       next: (s) => { this.rec.set(s); this.validating.set(false); },
       error: () => this.validating.set(false),
     });
@@ -276,7 +301,7 @@ export class PrintPointComponent implements OnInit {
     const reason = window.prompt(this.i18n.t('pp_sara_reject_reason')) ?? '';
     if (reason === null) return; // cancelled
     this.validating.set(true);
-    this.api.validateSara(ref, 'reject', reason || undefined).subscribe({
+    this.api.validateSara(ref, 'reject', { reason: reason || undefined, ...this.saraOpts() }).subscribe({
       next: (s) => { this.rec.set(s); this.validating.set(false); },
       error: () => this.validating.set(false),
     });
@@ -298,6 +323,10 @@ export class PrintPointComponent implements OnInit {
   private setRecord(s: Subscription) {
     this.rec.set(s);
     this.editingNiu.set(false); this.niuDraft.set('');
+    // Prefill the editable SARA receipt fields with what was auto-extracted.
+    this.saraRefDraft.set(s.saraRef ?? '');
+    this.saraPhoneDraft.set(s.saraPayerPhone ?? '');
+    this.saraAmountDraft.set(s.saraAmount != null ? String(s.saraAmount) : '');
     if (s.hasSelfie) this.loadImage(s.ref, 'selfie', this.selfieUrl);
     if (s.hasCniRecto) this.loadImage(s.ref, 'cni-recto', this.rectoUrl);
     if (s.hasCniVerso) this.loadImage(s.ref, 'cni-verso', this.versoUrl);

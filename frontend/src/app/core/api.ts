@@ -61,9 +61,14 @@ export class Api {
   print(ref: string): Observable<Subscription> {
     return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/print`, {});
   }
-  /** Point of sale (staff) — validate or reject a SARA money receipt. */
-  validateSara(ref: string, outcome: 'validate' | 'reject', reason?: string): Observable<Subscription> {
-    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/sara-validate`, { outcome, reason });
+  /** Point of sale (staff) — validate or reject a SARA money receipt. The opts carry the agent's
+   *  confirmed/corrected receipt values (reference, payer phone, amount) prefilled from extraction. */
+  validateSara(
+    ref: string,
+    outcome: 'validate' | 'reject',
+    opts?: { reason?: string; saraRef?: string; saraPayerPhone?: string; saraAmount?: number },
+  ): Observable<Subscription> {
+    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/sara-validate`, { outcome, ...opts });
   }
   claim(phone: string, cni: string, niu?: string): Observable<ClaimResult> {
     return this.http.post<ClaimResult>(`${this.base}/subscriptions/claim`, { phone, cni, niu });

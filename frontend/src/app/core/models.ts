@@ -52,6 +52,9 @@ export interface Subscription {
   hasCniRecto: boolean;
   hasCniVerso: boolean;
   hasSaraReceipt: boolean;
+  saraRef?: string | null;         // extracted from the SARA receipt — agent confirms at point of sale
+  saraPayerPhone?: string | null;  // payer ("Émetteur") phone extracted from the receipt
+  saraAmount?: number | null;      // total amount extracted from the receipt (XAF)
   status: string;     // printed | failed | cash | sara_pending | awaiting
   createdAt: string;
   paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")

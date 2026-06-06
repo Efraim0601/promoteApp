@@ -12,6 +12,9 @@ frontend/.angular/
 # Misc
 *.log
 .DS_Store
+
+# Sample SARA receipt — contains real personal data (names, account numbers); keep out of the repo
+wallet_transaction_detail.docx
 .idea/
 *.iml
 
