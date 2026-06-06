@@ -35,12 +35,20 @@ public class DataSeeder implements CommandLineRunner {
     private final String adminName;
     private final boolean seedTestAgent;
 
+    // Print point account (PRINT_AGENT) — set PRINT_EMAIL / PRINT_PASSWORD / PRINT_NAME in production.
+    private final String printEmail;
+    private final String printPassword;
+    private final String printName;
+
     public DataSeeder(AppUserRepository users, CardConfigRepository configs, SubscriptionRepository subs,
                       SubscriptionService service, PasswordEncoder encoder,
                       @Value("${app.admin.email}") String adminEmail,
                       @Value("${app.admin.password}") String adminPassword,
                       @Value("${app.admin.name:Administrateur Promote}") String adminName,
-                      @Value("${app.seed.test-agent:true}") boolean seedTestAgent) {
+                      @Value("${app.seed.test-agent:true}") boolean seedTestAgent,
+                      @Value("${app.print.email}") String printEmail,
+                      @Value("${app.print.password}") String printPassword,
+                      @Value("${app.print.name:Point d'impression}") String printName) {
         this.users = users;
         this.configs = configs;
         this.subs = subs;
@@ -50,12 +58,16 @@ public class DataSeeder implements CommandLineRunner {
         this.adminPassword = adminPassword;
         this.adminName = adminName;
         this.seedTestAgent = seedTestAgent;
+        this.printEmail = printEmail;
+        this.printPassword = printPassword;
+        this.printName = printName;
     }
 
     @Override
     public void run(String... args) {
         seedConfig();
         seedUsers();
+        seedPrintAgent(); // independent of the first-boot guard, so it appears on existing deployments
         // No demo client-journey data is seeded: subscriptions start empty.
         service.initSequence();
     }
@@ -77,6 +89,14 @@ public class DataSeeder implements CommandLineRunner {
             users.save(AppUser.builder().id("a1").name("Awa Fall").email("awa.fall@afrilandfirstbank.com")
                     .passwordHash(encoder.encode("promote")).role(Role.AGENT).agency("Agence Akwa").phone("699123456").build());
         }
+    }
+
+    /** Ensure a print-point account exists (PRINT_AGENT). Idempotent by email, so it is created
+     *  on existing deployments too — completing the three roles: ADMIN, AGENT, PRINT_AGENT. */
+    private void seedPrintAgent() {
+        if (users.findByEmailIgnoreCase(printEmail).isPresent()) return;
+        users.save(AppUser.builder().id("print").name(printName).email(printEmail)
+                .passwordHash(encoder.encode(printPassword)).role(Role.PRINT_AGENT).build());
     }
 
     /** Builds a demo subscription, mirroring app.jsx:seedTx's mk() helper. */

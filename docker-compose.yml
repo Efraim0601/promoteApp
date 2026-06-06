@@ -59,6 +59,9 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-promote}
       ADMIN_NAME: ${ADMIN_NAME:-Administrateur Promote}
       SEED_TEST_AGENT: ${SEED_TEST_AGENT:-true}
+      PRINT_EMAIL: ${PRINT_EMAIL:-imprimeur.promote@afrilandfirstbank.com}
+      PRINT_PASSWORD: ${PRINT_PASSWORD:-promote}
+      PRINT_NAME: ${PRINT_NAME:-Point d'impression}
       APP_PAYMENT_PROVIDER: ${APP_PAYMENT_PROVIDER:-simulated}
       TRUSTPAYWAY_BASE_URL: ${TRUSTPAYWAY_BASE_URL:-}
       TRUSTPAYWAY_SECRET_KEY: ${TRUSTPAYWAY_SECRET_KEY:-}

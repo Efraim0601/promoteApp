@@ -19,6 +19,10 @@ app:
     email: ${ADMIN_EMAIL:admin@afrilandfirstbank.com}
     password: ${ADMIN_PASSWORD:promote}
     name: ${ADMIN_NAME:Administrateur Promote}
+  print:
+    email: ${PRINT_EMAIL:imprimeur.promote@afrilandfirstbank.com}
+    password: ${PRINT_PASSWORD:promote}
+    name: ${PRINT_NAME:Point d'impression}
   seed:
     test-agent: ${SEED_TEST_AGENT:true}   # set false in production to skip the demo agent
   jwt:
