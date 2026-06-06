@@ -12,7 +12,7 @@ import { IconComponent } from './icon';
     <div class="appbar">
       <ng-content select="[appbar-left]"></ng-content>
       <div class="brand">
-        <img src="assets/afriland-logo.png" alt="Afriland First Bank" class="brand-logo" />
+        <img src="assets/main_logo.png" alt="Carte Promote" class="brand-logo" />
         <span class="brand-sep" aria-hidden="true"></span>
         <div class="brand-sub">{{ i18n.t('card_name') }}</div>
       </div>

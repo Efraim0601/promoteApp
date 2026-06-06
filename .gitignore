@@ -15,6 +15,10 @@ frontend/.angular/
 
 # Sample SARA receipt — contains real personal data (names, account numbers); keep out of the repo
 wallet_transaction_detail.docx
+
+# Source logos dropped at the repo root (the app uses the copies in frontend/public/assets)
+/main_logo.png
+/sara_logo.png
 .idea/
 *.iml
 

@@ -3,7 +3,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Agent, CardConfig, Subscription } from '../core/models';
-import { PAY_METHODS, payById } from '../shared/constants';
+import { PAY_METHODS, payById, matchesOperator } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent, PhoneFieldComponent, CniFieldComponent, ExpiryFieldComponent } from '../shared/fields';
@@ -94,7 +94,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.channel = this.route.snapshot.data['channel'] === 'self' ? 'self' : 'agent';
+    this.restore();                                   // bring back any in-progress entry
     this.api.getConfig().subscribe((c) => (this.config = c));
+    if (this.isSelf && this.form.refPhone) this.onRefPhone(this.form.refPhone);
   }
 
   ngOnDestroy() { this.stopPolling(); }
@@ -105,7 +107,36 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     // When a MoMo method is picked, default the payment number to the KYC phone (still editable):
     // the client confirms or changes the number that will actually receive the prompt.
     if (k === 'pay' && (v === 'om' || v === 'mtn') && !this.form.payPhone) this.form.payPhone = this.form.phone;
+    this.persist();
   }
+
+  // ---- draft persistence: survive reloads / navigating away, so nothing typed is lost ----
+  private storageKey() { return `promote-wizard-${this.channel}`; }
+
+  /** Save text fields + upload keys + step. Heavy base64 previews are skipped (localStorage quota);
+   *  the uploads themselves already live on the server, referenced by their keys. */
+  private persist() {
+    try {
+      const { selfieData, cniRectoData, cniVersoData, saraReceiptData, ...rest } = this.form;
+      localStorage.setItem(this.storageKey(), JSON.stringify({ form: rest, step: this.step() }));
+    } catch { /* storage unavailable or full — ignore */ }
+  }
+
+  private restore() {
+    try {
+      const raw = localStorage.getItem(this.storageKey());
+      if (!raw) return;
+      const saved = JSON.parse(raw) as { form?: Partial<WizardForm>; step?: number };
+      if (saved.form) {
+        // Restore fields, but force previews null (only their keys were persisted).
+        this.form = { ...this.form, ...saved.form,
+          selfieData: null, cniRectoData: null, cniVersoData: null, saraReceiptData: null };
+      }
+      if (typeof saved.step === 'number') this.step.set(Math.min(this.lastStep, Math.max(0, saved.step)));
+    } catch { /* corrupt draft — ignore */ }
+  }
+
+  private clearPersist() { try { localStorage.removeItem(this.storageKey()); } catch { /* ignore */ } }
 
   private onRefPhone(v: string) {
     // Resolve & show the referrer's NAME only on the client/QR path. In the commercial
@@ -150,10 +181,32 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     const x = this.errs;
     return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.region;
   }
-  get docsOk() { return !!this.form.cniRectoData && !!this.form.cniVersoData; }
+  // Document / photo steps are satisfied by a local capture OR a restored upload key (so a
+  // page reload mid-wizard doesn't force the client to retake what was already uploaded).
+  get docsOk() {
+    return (!!this.form.cniRectoData || !!this.form.cniRectoKey)
+        && (!!this.form.cniVersoData || !!this.form.cniVersoKey);
+  }
+  get selfieOk() { return !!this.form.selfieData || !!this.form.selfieKey; }
   /** Mobile Money methods that need a payment number + USSD push. */
   get isMomo() { return this.form.pay === 'om' || this.form.pay === 'mtn'; }
-  get payPhoneOk() { return /^6\d{8}$/.test(this.form.payPhone); }
+  /** Valid = 9-digit Cameroon number AND it belongs to the chosen operator (MTN/Orange). */
+  get payPhoneOk() {
+    return /^6\d{8}$/.test(this.form.payPhone) && matchesOperator(this.form.pay, this.form.payPhone);
+  }
+  /** Error to show under the payment number: bad format, or right format but wrong operator. */
+  get payPhoneError(): string | null {
+    if (!this.isMomo) return null;
+    if (!/^6\d{8}$/.test(this.form.payPhone)) return this.i18n.t('invalid_phone');
+    if (!matchesOperator(this.form.pay, this.form.payPhone)) {
+      return this.i18n.t(this.form.pay === 'mtn' ? 'pay_phone_not_mtn' : 'pay_phone_not_om');
+    }
+    return null;
+  }
+  /** Show the payment-number error once the field is "complete enough" or the step was touched. */
+  get payPhoneErrorShown(): string | null {
+    return this.touched() || this.form.payPhone.length >= 9 ? this.payPhoneError : null;
+  }
   /** Payment step: a method is chosen; MoMo needs a valid payment number, SARA needs a receipt. */
   get payStepOk() {
     if (!this.form.pay) return false;
@@ -162,7 +215,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     return true;
   }
   get stepValid() {
-    return [this.step0ok, this.docsOk, !!this.form.selfieData, this.payStepOk, true][this.step()];
+    return [this.step0ok, this.docsOk, this.selfieOk, this.payStepOk, true][this.step()];
   }
   get lastStep() { return STEP_COUNT - 1; }
   stepKey(i: number) { return STEP_KEYS[i]; }
@@ -186,7 +239,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       sara: this.i18n.t('pay_sara_desc'), cash: this.i18n.t('pay_cash_desc'),
     };
     return PAY_METHODS.map((p) => ({
-      id: p.id, bg: p.bg, color: p.fg, icon: p.short,
+      id: p.id, bg: p.bg, color: p.fg, icon: p.short, logo: p.logo,
       title: p.id === 'cash' ? this.i18n.t('pay_cash_name') : p.name,
       desc: desc[p.id] ?? '',
     }));
@@ -201,11 +254,12 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       // Entering the payment step with a MoMo method: default the payment number to the
       // KYC phone (still editable) so the client just confirms it or types the right one.
       if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
+      this.persist();
     }
   }
   prev() {
     if (this.step() === 0) this.exit();
-    else { this.touched.set(false); this.step.set(this.step() - 1); }
+    else { this.touched.set(false); this.step.set(this.step() - 1); this.persist(); }
   }
   exit() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
   home() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
@@ -213,26 +267,26 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   /** Client photo captured (front or rear camera): keep preview + upload. */
   onSelfie(dataUrl: string) {
     this.form.selfieData = dataUrl; this.form.selfieKey = null;
-    this.api.uploadImage(dataUrl, 'selfie').subscribe({ next: (r) => (this.form.selfieKey = r.key), error: () => {} });
+    this.api.uploadImage(dataUrl, 'selfie').subscribe({ next: (r) => { this.form.selfieKey = r.key; this.persist(); }, error: () => {} });
   }
-  onRetakeSelfie() { this.form.selfieData = null; this.form.selfieKey = null; }
+  onRetakeSelfie() { this.form.selfieData = null; this.form.selfieKey = null; this.persist(); }
 
   onCniRecto(dataUrl: string) {
     this.form.cniRectoData = dataUrl; this.form.cniRectoKey = null;
-    this.api.uploadImage(dataUrl, 'cni-recto').subscribe({ next: (r) => (this.form.cniRectoKey = r.key), error: () => {} });
+    this.api.uploadImage(dataUrl, 'cni-recto').subscribe({ next: (r) => { this.form.cniRectoKey = r.key; this.persist(); }, error: () => {} });
   }
-  onRetakeRecto() { this.form.cniRectoData = null; this.form.cniRectoKey = null; }
+  onRetakeRecto() { this.form.cniRectoData = null; this.form.cniRectoKey = null; this.persist(); }
 
   onCniVerso(dataUrl: string) {
     this.form.cniVersoData = dataUrl; this.form.cniVersoKey = null;
-    this.api.uploadImage(dataUrl, 'cni-verso').subscribe({ next: (r) => (this.form.cniVersoKey = r.key), error: () => {} });
+    this.api.uploadImage(dataUrl, 'cni-verso').subscribe({ next: (r) => { this.form.cniVersoKey = r.key; this.persist(); }, error: () => {} });
   }
-  onRetakeVerso() { this.form.cniVersoData = null; this.form.cniVersoKey = null; }
+  onRetakeVerso() { this.form.cniVersoData = null; this.form.cniVersoKey = null; this.persist(); }
 
   /** SARA money receipt picked (image or PDF): keep preview + upload, store its key. */
   onSaraReceipt(dataUrl: string) {
     this.form.saraReceiptData = dataUrl; this.form.saraReceiptKey = null;
-    this.api.uploadImage(dataUrl, 'sara-receipt').subscribe({ next: (r) => (this.form.saraReceiptKey = r.key), error: () => {} });
+    this.api.uploadImage(dataUrl, 'sara-receipt').subscribe({ next: (r) => { this.form.saraReceiptKey = r.key; this.persist(); }, error: () => {} });
   }
 
   private payload() {
@@ -255,6 +309,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     obs.subscribe({
       next: (s: Subscription) => {
         this.busy.set(false);
+        this.clearPersist();   // record created server-side — drop the local draft
         this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage });
         // cash and SARA money are settled off-platform → straight to the reference screen, no polling.
         if (this.form.pay === 'cash' || this.form.pay === 'sara') { this.proc.set('reference'); }
@@ -318,6 +373,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   reset() {
     this.stopPolling();
+    this.clearPersist();
     this.form = {
       prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', region: '',
       selfie: false, selfieData: null, selfieKey: null,

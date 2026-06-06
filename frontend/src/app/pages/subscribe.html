@@ -6,7 +6,7 @@
       <div style="position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center">
         <span style="position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb, var(--primary) 22%, transparent);animation:ripple 1.8s ease-out infinite"></span>
         <span style="position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb, var(--primary) 22%, transparent);animation:ripple 1.8s ease-out infinite 0.9s"></span>
-        <span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:72px;height:72px;border-radius:22px;font-size:20px;box-shadow:var(--shadow-lg)">{{ pm.short }}</span>
+        <span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:72px;height:72px;border-radius:22px;font-size:20px;box-shadow:var(--shadow-lg);overflow:hidden">@if (pm.logo) { <img [src]="pm.logo" [alt]="pm.name" style="width:100%;height:100%;object-fit:contain;padding:8px;box-sizing:border-box" /> } @else { {{ pm.short }} }</span>
       </div>
       @if (phase() === 'send') {
         <div class="spinner" style="border-color:color-mix(in srgb, var(--primary) 35%, transparent);border-top-color:var(--primary)"></div>
@@ -175,7 +175,7 @@
       @else if (step() === 2) {
         <photo-capture [imageData]="form.selfieData" facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
           [guide]="i18n.t('photo_guide')" (captured)="onSelfie($event)" (retake)="onRetakeSelfie()"></photo-capture>
-        @if (touched() && !form.selfieData) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
+        @if (touched() && !selfieOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }
 
       <!-- Step 3: payment -->
@@ -184,11 +184,16 @@
         @if (isMomo) {
           <div style="margin-top:10px">
             <phone-field [label]="i18n.t('pay_phone_label')" [value]="form.payPhone" (valueChange)="set('payPhone', $event)"
-              [hint]="i18n.t('pay_phone_hint')" [err]="touched() && !payPhoneOk ? i18n.t('invalid_phone') : null"></phone-field>
+              [hint]="i18n.t('pay_phone_hint')" [err]="payPhoneErrorShown"></phone-field>
           </div>
         }
         @if (form.pay === 'sara') {
-          <div style="font-size:13px;font-weight:700;margin-top:10px">{{ i18n.t('sara_receipt_label') }}</div>
+          <!-- SARA is settled in the SARA app first; the client then uploads the proof here. -->
+          <div class="card" style="padding:12px 14px;margin-top:10px;display:flex;gap:9px;align-items:flex-start;background:var(--surface-2)">
+            <ic name="alert" [size]="18" style="color:var(--af-gold);flex-shrink:0;margin-top:1px"></ic>
+            <span style="font-size:12px;line-height:1.5">{{ i18n.t('sara_flow_notice') }}</span>
+          </div>
+          <div style="font-size:13px;font-weight:700;margin-top:12px">{{ i18n.t('sara_receipt_label') }}</div>
           <receipt-upload [imageData]="form.saraReceiptData" [guide]="i18n.t('sara_receipt_guide')" (captured)="onSaraReceipt($event)"></receipt-upload>
           @if (touched() && !form.saraReceiptKey) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('sara_receipt_required') }}</div> }
         }
@@ -207,7 +212,7 @@
           <div class="srow"><span class="lbl">{{ i18n.t('email_label') }}</span><span class="val">{{ form.email }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('quartier') }}</span><span class="val">{{ form.quartier }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('region_label') }}</span><span class="val">{{ form.region }}</span></div>
-          <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:22px;height:22px;font-size:9px;border-radius:6px">{{ pm.short }}</span>{{ form.pay === 'cash' ? i18n.t('pay_cash_name') : pm.name }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:22px;height:22px;font-size:9px;border-radius:6px;overflow:hidden">@if (pm.logo) { <img [src]="pm.logo" [alt]="pm.name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm.short }} }</span>{{ form.pay === 'cash' ? i18n.t('pay_cash_name') : pm.name }}</span></div>
           @if (isMomo) { <div class="srow"><span class="lbl">{{ i18n.t('pay_phone_label') }}</span><span class="val">+237 {{ form.payPhone }}</span></div> }
           @if (refAgent()) { <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ refAgent()!.name }}</span></div> }
         </div>

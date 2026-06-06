@@ -7,6 +7,7 @@ export interface TileOption {
   desc?: string;
   meta?: string;
   icon?: string;      // short text (e.g. "OM", "MTN", "₣")
+  logo?: string;      // optional logo image URL — shown instead of the short text
   bg?: string;
   color?: string;
 }
@@ -20,7 +21,10 @@ export interface TileOption {
     <div style="display:flex;flex-direction:column;gap:10px">
       @for (o of options; track o.id) {
         <button type="button" class="tile" [class.sel]="value === o.id" (click)="valueChange.emit(o.id)">
-          <span class="tile-ic" [style.background]="o.color ? o.bg : null" [style.color]="o.color || null">{{ o.icon }}</span>
+          <span class="tile-ic" [style.background]="o.color ? o.bg : null" [style.color]="o.color || null">
+            @if (o.logo) { <img [src]="o.logo" [alt]="o.title" style="width:100%;height:100%;object-fit:contain;padding:4px;box-sizing:border-box" /> }
+            @else { {{ o.icon }} }
+          </span>
           <span style="min-width:0;flex:1;text-align:left">
             <span class="tile-title">{{ o.title }}</span>
             @if (o.desc) { <span class="tile-desc">{{ o.desc }}</span> }
