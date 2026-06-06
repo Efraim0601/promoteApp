@@ -162,10 +162,10 @@
       <!-- Step 1: ID document (CNI recto + verso, rear camera) -->
       @else if (step() === 1) {
         <div style="font-size:13px;font-weight:700;margin-top:2px">{{ i18n.t('cni_recto') }}</div>
-        <photo-capture [imageData]="form.cniRectoData" facing="environment" [boxW]="280" [boxH]="180"
+        <photo-capture [imageData]="form.cniRectoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
           [guide]="i18n.t('cni_recto_guide')" (captured)="onCniRecto($event)" (retake)="onRetakeRecto()"></photo-capture>
         <div style="font-size:13px;font-weight:700;margin-top:6px">{{ i18n.t('cni_verso') }}</div>
-        <photo-capture [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180"
+        <photo-capture [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
           [guide]="i18n.t('cni_verso_guide')" (captured)="onCniVerso($event)" (retake)="onRetakeVerso()"></photo-capture>
         @if (touched() && !docsOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }

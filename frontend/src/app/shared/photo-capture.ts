@@ -1,6 +1,7 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild, inject, signal } from '@angular/core';
 import { I18n } from '../core/i18n';
 import { IconComponent } from './icon';
+import { assessDocument, DocIssue } from './image-quality';
 
 /**
  * KYC photo capture via the device camera (getUserMedia). Supports the front
@@ -44,6 +45,12 @@ import { IconComponent } from './icon';
           @if (shooting()) { <span style="position:absolute;inset:0;background:#fff;animation:pulse .9s ease"></span> }
         </div>
         <p class="muted" style="font-size:12px;text-align:center;line-height:1.45;max-width:260px">{{ guide || i18n.t('selfie_guide') }}</p>
+        @if (qualityIssue()) {
+          <p style="display:flex;gap:7px;align-items:flex-start;font-size:12px;line-height:1.4;max-width:280px;text-align:left;color:var(--accent);font-weight:600;background:var(--accent-soft);border-radius:10px;padding:9px 11px">
+            <ic name="alert" [size]="16" [sw]="2.4" style="flex:0 0 auto;margin-top:1px"></ic>
+            <span>{{ i18n.t('q_' + qualityIssue()) }}</span>
+          </p>
+        }
         <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
           @if (!streaming()) {
             <button class="btn btn-primary" (click)="start()" [disabled]="starting()" style="width:auto;padding:11px 18px">
@@ -79,6 +86,8 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   @Input() guide = '';
   @Input() boxW = 200;
   @Input() boxH = 200;
+  /** When true, captured frames are checked for document quality (sharp, exposed, fully framed). */
+  @Input() qualityCheck = false;
   @Output() captured = new EventEmitter<string>();
   @Output() retake = new EventEmitter<void>();
 
@@ -89,6 +98,8 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   streaming = signal(false);
   starting = signal(false);
   shooting = signal(false);
+  /** Last blocking quality issue (null = none); drives the on-screen guidance message. */
+  qualityIssue = signal<DocIssue | null>(null);
   private stream: MediaStream | null = null;
 
   ngAfterViewInit() { /* camera starts on user action */ }
@@ -130,6 +141,12 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     else { sh = v.videoWidth / cr; sy = (v.videoHeight - sh) / 2; }
     if (this.facing === 'user') { ctx.translate(w, 0); ctx.scale(-1, 1); }
     ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
+    // Quality gate: reject blurry / dark / glare / mis-framed shots, keep the camera open to retry.
+    if (this.qualityCheck) {
+      const verdict = assessDocument(c);
+      if (!verdict.ok) { this.qualityIssue.set(verdict.issue); this.shooting.set(false); return; }
+    }
+    this.qualityIssue.set(null);
     const data = c.toDataURL('image/jpeg', 0.82);
     setTimeout(() => { this.shooting.set(false); this.stop(); this.imageData = data; this.captured.emit(data); }, 220);
   }
@@ -151,6 +168,12 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
         this.stop(); // release the camera if it was open
         const data = this.drawCover(img);
         input.value = ''; // allow re-picking the same file later
+        // Apply the same quality gate to gallery picks so unusable photos can't slip through.
+        if (this.qualityCheck && this.canvas) {
+          const verdict = assessDocument(this.canvas.nativeElement);
+          if (!verdict.ok) { this.qualityIssue.set(verdict.issue); return; }
+        }
+        this.qualityIssue.set(null);
         this.imageData = data;
         this.captured.emit(data);
       };
@@ -194,7 +217,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     this.captured.emit(this.imageData);
   }
 
-  retakePhoto() { this.imageData = null; this.retake.emit(); }
+  retakePhoto() { this.imageData = null; this.qualityIssue.set(null); this.retake.emit(); }
 
   private stop() {
     this.stream?.getTracks().forEach((t) => t.stop());
