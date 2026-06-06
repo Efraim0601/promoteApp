@@ -168,11 +168,8 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
         this.stop(); // release the camera if it was open
         const data = this.drawCover(img);
         input.value = ''; // allow re-picking the same file later
-        // Apply the same quality gate to gallery picks so unusable photos can't slip through.
-        if (this.qualityCheck && this.canvas) {
-          const verdict = assessDocument(this.canvas.nativeElement);
-          if (!verdict.ok) { this.qualityIssue.set(verdict.issue); return; }
-        }
+        // No quality gate on gallery picks — the sharpness/framing check applies only to photos
+        // captured live by the in-app camera (the user can't reframe a file they already have).
         this.qualityIssue.set(null);
         this.imageData = data;
         this.captured.emit(data);
