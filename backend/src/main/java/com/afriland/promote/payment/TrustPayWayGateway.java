@@ -4,10 +4,12 @@ import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
@@ -37,13 +39,15 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     private final TrustPayWayProperties props;
     private final RestClient http;
+    private final ObjectMapper json;
 
     // Cached access token + its expiry instant (login is reused until it nears expiry).
     private volatile String accessToken;
     private volatile Instant tokenExpiry = Instant.EPOCH;
 
-    public TrustPayWayGateway(TrustPayWayProperties props) {
+    public TrustPayWayGateway(TrustPayWayProperties props, ObjectMapper json) {
         this.props = props;
+        this.json = json;
         this.http = RestClient.builder().baseUrl(props.getBaseUrl() == null ? "" : props.getBaseUrl()).build();
     }
 
@@ -55,25 +59,30 @@ public class TrustPayWayGateway implements PaymentGateway {
     @Override
     public PaymentRequest requestPayment(Subscription sub, String operator) {
         String network = network(operator);
-        ProcessResponse resp = http.post()
+        String msisdn = msisdn(sub);
+        // Capture the raw body + HTTP status ourselves: on failure the API may answer either a
+        // structured 417 ({data.status, message}) OR a bare {"error": "..."} — the latter has no
+        // data/message, so without the raw body the cause is invisible (logged as null/null).
+        ResponseEntity<String> entity = http.post()
                 .uri("/api/{network}/process-payment", network)
                 .header("Authorization", "Bearer " + token())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of(
                         "amount", String.valueOf(sub.getAmount()),
                         "currency", "XAF",
-                        "subscriberMsisdn", msisdn(sub),
+                        "subscriberMsisdn", msisdn,
                         "description", "Carte Promote " + sub.getRef(),
                         "orderId", sub.getRef(),          // our reference — echoed back in the webhook
                         "notifUrl", props.getNotifUrl()
                 ))
                 .retrieve()
-                // The API answers HTTP 417 with a JSON body on failure — don't let RestClient
-                // throw, we want to read data.status / message and the transaction_id.
+                // Don't let RestClient throw on 4xx/5xx — we read the body regardless of status.
                 .onStatus(HttpStatusCode::isError, (req, res) -> { })
-                .body(ProcessResponse.class);
+                .toEntity(String.class);
 
-        // Real response shape: { data: { status, transaction_id }, message, status_code }.
+        String raw = entity.getBody();
+        ProcessResponse resp = parse(raw);
+        // Real success shape: { data: { status, transaction_id }, message, status_code }.
         String dataStatus = resp != null && resp.data() != null ? resp.data().status() : null;
         String txId = resp != null && resp.data() != null ? resp.data().transactionId() : null;
         // The USSD push is "accepted" when initiated (PENDING / INITIATED / COMPLETED),
@@ -81,15 +90,39 @@ public class TrustPayWayGateway implements PaymentGateway {
         boolean accepted = dataStatus != null
                 && !"FAILED".equalsIgnoreCase(dataStatus)
                 && map(dataStatus).orElse(null) != PayStatus.failed;
-        String message = resp != null ? resp.message() : null;
+        // Prefer the API's message; fall back to a top-level {"error": "..."} or the raw body.
+        String message = resp != null && resp.message() != null ? resp.message() : errorField(raw);
         if (accepted) {
             log.info("TrustPayWay process-payment ref={} network={} status={} txId={}",
                     sub.getRef(), network, dataStatus, txId);
         } else {
-            log.warn("TrustPayWay process-payment REJECTED ref={} network={} status={} msg={}",
-                    sub.getRef(), network, dataStatus, message);
+            // Log the HTTP status + raw body so the real reason is never hidden again.
+            log.warn("TrustPayWay process-payment REJECTED ref={} network={} msisdn={} http={} status={} msg={} body={}",
+                    sub.getRef(), network, msisdn, entity.getStatusCode().value(), dataStatus, message, raw);
         }
         return new PaymentRequest(txId, operator, accepted, message);
+    }
+
+    /** Parse the process-payment body into our response shape; null/empty/garbage → null. */
+    private ProcessResponse parse(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            return json.readValue(raw, ProcessResponse.class);
+        } catch (Exception ex) {
+            log.warn("TrustPayWay: unparseable process-payment body: {}", raw);
+            return null;
+        }
+    }
+
+    /** Extract a top-level {@code {"error": "..."}} message, when the API returns that shape. */
+    private String errorField(String raw) {
+        if (raw == null || raw.isBlank()) return null;
+        try {
+            var node = json.readTree(raw).get("error");
+            return node == null ? null : node.asText();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 
     @Override
