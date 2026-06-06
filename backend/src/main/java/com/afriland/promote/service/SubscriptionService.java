@@ -6,6 +6,8 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.web.dto.Dtos.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,6 +18,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 /** Core subscription / KYC business logic, ported from the prototype (app.jsx, kyc.jsx). */
 @Service
 public class SubscriptionService {
+
+    private static final Logger log = LoggerFactory.getLogger(SubscriptionService.class);
 
     private final SubscriptionRepository subs;
     private final CardConfigRepository configs;
@@ -118,9 +122,11 @@ public class SubscriptionService {
                 s.setPaymentMessage(pr.message());           // reason to surface on failure
                 if (!pr.accepted()) s.setPayStatus(PayStatus.failed);
             } catch (RuntimeException ex) {
-                // The aggregator was unreachable / rejected the request: keep the KYC file
-                // but mark the payment failed so the client can retry.
+                // The aggregator was unreachable / login failed (e.g. an invalidated secret):
+                // keep the KYC file but mark the payment failed, and LOG why for diagnosis.
+                log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), req.pay(), ex.getMessage());
                 s.setPayStatus(PayStatus.failed);
+                s.setPaymentMessage("Service de paiement indisponible");
             }
             s = subs.save(s);
         }
