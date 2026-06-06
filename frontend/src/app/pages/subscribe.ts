@@ -92,7 +92,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   }
 
   private onRefPhone(v: string) {
-    if (v.length === 9) {
+    // Resolve & show the referrer's NAME only on the client/QR path. In the commercial
+    // (agent) flow the number is still captured & stored, but the name is never revealed.
+    if (this.isSelf && v.length === 9) {
       this.api.resolveAgent(v).subscribe((a) => { this.refAgent.set(a); this.refUnknown.set(!a); });
     } else {
       this.refAgent.set(null); this.refUnknown.set(false);
