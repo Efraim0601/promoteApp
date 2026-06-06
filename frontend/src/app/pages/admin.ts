@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -74,17 +74,18 @@ import { TxRowComponent } from '../shared/tx-row';
         </div>
         <div style="display:flex;flex-direction:column;gap:12px">
           <field [label]="i18n.t('card_price')">
-            <div class="input-prefix"><input inputmode="numeric" [value]="cfg.price" (input)="onCfg('price', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
+            <div class="input-prefix"><input inputmode="numeric" [value]="cfg().price" (input)="onCfg('price', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
           </field>
           <field [label]="i18n.t('fees')">
-            <div class="input-prefix"><input inputmode="numeric" [value]="cfg.fees" (input)="onCfg('fees', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
+            <div class="input-prefix"><input inputmode="numeric" [value]="cfg().fees" (input)="onCfg('fees', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
           </field>
           <field [label]="i18n.t('transport_fee')">
-            <div class="input-prefix"><input inputmode="numeric" [value]="cfg.transport" (input)="onCfg('transport', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
+            <div class="input-prefix"><input inputmode="numeric" [value]="cfg().transport" (input)="onCfg('transport', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
           </field>
-          <button class="btn btn-primary" [disabled]="!changed" (click)="saveCfg()" style="padding:12px">
+          <button class="btn btn-primary" [disabled]="!changed()" (click)="saveCfg()" style="padding:12px">
             @if (saved()) { <ic name="check" [size]="18" [sw]="2.5"></ic> {{ i18n.t('saved') }} } @else { {{ i18n.t('save') }} }
           </button>
+          @if (saveErr()) { <p class="err" style="font-size:12px;text-align:center;margin-top:2px">{{ i18n.t('save_error') }}</p> }
         </div>
       </div>
 
@@ -118,14 +119,20 @@ export class AdminComponent implements OnInit {
 
   stats = signal<AdminStats | null>(null);
   txs = signal<Subscription[]>([]);
-  cfg: CardConfig = { price: 0, fees: 0, transport: 0 };
-  private original: CardConfig = { price: 0, fees: 0, transport: 0 };
+  // Signals so the "save" button's [disabled] binding stays reactive (the app is zoneless).
+  cfg = signal<CardConfig>({ price: 0, fees: 0, transport: 0 });
+  private original = signal<CardConfig>({ price: 0, fees: 0, transport: 0 });
+  changed = computed(() => {
+    const c = this.cfg(), o = this.original();
+    return c.price !== o.price || c.fees !== o.fees || c.transport !== o.transport;
+  });
   saved = signal(false);
+  saveErr = signal(false);
 
   ngOnInit() {
     this.api.adminStats().subscribe((s) => this.stats.set(s));
     this.api.allSubscriptions().subscribe((t) => this.txs.set(t));
-    this.api.getConfig().subscribe((c) => { this.cfg = { ...c }; this.original = { ...c }; });
+    this.api.getConfig().subscribe((c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); });
   }
 
   get reversed() { return this.txs().slice().reverse(); }
@@ -134,16 +141,18 @@ export class AdminComponent implements OnInit {
     return (count / max) * 100;
   }
   onCfg(k: keyof CardConfig, e: Event) {
-    this.cfg[k] = Number((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 8)) || 0;
-    this.saved.set(false);
-  }
-  get changed() {
-    return this.cfg.price !== this.original.price || this.cfg.fees !== this.original.fees || this.cfg.transport !== this.original.transport;
+    const n = Number((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 8)) || 0;
+    this.cfg.update((v) => ({ ...v, [k]: n }));
+    this.saved.set(false); this.saveErr.set(false);
   }
   saveCfg() {
-    this.api.updateConfig(this.cfg).subscribe((c) => {
-      this.original = { ...c }; this.cfg = { ...c };
-      this.saved.set(true); setTimeout(() => this.saved.set(false), 1600);
+    this.saveErr.set(false);
+    this.api.updateConfig(this.cfg()).subscribe({
+      next: (c) => {
+        this.original.set({ ...c }); this.cfg.set({ ...c });
+        this.saved.set(true); setTimeout(() => this.saved.set(false), 1600);
+      },
+      error: () => this.saveErr.set(true),
     });
   }
   openRef(ref: string) { this.router.navigate(['/print'], { queryParams: { ref } }); }
