@@ -77,7 +77,10 @@ public class SubscriptionService {
         int amount = total(cfg, delivery);
         boolean isSelf = "self".equals(channel);
 
-        AppUser referrer = isSelf ? resolveAgentByPhone(req.referrerPhone()) : null;
+        // Resolve the referrer (parrain) by phone for BOTH channels. In the self path the
+        // referrer also becomes the owning agent (QR sale attribution); in the assisted path
+        // the seller stays the logged-in agent and the referrer is recorded for tracking only.
+        AppUser referrer = resolveAgentByPhone(req.referrerPhone());
         boolean cash = "cash".equals(req.pay());
 
         Subscription s = Subscription.builder()
@@ -95,7 +98,7 @@ public class SubscriptionService {
                 .channel(channel)
                 .agentId(isSelf ? (referrer != null ? referrer.getId() : null) : agentId)
                 .referrerName(referrer != null ? referrer.getName() : null)
-                .referrerPhone(isSelf && req.referrerPhone() != null && !req.referrerPhone().isBlank()
+                .referrerPhone(req.referrerPhone() != null && !req.referrerPhone().isBlank()
                         ? "+237 " + req.referrerPhone().replaceAll("\\D", "") : null)
                 .payStatus(cash ? PayStatus.cash : PayStatus.pending)
                 .printed(false)

@@ -41,13 +41,6 @@ export class Api {
   byRef(ref: string): Observable<Subscription> {
     return this.http.get<Subscription>(`${this.base}/subscriptions/${ref}`);
   }
-  pay(ref: string, outcome: 'validate' | 'fail'): Observable<Subscription> {
-    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/pay`, { outcome });
-  }
-  /** Which payment gateway is live (simulated | trustpayway). */
-  paymentProvider(): Observable<{ provider: string }> {
-    return this.http.get<{ provider: string }>(`${this.base}/payment/provider`);
-  }
   /** Poll the live payment status of a subscription (public, lightweight). */
   paymentStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus }> {
     return this.http.get<{ ref: string; payStatus: PayStatus }>(`${this.base}/subscriptions/${ref}/status`);

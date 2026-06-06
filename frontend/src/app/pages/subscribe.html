@@ -24,17 +24,8 @@
     </div>
     @if (phase() === 'wait') {
       <div class="scr-foot">
-        @if (isSimulated) {
-          <!-- Demo only: drive the result manually when no real aggregator is connected. -->
-          <button class="btn btn-primary" (click)="finishOk()"><ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('simulate_validate') }}</button>
-          <div style="display:flex;gap:10px">
-            <button class="btn btn-ghost" (click)="finishFail()" style="font-size:13px">{{ i18n.t('simulate_fail') }}</button>
-            <button class="btn btn-ghost" (click)="exit()" style="font-size:13px">{{ i18n.t('cancel') }}</button>
-          </div>
-        } @else {
-          <!-- Real gateway: the result arrives via the webhook; we just wait & poll. -->
-          <button class="btn btn-ghost" (click)="exit()" style="font-size:13px">{{ i18n.t('cancel') }}</button>
-        }
+        <!-- The result arrives via the aggregator (webhook + polling); the client just confirms on their phone. -->
+        <button class="btn btn-ghost" (click)="exit()" style="font-size:13px">{{ i18n.t('cancel') }}</button>
       </div>
     }
   </div>
@@ -132,24 +123,22 @@
         <expiry-field [label]="i18n.t('cni_exp')" [value]="form.cniExp" (valueChange)="set('cniExp', $event)" [err]="e('cniExp')"></expiry-field>
         <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
 
-        @if (isSelf) {
-          <div style="border-top:1px solid var(--border);padding-top:16px">
-            <phone-field [label]="i18n.t('ref_phone_label3')" [value]="form.refPhone" (valueChange)="set('refPhone', $event)" [hint]="i18n.t('ref_phone_hint3')"></phone-field>
-            @if (refAgent()) {
-              <div style="display:flex;align-items:center;gap:9px;margin-top:10px;padding:10px 12px;border-radius:var(--radius);background:var(--success-soft)">
-                <avatar [name]="refAgent()!.name" [size]="32"></avatar>
-                <div style="min-width:0;flex:1">
-                  <div style="font-size:13px;font-weight:700;color:var(--success)">{{ refAgent()!.name }}</div>
-                  <div style="font-size:11px;color:var(--muted)">{{ refAgent()!.agency }}</div>
-                </div>
-                <ic name="check" [size]="18" [sw]="2.6" style="color:var(--success)"></ic>
+        <div style="border-top:1px solid var(--border);padding-top:16px">
+          <phone-field [label]="i18n.t('ref_phone_label3')" [value]="form.refPhone" (valueChange)="set('refPhone', $event)" [hint]="i18n.t('ref_phone_hint3')"></phone-field>
+          @if (refAgent()) {
+            <div style="display:flex;align-items:center;gap:9px;margin-top:10px;padding:10px 12px;border-radius:var(--radius);background:var(--success-soft)">
+              <avatar [name]="refAgent()!.name" [size]="32"></avatar>
+              <div style="min-width:0;flex:1">
+                <div style="font-size:13px;font-weight:700;color:var(--success)">{{ refAgent()!.name }}</div>
+                <div style="font-size:11px;color:var(--muted)">{{ refAgent()!.agency }}</div>
               </div>
-            }
-            @if (refUnknown()) {
-              <p class="muted" style="font-size:11.5px;margin-top:9px;display:flex;align-items:center;gap:6px"><ic name="alert" [size]="14"></ic> {{ i18n.t('ref_unknown') }}</p>
-            }
-          </div>
-        }
+              <ic name="check" [size]="18" [sw]="2.6" style="color:var(--success)"></ic>
+            </div>
+          }
+          @if (refUnknown()) {
+            <p class="muted" style="font-size:11.5px;margin-top:9px;display:flex;align-items:center;gap:6px"><ic name="alert" [size]="14"></ic> {{ i18n.t('ref_unknown') }}</p>
+          }
+        </div>
       }
 
       <!-- Step 1: ID document (CNI recto + verso, rear camera) -->

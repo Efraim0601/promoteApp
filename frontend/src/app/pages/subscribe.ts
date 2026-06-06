@@ -69,9 +69,6 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   copied = signal(false);
   busy = signal(false);
 
-  /** Active payment gateway (simulated | trustpayway) — drives whether demo buttons show. */
-  provider = signal<string>('simulated');
-  get isSimulated() { return this.provider() === 'simulated'; }
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
 
@@ -85,7 +82,6 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.channel = this.route.snapshot.data['channel'] === 'self' ? 'self' : 'agent';
     this.api.getConfig().subscribe((c) => (this.config = c));
-    this.api.paymentProvider().subscribe({ next: (p) => this.provider.set(p.provider), error: () => {} });
   }
 
   ngOnDestroy() { this.stopPolling(); }
@@ -96,7 +92,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   }
 
   private onRefPhone(v: string) {
-    if (this.isSelf && v.length === 9) {
+    if (v.length === 9) {
       this.api.resolveAgent(v).subscribe((a) => { this.refAgent.set(a); this.refUnknown.set(!a); });
     } else {
       this.refAgent.set(null); this.refUnknown.set(false);
@@ -192,7 +188,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       pay: this.form.pay, delivery: this.form.delivery,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
-      referrerPhone: this.isSelf ? this.form.refPhone : undefined,
+      referrerPhone: this.form.refPhone || undefined,
     };
   }
 
@@ -209,9 +205,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
         else {
           this.proc.set('paying');
           this.runMomo();
-          // Real gateway: the customer confirms on their phone and the result arrives via
-          // webhook — poll the backend for it. Simulated mode keeps the manual demo buttons.
-          if (!this.isSimulated) this.startStatusPolling(s.ref);
+          // The customer confirms on their phone; the result arrives via the aggregator
+          // (webhook + get-status) — poll the backend until it resolves.
+          this.startStatusPolling(s.ref);
         }
       },
       error: () => this.busy.set(false),
@@ -260,17 +256,6 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   private stopPolling() {
     this.polling = false;
     if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
-  }
-  finishOk() {
-    const r = this.result(); if (!r) return;
-    this.api.pay(r.ref, 'validate').subscribe(() => {
-      this.result.set({ ...r, payStatus: 'paid', amount: this.total });
-      this.proc.set('reference');
-    });
-  }
-  finishFail() {
-    const r = this.result(); if (!r) return;
-    this.api.pay(r.ref, 'fail').subscribe(() => this.proc.set('failed'));
   }
   retry() { this.stopPolling(); this.proc.set(null); }
 
