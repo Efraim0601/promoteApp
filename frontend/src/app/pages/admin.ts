@@ -1,9 +1,11 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { AdminStats, CardConfig, CreateUserRequest, Role, Subscription, User } from '../core/models';
+import { payById } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -211,7 +213,62 @@ import { TxRowComponent } from '../shared/tx-row';
             <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_empty') }}</p>
           } @else {
             <div style="display:flex;flex-direction:column">
-              @for (t of filteredTxs(); track t.ref) { <tx-row [t]="t" (open)="openRef(t.ref)"></tx-row> }
+              @for (t of filteredTxs(); track t.ref) {
+                <tx-row [t]="t" (open)="toggleExpand(t.ref)"></tx-row>
+                @if (expandedRef() === t.ref) {
+                  <div class="card" style="margin:2px 2px 8px;padding:13px 14px;background:var(--surface-2)">
+                    <!-- Photos: client + CNI recto/verso (présence + aperçu) -->
+                    <div style="display:flex;gap:10px;margin-bottom:8px">
+                      <div style="flex:1;text-align:center">
+                        @if (dSelfie()) {
+                          <img [src]="dSelfie()" alt="photo client" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+                        } @else {
+                          <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="user" [size]="22"></ic></div>
+                        }
+                        <div class="muted" style="font-size:10px;margin-top:3px">{{ i18n.t('tx_photo_client') }} · <b [style.color]="t.hasSelfie ? 'var(--success)' : 'var(--accent)'">{{ i18n.t(t.hasSelfie ? 'tx_present' : 'tx_absent') }}</b></div>
+                      </div>
+                      <div style="flex:1;text-align:center">
+                        @if (dRecto()) {
+                          <img [src]="dRecto()" alt="CNI recto" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+                        } @else {
+                          <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
+                        }
+                        <div class="muted" style="font-size:10px;margin-top:3px">{{ i18n.t('pp_cni_recto') }} · <b [style.color]="t.hasCniRecto ? 'var(--success)' : 'var(--accent)'">{{ i18n.t(t.hasCniRecto ? 'tx_present' : 'tx_absent') }}</b></div>
+                      </div>
+                      <div style="flex:1;text-align:center">
+                        @if (dVerso()) {
+                          <img [src]="dVerso()" alt="CNI verso" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+                        } @else {
+                          <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
+                        }
+                        <div class="muted" style="font-size:10px;margin-top:3px">{{ i18n.t('pp_cni_verso') }} · <b [style.color]="t.hasCniVerso ? 'var(--success)' : 'var(--accent)'">{{ i18n.t(t.hasCniVerso ? 'tx_present' : 'tx_absent') }}</b></div>
+                      </div>
+                    </div>
+
+                    <div style="font-size:13px">
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_datetime') }}</span><span class="val">{{ fmtDateTime(t.createdAt) }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('ref') }}</span><span class="val">{{ t.ref }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('nom') }} / {{ i18n.t('prenom') }}</span><span class="val">{{ t.fullName }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('sexe') }}</span><span class="val">{{ sexeLabel(t.sexe) }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('cni_short') }}</span><span class="val">{{ t.cni }}@if (t.cniExp) { <span class="muted" style="font-weight:600"> · {{ i18n.t('validity') }} {{ t.cniExp }}</span> }</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('niu_short') }}</span><span class="val">@if (t.niu) { {{ t.niu }} } @else { <span class="muted">{{ i18n.t('niu_none') }}</span> }</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_contact_phone') }}</span><span class="val">{{ t.phone || '—' }}</span></div>
+                      @if (t.email) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('email_label') }}</span><span class="val">{{ t.email }}</span></div> }
+                      @if (t.quartier || t.region) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('quartier') }} / {{ i18n.t('region_label') }}</span><span class="val">{{ t.quartier }}{{ t.quartier && t.region ? ' · ' : '' }}{{ t.region }}</span></div> }
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val">{{ t.pay === 'cash' ? i18n.t('pay_cash_name') : payName(t.pay) }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_pay_phone') }}</span><span class="val">{{ t.payPhone || '—' }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ t.referrerName || '—' }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_referrer_phone') }}</span><span class="val">{{ t.referrerPhone || '—' }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ i18n.t('del_' + t.delivery + '_title') }}</span></div>
+                      <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_channel') }}</span><span class="val">{{ t.channel === 'self' ? i18n.t('online_channel') : (i18n.t('tx_agent') + ' · ' + agentName(t.agentId)) }}</span></div>
+                      @if (t.cardNumber) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pp_card_number') }}</span><span class="val">{{ t.cardNumber }}</span></div> }
+                      <div class="srow total" style="padding:8px 0"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(t.amount) }}</span></div>
+                    </div>
+
+                    <button class="btn btn-outline" (click)="openRef(t.ref)" style="margin-top:10px;padding:9px;font-size:13px"><ic name="printer" [size]="15"></ic> {{ i18n.t('tx_open_print') }}</button>
+                  </div>
+                }
+              }
             </div>
           }
         </div>
@@ -227,6 +284,7 @@ export class AdminComponent implements OnInit {
   auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
+  private sanitizer = inject(DomSanitizer);
 
   /** Active sidebar section. */
   section = signal<'overview' | 'config' | 'users' | 'transactions'>('overview');
@@ -259,6 +317,12 @@ export class AdminComponent implements OnInit {
   txAgent = signal('all');    // all | <agentId> | self
   txFrom = signal('');        // yyyy-mm-dd
   txTo = signal('');
+  // --- expandable transaction detail (full client file) ---
+  expandedRef = signal<string | null>(null);
+  dSelfie = signal<SafeUrl | null>(null);
+  dRecto = signal<SafeUrl | null>(null);
+  dVerso = signal<SafeUrl | null>(null);
+  private detailUrls: string[] = [];
   filteredTxs = computed(() => {
     const q = this.txSearch().trim().toLowerCase();
     const digits = this.txSearch().replace(/\D/g, '');
@@ -318,10 +382,23 @@ export class AdminComponent implements OnInit {
   }
   exportCsv() {
     const rows = this.filteredTxs();
-    const head = ['Reference', 'Nom', 'Telephone', 'Paiement', 'Statut', 'Montant', 'Canal', 'Date'];
+    const head = [
+      'Date', 'Reference', 'Nom', 'Sexe', 'CNI', 'Expiration CNI', 'NIU', 'Telephone contact', 'Email',
+      'Quartier', 'Region', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
+      'Paiement', 'Telephone paiement', 'Recommande par', 'Telephone parrain',
+      'Livraison', 'Canal', 'Vendeur', 'Numero carte', 'Statut', 'Montant',
+    ];
+    const yn = (b: boolean) => (b ? 'Oui' : 'Non');
     const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
     const lines = [head.join(',')].concat(
-      rows.map((t) => [t.ref, t.fullName, t.phone, t.pay, t.status, String(t.amount), t.channel, t.createdAt].map(esc).join(',')),
+      rows.map((t) => [
+        this.fmtDateTime(t.createdAt), t.ref, t.fullName, t.sexe, t.cni, t.cniExp, t.niu ?? '',
+        t.phone, t.email, t.quartier, t.region,
+        yn(t.hasSelfie), yn(t.hasCniRecto), yn(t.hasCniVerso),
+        t.pay, t.payPhone ?? '', t.referrerName ?? '', t.referrerPhone ?? '',
+        t.delivery, t.channel === 'self' ? 'En ligne' : (this.agentName(t.agentId)), t.cardNumber ?? '',
+        t.status, String(t.amount),
+      ].map((v) => esc(String(v))).join(',')),
     );
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -350,4 +427,44 @@ export class AdminComponent implements OnInit {
     });
   }
   openRef(ref: string) { this.router.navigate(['/print'], { queryParams: { ref } }); }
+
+  /** Toggle the full-detail panel under an admin row; lazily load its KYC images. */
+  toggleExpand(ref: string) {
+    this.clearDetailImages();
+    if (this.expandedRef() === ref) { this.expandedRef.set(null); return; }
+    this.expandedRef.set(ref);
+    const t = this.txs().find((x) => x.ref === ref);
+    if (!t) return;
+    if (t.hasSelfie) this.loadDetailImage(ref, 'selfie', this.dSelfie);
+    if (t.hasCniRecto) this.loadDetailImage(ref, 'cni-recto', this.dRecto);
+    if (t.hasCniVerso) this.loadDetailImage(ref, 'cni-verso', this.dVerso);
+  }
+  private loadDetailImage(ref: string, kind: string, target: { set: (v: SafeUrl | null) => void }) {
+    this.api.imageBlob(ref, kind).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        this.detailUrls.push(url);
+        target.set(this.sanitizer.bypassSecurityTrustUrl(url));
+      },
+      error: () => target.set(null),
+    });
+  }
+  private clearDetailImages() {
+    this.detailUrls.forEach((u) => URL.revokeObjectURL(u));
+    this.detailUrls = [];
+    this.dSelfie.set(null); this.dRecto.set(null); this.dVerso.set(null);
+  }
+
+  /** Display helpers for the detail panel. */
+  fmtDateTime(iso: string) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString(this.i18n.lang() === 'en' ? 'en-GB' : 'fr-FR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  }
+  sexeLabel(s: string) { return s === 'M' ? this.i18n.t('sexe_m') : s === 'F' ? this.i18n.t('sexe_f') : (s || '—'); }
+  payName(pay: string) { return payById(pay).name; }
+  agentName(id: string | null) { return this.usersList().find((u) => u.id === id)?.name ?? id ?? '—'; }
 }

@@ -111,6 +111,14 @@
 
         <p class="muted" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t(isSaraPending ? 'ref_instr_sara' : 'ref_instr') }}</p>
 
+        <div class="card" style="width:100%;padding:14px 16px;display:flex;gap:11px;align-items:flex-start;text-align:left;background:color-mix(in srgb, var(--af-gold) 14%, transparent);border-color:color-mix(in srgb, var(--af-gold) 45%, transparent)">
+          <span style="width:34px;height:34px;border-radius:10px;background:var(--af-gold);color:#5a4200;display:flex;align-items:center;justify-content:center;flex-shrink:0"><ic name="store" [size]="18"></ic></span>
+          <div style="min-width:0">
+            <div style="font-size:13px;font-weight:800;color:#5a4200">{{ i18n.t('pickup_title') }}</div>
+            <div style="font-size:12px;line-height:1.45;margin-top:2px;color:#6b4f00">{{ i18n.t('pickup_notice') }}</div>
+          </div>
+        </div>
+
         <div class="card" style="padding:4px 16px;width:100%">
           <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid'"></status-badge></span></div>
           <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>
