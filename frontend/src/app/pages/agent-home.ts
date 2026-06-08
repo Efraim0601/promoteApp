@@ -9,12 +9,13 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
 import { TxRowComponent } from '../shared/tx-row';
+import { TxDetailComponent } from '../shared/tx-detail';
 import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../shared/fields';
 
 @Component({
   selector: 'page-agent-home',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -86,7 +87,12 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
             <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_no_match') }}</p>
           } @else {
             <div style="display:flex;flex-direction:column">
-              @for (t of filtered(); track t.ref) { <tx-row [t]="t" (open)="openRef(t.ref)"></tx-row> }
+              @for (t of filtered(); track t.ref) {
+                <tx-row [t]="t" (open)="toggleExpand(t.ref)"></tx-row>
+                @if (expandedRef() === t.ref) {
+                  <tx-detail [t]="t" (openPrint)="openRef($event)"></tx-detail>
+                }
+              }
             </div>
           }
         </div>
@@ -159,6 +165,7 @@ export class AgentHomeComponent implements OnInit {
   txPay = signal('all');      // all | om | mtn | sara | cash
   txFrom = signal('');        // yyyy-mm-dd
   txTo = signal('');
+  expandedRef = signal<string | null>(null);
   filtered = computed(() => {
     const q = this.txSearch().trim().toLowerCase();
     const digits = this.txSearch().replace(/\D/g, '');
@@ -191,11 +198,22 @@ export class AgentHomeComponent implements OnInit {
   /** Export the currently filtered sales as CSV (reference + key details). */
   exportCsv() {
     const rows = this.filtered();
-    const head = ['Reference', 'Nom', 'NIU', 'Telephone', 'Paiement', 'Statut', 'Montant', 'Ref SARA', 'Date'];
+    const head = [
+      'Date', 'Reference', 'Nom', 'Sexe', 'CNI', 'Expiration CNI', 'NIU', 'Telephone contact', 'Email',
+      'Quartier', 'Region', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
+      'Paiement', 'Telephone paiement', 'Recommande par', 'Telephone parrain',
+      'Livraison', 'Numero carte', 'Statut', 'Montant', 'Ref SARA',
+    ];
+    const yn = (b: boolean) => (b ? 'Oui' : 'Non');
     const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
     const lines = [head.join(',')].concat(
-      rows.map((t) => [t.ref, t.fullName, t.niu ?? '', t.phone, t.pay, t.status,
-        String(t.amount), t.saraRef ?? '', t.createdAt].map((v) => esc(String(v))).join(',')),
+      rows.map((t) => [
+        t.createdAt, t.ref, t.fullName, t.sexe, t.cni, t.cniExp, t.niu ?? '',
+        t.phone, t.email, t.quartier, t.region,
+        yn(t.hasSelfie), yn(t.hasCniRecto), yn(t.hasCniVerso),
+        t.pay, t.payPhone ?? '', t.referrerName ?? '', t.referrerPhone ?? '',
+        t.delivery, t.cardNumber ?? '', t.status, String(t.amount), t.saraRef ?? '',
+      ].map((v) => esc(String(v))).join(',')),
     );
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -211,6 +229,7 @@ export class AgentHomeComponent implements OnInit {
 
   newSub() { this.router.navigateByUrl('/subscribe'); }
   openRef(ref: string) { this.router.navigate(['/print'], { queryParams: { ref } }); }
+  toggleExpand(ref: string) { this.expandedRef.set(this.expandedRef() === ref ? null : ref); }
 
   submit() {
     if (!this.canSubmit) return;
