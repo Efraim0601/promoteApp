@@ -34,7 +34,7 @@ class PromoteApplicationTests {
         CreateSubscriptionRequest req = new CreateSubscriptionRequest(
                 "Test", "Client", "M", "445566778", null, "01/01/2031", "618641969",
                 "test@client.cm", "Bonamoussadi", "Littoral",
-                "om", null, "promote", true, null, null, null, null, null);
+                "om", null, "promote", true, null, null, null, null, null, null);
         Subscription s = service.create(req, "self", null);
         service.applyPayment(s.getRef(), "validate");
 
