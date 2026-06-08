@@ -354,7 +354,7 @@ export class AdminComponent implements OnInit {
       'Date', 'Reference', 'Nom', 'Sexe', 'CNI', 'Expiration CNI', 'NIU', 'Telephone contact', 'Email',
       'Quartier', 'Region', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
       'Paiement', 'Telephone paiement', 'Recommande par', 'Telephone parrain',
-      'Livraison', 'Canal', 'Vendeur', 'Numero carte', 'Statut', 'Montant',
+      'Livraison', 'Canal', 'Vendeur', 'Numero carte', 'PAN', 'Statut', 'Montant',
     ];
     const yn = (b: boolean) => (b ? 'Oui' : 'Non');
     const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
@@ -364,7 +364,7 @@ export class AdminComponent implements OnInit {
         t.phone, t.email, t.quartier, t.region,
         yn(t.hasSelfie), yn(t.hasCniRecto), yn(t.hasCniVerso),
         t.pay, t.payPhone ?? '', t.referrerName ?? '', t.referrerPhone ?? '',
-        t.delivery, t.channel === 'self' ? 'En ligne' : (this.agentName(t.agentId)), t.cardNumber ?? '',
+        t.delivery, t.channel === 'self' ? 'En ligne' : (this.agentName(t.agentId)), t.cardNumber ?? '', t.pan ?? '',
         t.status, String(t.amount),
       ].map((v) => esc(String(v))).join(',')),
     );

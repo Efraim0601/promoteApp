@@ -60,6 +60,7 @@ public class Subscription {
 
     private boolean printed;
     private String cardNumber;      // physical card number, entered at the print point before printing
+    private String pan;             // PAN (Primary Account Number) captured when the card is activated
     private boolean selfieVerified;
 
     /** Object-storage keys of the captured KYC images (null if not captured). */

@@ -62,7 +62,7 @@ public final class Dtos {
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
-            String saraRef, String saraPayerPhone, Integer saraAmount, String cardNumber,
+            String saraRef, String saraPayerPhone, Integer saraAmount, String cardNumber, String pan,
             String status, String createdAt, String paymentMessage) {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
@@ -73,13 +73,13 @@ public final class Dtos {
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
                     s.getSaraReceiptKey() != null,
-                    s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(), s.getCardNumber(),
+                    s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(), s.getCardNumber(), s.getPan(),
                     s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage());
         }
     }
 
-    /** Print point — physical card number entered before printing (required). */
-    public record PrintRequest(String cardNumber) {}
+    /** Print point — physical card number (required) + PAN (optional) entered at activation. */
+    public record PrintRequest(String cardNumber, String pan) {}
 
     /** Print point — replace a captured KYC image (re-uploaded via /api/kyc/image).
      *  kind = selfie | cni-recto | cni-verso; key is the new object-storage key. */

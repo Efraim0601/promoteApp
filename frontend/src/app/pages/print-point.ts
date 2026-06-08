@@ -88,6 +88,9 @@ import { SpinnerComponent } from '../shared/spinner';
             @if (r.cardNumber) {
               <div class="muted" style="font-size:12.5px"><ic name="idcard" [size]="13" style="vertical-align:-2px;margin-right:3px"></ic>{{ i18n.t('pp_card_number') }} : <b style="color:var(--text)">{{ r.cardNumber }}</b></div>
             }
+            @if (r.pan) {
+              <div class="muted" style="font-size:12.5px"><ic name="idcard" [size]="13" style="vertical-align:-2px;margin-right:3px"></ic>{{ i18n.t('pp_pan') }} : <b style="color:var(--text)">{{ r.pan }}</b></div>
+            }
           </div>
         } @else {
           <div class="card" style="overflow:hidden">
@@ -214,6 +217,14 @@ import { SpinnerComponent } from '../shared/spinner';
                            (input)="cardNumber.set($any($event.target).value)" style="letter-spacing:.04em;font-weight:600" />
                   </div>
                 </field>
+                <!-- PAN (Primary Account Number) — captured at activation, optional -->
+                <field [label]="i18n.t('pp_pan')" [hint]="i18n.t('pp_pan_hint')">
+                  <div class="input-prefix">
+                    <span class="pfx"><ic name="idcard" [size]="16"></ic></span>
+                    <input inputmode="numeric" [placeholder]="i18n.t('pp_pan_ph')" [value]="pan()"
+                           (input)="pan.set($any($event.target).value)" style="letter-spacing:.04em;font-weight:600" />
+                  </div>
+                </field>
               </div>
             }
           </div>
@@ -279,6 +290,7 @@ export class PrintPointComponent implements OnInit {
   photoBusy = signal(false);
   printing = signal(false);
   cardNumber = signal('');
+  pan = signal('');
   cardTouched = signal(false);
   private objectUrls: string[] = [];
 
@@ -325,14 +337,14 @@ export class PrintPointComponent implements OnInit {
   }
   again() {
     this.ref.set(''); this.searched.set(false); this.rec.set(null); this.results.set([]); this.clearSelfie();
-    this.cardNumber.set(''); this.cardTouched.set(false); this.retaking.set(false);
+    this.cardNumber.set(''); this.pan.set(''); this.cardTouched.set(false); this.retaking.set(false);
   }
   /** Validate the print — card number is required and stored with the record. */
   doPrint(ref: string) {
     this.cardTouched.set(true);
     if (!this.cardNumberOk || this.printing()) return;
     this.printing.set(true);
-    this.api.print(ref, this.cardNumber().trim()).subscribe({
+    this.api.print(ref, this.cardNumber().trim(), this.pan().trim() || undefined).subscribe({
       next: (s) => { this.rec.set(s); this.printing.set(false); },
       error: () => this.printing.set(false),
     });
@@ -403,7 +415,7 @@ export class PrintPointComponent implements OnInit {
     this.rec.set(s);
     this.editingNiu.set(false); this.niuDraft.set('');
     this.retaking.set(false); this.photoBusy.set(false);
-    this.cardTouched.set(false); this.cardNumber.set(s.cardNumber ?? '');
+    this.cardTouched.set(false); this.cardNumber.set(s.cardNumber ?? ''); this.pan.set(s.pan ?? '');
     // Prefill the editable SARA receipt fields with what was auto-extracted.
     this.saraRefDraft.set(s.saraRef ?? '');
     this.saraPhoneDraft.set(s.saraPayerPhone ?? '');

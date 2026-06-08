@@ -100,7 +100,7 @@ public class SubscriptionController {
     /** Print point — mark a card printed & handed over. */
     @PatchMapping("/{ref}/print")
     public SubscriptionDto print(@PathVariable String ref, @RequestBody PrintRequest req) {
-        return SubscriptionDto.of(service.markPrinted(ref, req.cardNumber()));
+        return SubscriptionDto.of(service.markPrinted(ref, req.cardNumber(), req.pan()));
     }
 
     /** Print point — replace a captured KYC image (e.g. retake a badly-shot photo) before printing. */

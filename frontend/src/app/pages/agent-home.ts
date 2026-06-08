@@ -213,7 +213,7 @@ export class AgentHomeComponent implements OnInit {
       'Date', 'Reference', 'Nom', 'Sexe', 'CNI', 'Expiration CNI', 'NIU', 'Telephone contact', 'Email',
       'Quartier', 'Region', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
       'Paiement', 'Telephone paiement', 'Recommande par', 'Telephone parrain',
-      'Livraison', 'Numero carte', 'Statut', 'Montant', 'Ref SARA',
+      'Livraison', 'Numero carte', 'PAN', 'Statut', 'Montant', 'Ref SARA',
     ];
     const yn = (b: boolean) => (b ? 'Oui' : 'Non');
     const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
@@ -223,7 +223,7 @@ export class AgentHomeComponent implements OnInit {
         t.phone, t.email, t.quartier, t.region,
         yn(t.hasSelfie), yn(t.hasCniRecto), yn(t.hasCniVerso),
         t.pay, t.payPhone ?? '', t.referrerName ?? '', t.referrerPhone ?? '',
-        t.delivery, t.cardNumber ?? '', t.status, String(t.amount), t.saraRef ?? '',
+        t.delivery, t.cardNumber ?? '', t.pan ?? '', t.status, String(t.amount), t.saraRef ?? '',
       ].map((v) => esc(String(v))).join(',')),
     );
     const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });

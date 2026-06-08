@@ -1,5 +1,6 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
+import * as QRCode from 'qrcode';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Agent, CardConfig, Subscription } from '../core/models';
@@ -78,7 +79,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   touched = signal(false);
   refAgent = signal<Agent | null>(null);
   refUnknown = signal(false);
-  result = signal<{ ref: string; payStatus?: string; amount?: number; message?: string | null } | null>(null);
+  result = signal<{ ref: string; payStatus?: string; amount?: number; message?: string | null;
+                    fullName?: string; pay?: string; payPhone?: string | null; createdAt?: string } | null>(null);
+  receiptBusy = signal(false);
   copied = signal(false);
   busy = signal(false);
 
@@ -86,6 +89,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   private polling = false;
 
   readonly REGIONS = REGIONS;
+  /** Progressive guidance shown on the CNI capture (i18n keys, rendered as a checklist). */
+  readonly cniTips = ['cni_tip_flat', 'cni_tip_light', 'cni_tip_glare', 'cni_tip_frame'];
 
   form: WizardForm = {
     prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '',
@@ -348,7 +353,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       next: (s: Subscription) => {
         this.busy.set(false);
         this.clearPersist();   // record created server-side — drop the local draft
-        this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage });
+        this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage,
+          fullName: s.fullName, pay: s.pay, payPhone: s.payPhone, createdAt: s.createdAt });
         // cash and SARA money are settled off-platform → straight to the reference screen, no polling.
         if (this.form.pay === 'cash' || this.form.pay === 'sara') { this.proc.set('reference'); }
         else if (s.payStatus === 'failed') { this.proc.set('failed'); } // gateway rejected the push
@@ -433,6 +439,126 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   goPrint() {
     const r = this.result();
     this.router.navigate(['/print'], { queryParams: r ? { ref: r.ref } : {} });
+  }
+
+  /** Human-readable payment status for the receipt. */
+  private statusLabel(payStatus?: string) {
+    const k: Record<string, string> = {
+      paid: 'st_paid', cash: 'st_cash', sara_pending: 'st_sara_pending', pending: 'st_awaiting', failed: 'st_failed',
+    };
+    return this.i18n.t(k[payStatus ?? ''] ?? 'st_awaiting');
+  }
+  private payDisplay(pay?: string) {
+    return pay === 'cash' ? this.i18n.t('pay_cash_name') : pay ? payById(pay).name : '—';
+  }
+  private fmtDateTime(iso?: string) {
+    const d = iso ? new Date(iso) : new Date();
+    if (isNaN(d.getTime())) return iso ?? '';
+    return d.toLocaleString(this.i18n.lang() === 'en' ? 'en-GB' : 'fr-FR',
+      { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  private loadImg(src: string): Promise<HTMLImageElement> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = src;
+    });
+  }
+  private wrap(ctx: CanvasRenderingContext2D, text: string, maxW: number): string[] {
+    const words = text.split(' '); const lines: string[] = []; let line = '';
+    for (const w of words) {
+      const test = line ? line + ' ' + w : w;
+      if (ctx.measureText(test).width > maxW && line) { lines.push(line); line = w; }
+      else line = test;
+    }
+    if (line) lines.push(line);
+    return lines;
+  }
+
+  /** Generate and download a PNG receipt: payment info + reference + QR to show at the print point. */
+  async downloadReceipt() {
+    const r = this.result();
+    if (!r || this.receiptBusy()) return;
+    this.receiptBusy.set(true);
+    try {
+      const W = 760, DARK = '#0F2A1B', RED = '#C8102E', MUTED = '#6b7770', LINE = '#e3e8e5';
+      // QR encoding the print-point deep link.
+      let qrImg: HTMLImageElement | null = null;
+      try {
+        const url = await QRCode.toDataURL(this.refUrl || r.ref, { width: 520, margin: 1, errorCorrectionLevel: 'M', color: { dark: DARK, light: '#ffffff' } });
+        qrImg = await this.loadImg(url);
+      } catch { /* QR optional */ }
+
+      // Rows of payment info (skip empty payment phone).
+      const rows: [string, string][] = [
+        [this.i18n.t('tx_datetime'), this.fmtDateTime(r.createdAt)],
+        [this.i18n.t('receipt_holder'), r.fullName || '—'],
+        [this.i18n.t('pay_method_label'), this.payDisplay(r.pay)],
+      ];
+      if (r.payPhone) rows.push([this.i18n.t('tx_pay_phone'), r.payPhone]);
+      rows.push([this.i18n.t('receipt_status'), this.statusLabel(r.payStatus)]);
+      rows.push([this.i18n.t('amount_paid'), this.i18n.money(r.amount ?? 0)]);
+
+      // Measure the footer (pickup note) to size the canvas.
+      const meas = document.createElement('canvas').getContext('2d')!;
+      meas.font = '14px system-ui, sans-serif';
+      const noteLines = this.wrap(meas, this.i18n.t('pickup_notice'), W - 96);
+
+      const qrTop = 230, qrSize = 260;
+      const rowsTop = qrTop + qrSize + 130;
+      const noteTop = rowsTop + rows.length * 52 + 26;
+      const H = noteTop + 26 + noteLines.length * 22 + 60;
+
+      const scale = 2;
+      const canvas = document.createElement('canvas');
+      canvas.width = W * scale; canvas.height = H * scale;
+      const ctx = canvas.getContext('2d')!;
+      ctx.scale(scale, scale);
+      ctx.textBaseline = 'alphabetic';
+
+      // Background
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      // Header band
+      ctx.fillStyle = DARK; ctx.fillRect(0, 0, W, 110);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '700 28px system-ui, sans-serif'; ctx.fillText(this.i18n.t('card_name').toUpperCase(), 48, 52);
+      ctx.font = '400 16px system-ui, sans-serif'; ctx.globalAlpha = 0.85; ctx.fillText(this.i18n.t('bank'), 48, 82); ctx.globalAlpha = 1;
+      // Title + status
+      ctx.fillStyle = DARK; ctx.font = '700 25px system-ui, sans-serif'; ctx.fillText(this.i18n.t('receipt_title'), 48, 165);
+      ctx.fillStyle = RED; ctx.font = '700 16px system-ui, sans-serif'; ctx.fillText(this.statusLabel(r.payStatus), 48, 194);
+      // QR
+      if (qrImg) ctx.drawImage(qrImg, (W - qrSize) / 2, qrTop, qrSize, qrSize);
+      // Reference
+      ctx.textAlign = 'center';
+      ctx.fillStyle = MUTED; ctx.font = '600 14px system-ui, sans-serif'; ctx.fillText(this.i18n.t('ref_label'), W / 2, qrTop + qrSize + 40);
+      ctx.fillStyle = DARK; ctx.font = '800 30px system-ui, sans-serif'; ctx.fillText(r.ref, W / 2, qrTop + qrSize + 80);
+      ctx.textAlign = 'left';
+      // Divider
+      ctx.strokeStyle = LINE; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(48, rowsTop - 30); ctx.lineTo(W - 48, rowsTop - 30); ctx.stroke();
+      // Rows
+      rows.forEach(([label, value], i) => {
+        const y = rowsTop + i * 52;
+        ctx.fillStyle = MUTED; ctx.font = '400 15px system-ui, sans-serif'; ctx.textAlign = 'left'; ctx.fillText(label, 48, y);
+        ctx.fillStyle = DARK; ctx.font = '700 16px system-ui, sans-serif'; ctx.textAlign = 'right'; ctx.fillText(value, W - 48, y);
+        ctx.strokeStyle = LINE; ctx.beginPath(); ctx.moveTo(48, y + 18); ctx.lineTo(W - 48, y + 18); ctx.stroke();
+      });
+      ctx.textAlign = 'left';
+      // Pickup note
+      ctx.fillStyle = DARK; ctx.font = '400 14px system-ui, sans-serif';
+      noteLines.forEach((ln, i) => ctx.fillText(ln, 48, noteTop + 26 + i * 22));
+      // Generated timestamp
+      ctx.fillStyle = MUTED; ctx.font = '400 11px system-ui, sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(`${this.i18n.t('receipt_generated')} ${this.fmtDateTime()}`, W / 2, H - 24);
+
+      const a = document.createElement('a');
+      a.href = canvas.toDataURL('image/png');
+      a.download = `recu-${r.ref}.png`;
+      a.click();
+    } finally {
+      this.receiptBusy.set(false);
+    }
   }
 
   // waiting description split helpers

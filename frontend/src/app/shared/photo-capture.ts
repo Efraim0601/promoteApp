@@ -24,9 +24,21 @@ import { assessDocument, DocIssue } from './image-quality';
             <ic name="check" [size]="16" [sw]="2.6"></ic>
           </span>
         </div>
-        <button class="btn btn-ghost" (click)="retakePhoto()" style="padding:10px 14px;font-size:13px;width:auto">
-          <ic name="refresh" [size]="16"></ic> {{ i18n.t('selfie_retake') }}
-        </button>
+        <!-- Non-blocking quality warning: the shot is kept, the user decides to retake or continue. -->
+        @if (qualityIssue()) {
+          <p style="display:flex;gap:7px;align-items:flex-start;font-size:12px;line-height:1.4;max-width:280px;text-align:left;color:var(--accent);font-weight:600;background:var(--accent-soft);border-radius:10px;padding:9px 11px">
+            <ic name="alert" [size]="16" [sw]="2.4" style="flex:0 0 auto;margin-top:1px"></ic>
+            <span>{{ i18n.t('q_' + qualityIssue()) }}<br><span style="font-weight:500;color:var(--muted)">{{ i18n.t('q_keep_or_retake') }}</span></span>
+          </p>
+        }
+        <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+          <button class="btn btn-ghost" (click)="retakePhoto()" style="padding:10px 14px;font-size:13px;width:auto">
+            <ic name="refresh" [size]="16"></ic> {{ i18n.t('selfie_retake') }}
+          </button>
+          <button class="btn btn-outline" (click)="pickFromGallery()" style="padding:10px 14px;font-size:13px;width:auto">
+            <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
+          </button>
+        </div>
       </div>
     } @else {
       <div class="card" style="padding:16px;display:flex;flex-direction:column;align-items:center;gap:12px">
@@ -45,11 +57,17 @@ import { assessDocument, DocIssue } from './image-quality';
           @if (shooting()) { <span style="position:absolute;inset:0;background:#fff;animation:pulse .9s ease"></span> }
         </div>
         <p class="muted" style="font-size:12px;text-align:center;line-height:1.45;max-width:260px">{{ guide || i18n.t('selfie_guide') }}</p>
-        @if (qualityIssue()) {
-          <p style="display:flex;gap:7px;align-items:flex-start;font-size:12px;line-height:1.4;max-width:280px;text-align:left;color:var(--accent);font-weight:600;background:var(--accent-soft);border-radius:10px;padding:9px 11px">
-            <ic name="alert" [size]="16" [sw]="2.4" style="flex:0 0 auto;margin-top:1px"></ic>
-            <span>{{ i18n.t('q_' + qualityIssue()) }}</span>
-          </p>
+        <!-- Progressive guidance: a short checklist of what makes a good shot. -->
+        @if (tips.length) {
+          <div style="width:100%;max-width:300px;display:flex;flex-direction:column;gap:6px;background:var(--surface-2);border-radius:12px;padding:11px 13px">
+            @if (tipsTitle) { <div style="font-size:11.5px;font-weight:800;color:var(--text)">{{ i18n.t(tipsTitle) }}</div> }
+            @for (tip of tips; track tip) {
+              <div style="display:flex;gap:7px;align-items:flex-start;font-size:11.5px;line-height:1.4;color:var(--muted)">
+                <ic name="check" [size]="14" [sw]="2.6" style="color:var(--success);flex:0 0 auto;margin-top:1px"></ic>
+                <span>{{ i18n.t(tip) }}</span>
+              </div>
+            }
+          </div>
         }
         <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
           @if (!streaming()) {
@@ -62,6 +80,9 @@ import { assessDocument, DocIssue } from './image-quality';
           } @else {
             <button class="btn btn-primary" (click)="shoot()" [disabled]="shooting()" style="width:auto;padding:11px 18px">
               <ic name="camera" [size]="18"></ic> {{ i18n.t('cam_take') }}
+            </button>
+            <button class="btn btn-outline" (click)="pickFromGallery()" style="width:auto;padding:11px 14px;font-size:13px">
+              <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
             </button>
             @if (allowFlip) {
               <button class="btn btn-outline" (click)="flip()" style="width:auto;padding:11px 14px;font-size:13px">
@@ -84,6 +105,9 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   @Input() allowFlip = false;
   @Input() round = false;
   @Input() guide = '';
+  /** Optional progressive guidance: i18n keys rendered as a checklist of tips. */
+  @Input() tips: string[] = [];
+  @Input() tipsTitle = '';
   @Input() boxW = 200;
   @Input() boxH = 200;
   /** When true, captured frames are checked for document quality (sharp, exposed, fully framed). */
@@ -141,12 +165,9 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     else { sh = v.videoWidth / cr; sy = (v.videoHeight - sh) / 2; }
     if (this.facing === 'user') { ctx.translate(w, 0); ctx.scale(-1, 1); }
     ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
-    // Quality gate: reject blurry / dark / glare / mis-framed shots, keep the camera open to retry.
-    if (this.qualityCheck) {
-      const verdict = assessDocument(c);
-      if (!verdict.ok) { this.qualityIssue.set(verdict.issue); this.shooting.set(false); return; }
-    }
-    this.qualityIssue.set(null);
+    // Quality check is now advisory (flexible): flag blurry / dark / glare / mis-framed shots as a
+    // warning shown on the preview, but keep the photo — the user retakes or continues as they wish.
+    this.qualityIssue.set(this.qualityCheck ? (assessDocument(c).issue ?? null) : null);
     const data = c.toDataURL('image/jpeg', 0.82);
     setTimeout(() => { this.shooting.set(false); this.stop(); this.imageData = data; this.captured.emit(data); }, 220);
   }

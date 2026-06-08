@@ -58,9 +58,9 @@ export class Api {
   imageBlob(ref: string, kind: string): Observable<Blob> {
     return this.http.get(`${this.base}/subscriptions/${ref}/image/${kind}`, { responseType: 'blob' });
   }
-  /** Print point — mark printed; the physical card number is required. */
-  print(ref: string, cardNumber: string): Observable<Subscription> {
-    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/print`, { cardNumber });
+  /** Print point — mark printed; the physical card number is required, the PAN optional. */
+  print(ref: string, cardNumber: string, pan?: string): Observable<Subscription> {
+    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/print`, { cardNumber, pan });
   }
   /** Print point — replace a captured KYC image (key from a fresh /kyc/image upload). */
   updatePhoto(ref: string, kind: string, key: string): Observable<Subscription> {

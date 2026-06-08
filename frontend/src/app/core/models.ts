@@ -57,6 +57,7 @@ export interface Subscription {
   saraPayerPhone?: string | null;  // payer ("Émetteur") phone extracted from the receipt
   saraAmount?: number | null;      // total amount extracted from the receipt (XAF)
   cardNumber?: string | null;      // physical card number, entered at the print point
+  pan?: string | null;             // PAN (Primary Account Number), captured at card activation
   status: string;     // printed | failed | cash | sara_pending | awaiting
   createdAt: string;
   paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")

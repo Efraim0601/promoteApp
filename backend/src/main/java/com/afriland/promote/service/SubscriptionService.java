@@ -253,13 +253,15 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public Subscription markPrinted(String ref, String cardNumber) {
+    public Subscription markPrinted(String ref, String cardNumber, String pan) {
         // The physical card number is mandatory: it ties the printed card to the subscription.
         if (cardNumber == null || cardNumber.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "card_number_required");
         }
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         s.setCardNumber(cardNumber.trim());
+        // PAN (Primary Account Number) — captured at activation, optional.
+        if (pan != null && !pan.isBlank()) s.setPan(pan.trim());
         s.setPrinted(true);
         return subs.save(s);
     }

@@ -123,6 +123,10 @@
           <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid'"></status-badge></span></div>
           <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>
         </div>
+
+        <button class="btn btn-outline" (click)="downloadReceipt()" [disabled]="receiptBusy()" style="width:100%">
+          @if (receiptBusy()) { <spinner tone="primary"></spinner> } @else { <ic name="download" [size]="17"></ic> {{ i18n.t('receipt_download') }} }
+        </button>
       </div>
     </div>
     <div class="scr-foot">
@@ -197,10 +201,10 @@
       @else if (step() === 1) {
         <div style="font-size:13px;font-weight:700;margin-top:2px">{{ i18n.t('cni_recto') }}</div>
         <photo-capture [imageData]="form.cniRectoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
-          [guide]="i18n.t('cni_recto_guide')" (captured)="onCniRecto($event)" (retake)="onRetakeRecto()"></photo-capture>
+          [guide]="i18n.t('cni_recto_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniRecto($event)" (retake)="onRetakeRecto()"></photo-capture>
         <div style="font-size:13px;font-weight:700;margin-top:6px">{{ i18n.t('cni_verso') }}</div>
         <photo-capture [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
-          [guide]="i18n.t('cni_verso_guide')" (captured)="onCniVerso($event)" (retake)="onRetakeVerso()"></photo-capture>
+          [guide]="i18n.t('cni_verso_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniVerso($event)" (retake)="onRetakeVerso()"></photo-capture>
         @if (touched() && !docsOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }
 
