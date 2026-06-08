@@ -46,6 +46,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/pay").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/status").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/kyc/image").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/kyc/receipt").permitAll()
                 // ---- payment aggregator: webhook (push) + which provider is live ----
                 .requestMatchers(HttpMethod.POST, "/api/payment/webhook/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/payment/provider").permitAll()

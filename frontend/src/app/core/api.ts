@@ -54,6 +54,11 @@ export class Api {
   uploadImage(image: string, kind: string): Observable<{ key: string }> {
     return this.http.post<{ key: string }>(`${this.base}/kyc/image`, { image, kind });
   }
+  /** Upload a SARA receipt (image/PDF data URL) and get back the auto-extracted fields
+   *  (reference is the primary one; the client confirms/corrects it). */
+  uploadReceipt(image: string): Observable<{ key: string; reference: string | null; payerPhone: string | null; amount: number | null }> {
+    return this.http.post<{ key: string; reference: string | null; payerPhone: string | null; amount: number | null }>(`${this.base}/kyc/receipt`, { image });
+  }
   /** Fetch a stored KYC image (staff) as a blob, for display. */
   imageBlob(ref: string, kind: string): Observable<Blob> {
     return this.http.get(`${this.base}/subscriptions/${ref}/image/${kind}`, { responseType: 'blob' });

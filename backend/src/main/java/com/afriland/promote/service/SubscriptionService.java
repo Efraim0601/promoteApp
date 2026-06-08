@@ -160,6 +160,8 @@ public class SubscriptionService {
             // Parse the uploaded receipt (PDF text / OCR) and prefill the reference, payer phone
             // and amount for the point-of-sale agent to confirm. Best-effort — never blocks.
             applyReceiptExtraction(s);
+            // The client may have confirmed/corrected the receipt reference on the form — it wins.
+            if (req.saraRef() != null && !req.saraRef().isBlank()) s.setSaraRef(req.saraRef().trim());
             s = subs.save(s);
         }
         return s;

@@ -53,6 +53,7 @@ public final class Dtos {
             String cniRectoKey,
             String cniVersoKey,
             String saraReceiptKey,       // SARA money: key of the uploaded receipt (required when pay == sara)
+            String saraRef,              // SARA money: receipt reference confirmed/corrected by the client
             String referrerPhone) {}     // self path only
 
     public record SubscriptionDto(
@@ -116,6 +117,10 @@ public final class Dtos {
     public record ImageUpload(@NotBlank String image, String kind) {}
 
     public record ImageKeyResponse(String key) {}
+
+    /** SARA receipt upload — returns the stored key plus what was auto-extracted (reference is the
+     *  primary field; the client confirms/corrects it). Any extracted field may be null. */
+    public record ReceiptUploadResponse(String key, String reference, String payerPhone, Integer amount) {}
 
     /** Agent claims a QR (self) sale by phone + CNI; {@code niu} is optionally captured at claim time. */
     public record ClaimRequest(@NotBlank String phone, @NotBlank String cni, String niu) {}

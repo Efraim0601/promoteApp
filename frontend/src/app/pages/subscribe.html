@@ -233,6 +233,32 @@
           <div style="font-size:13px;font-weight:700;margin-top:12px">{{ i18n.t('sara_receipt_label') }}</div>
           <receipt-upload [imageData]="form.saraReceiptData" [guide]="i18n.t('sara_receipt_guide')" (captured)="onSaraReceipt($event)"></receipt-upload>
           @if (touched() && !form.saraReceiptKey) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('sara_receipt_required') }}</div> }
+
+          <!-- After upload: show what was read from the receipt; the reference is the key field and is editable. -->
+          @if (saraExtracting()) {
+            <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('receipt_reading') }}</div>
+          } @else if (form.saraReceiptKey) {
+            <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:10px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <ic name="scan" [size]="16" style="color:var(--primary)"></ic>
+                <span style="font-size:13px;font-weight:800">{{ i18n.t('receipt_info_title') }}</span>
+              </div>
+              <field [label]="i18n.t('receipt_ref_label')" [hint]="i18n.t('receipt_ref_hint')"
+                     [err]="touched() && !form.saraRef.trim() ? i18n.t('receipt_ref_required') : null">
+                <div class="input-prefix">
+                  <span class="pfx"><ic name="hash" [size]="16"></ic></span>
+                  <input [placeholder]="i18n.t('receipt_ref_ph')" [value]="form.saraRef"
+                         (input)="set('saraRef', $any($event.target).value)" style="letter-spacing:.02em;font-weight:600" />
+                </div>
+              </field>
+              @if (saraExtract()?.payerPhone) {
+                <div class="srow" style="padding:6px 0"><span class="lbl">{{ i18n.t('pp_sara_payer') }}</span><span class="val">{{ saraExtract()!.payerPhone }}</span></div>
+              }
+              @if (saraExtract()?.amount) {
+                <div class="srow" style="padding:6px 0"><span class="lbl">{{ i18n.t('pp_sara_amount_field') }}</span><span class="val">{{ i18n.money(saraExtract()!.amount!) }}</span></div>
+              }
+            </div>
+          }
         }
       }
 

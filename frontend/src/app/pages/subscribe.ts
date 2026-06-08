@@ -27,7 +27,7 @@ interface WizardForm {
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
   cniVersoData: string | null; cniVersoKey: string | null;
-  saraReceiptData: string | null; saraReceiptKey: string | null;
+  saraReceiptData: string | null; saraReceiptKey: string | null; saraRef: string;
   pay: string; payPhone: string; delivery: string; refPhone: string;
 }
 
@@ -84,6 +84,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   receiptBusy = signal(false);
   copied = signal(false);
   busy = signal(false);
+  // SARA receipt: extraction in flight + the auto-extracted payer/amount shown alongside the reference.
+  saraExtracting = signal(false);
+  saraExtract = signal<{ payerPhone: string | null; amount: number | null } | null>(null);
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
@@ -97,7 +100,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     email: '', quartier: '', region: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
-    saraReceiptData: null, saraReceiptKey: null,
+    saraReceiptData: null, saraReceiptKey: null, saraRef: '',
     pay: 'om', payPhone: '', delivery: 'promote', refPhone: '',
   };
 
@@ -227,7 +230,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get payStepOk() {
     if (!this.form.pay) return false;
     if (this.isMomo) return this.payPhoneOk;
-    if (this.form.pay === 'sara') return !!this.form.saraReceiptKey;
+    // SARA: receipt uploaded AND its reference confirmed (the primary field — may need correction).
+    if (this.form.pay === 'sara') return !!this.form.saraReceiptKey && !!this.form.saraRef.trim();
     return true;
   }
   get stepValid() {
@@ -326,7 +330,18 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   /** SARA money receipt picked (image or PDF): keep preview + upload, store its key. */
   onSaraReceipt(dataUrl: string) {
     this.form.saraReceiptData = dataUrl; this.form.saraReceiptKey = null;
-    this.api.uploadImage(dataUrl, 'sara-receipt').subscribe({ next: (r) => { this.form.saraReceiptKey = r.key; this.persist(); }, error: () => {} });
+    this.saraExtract.set(null); this.saraExtracting.set(true);
+    // Upload + auto-extract: the receipt reference is the primary field; the client confirms/corrects it.
+    this.api.uploadReceipt(dataUrl).subscribe({
+      next: (r) => {
+        this.form.saraReceiptKey = r.key;
+        this.form.saraRef = r.reference ?? '';
+        this.saraExtract.set({ payerPhone: r.payerPhone, amount: r.amount });
+        this.saraExtracting.set(false);
+        this.persist();
+      },
+      error: () => { this.saraExtracting.set(false); },
+    });
   }
 
   private payload() {
@@ -338,6 +353,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
       saraReceiptKey: this.form.saraReceiptKey,
+      saraRef: this.form.pay === 'sara' ? (this.form.saraRef.trim() || undefined) : undefined,
       referrerPhone: this.form.refPhone || undefined,
     };
   }
@@ -422,7 +438,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', region: '',
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
-      saraReceiptData: null, saraReceiptKey: null,
+      saraReceiptData: null, saraReceiptKey: null, saraRef: '',
       pay: 'om', payPhone: '', delivery: 'promote', refPhone: '',
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);

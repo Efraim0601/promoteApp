@@ -1,8 +1,11 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.receipt.SaraReceipt;
+import com.afriland.promote.receipt.SaraReceiptExtractor;
 import com.afriland.promote.storage.ImageStorage;
 import com.afriland.promote.web.dto.Dtos.ImageKeyResponse;
 import com.afriland.promote.web.dto.Dtos.ImageUpload;
+import com.afriland.promote.web.dto.Dtos.ReceiptUploadResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -32,9 +35,11 @@ public class KycController {
             Pattern.compile("^data:(image/(?:jpeg|png)|application/pdf);base64,(.+)$", Pattern.DOTALL);
 
     private final ImageStorage storage;
+    private final SaraReceiptExtractor receiptExtractor;
 
-    public KycController(ImageStorage storage) {
+    public KycController(ImageStorage storage, SaraReceiptExtractor receiptExtractor) {
         this.storage = storage;
+        this.receiptExtractor = receiptExtractor;
     }
 
     @PostMapping("/image")
@@ -43,15 +48,32 @@ public class KycController {
         if (!KINDS.contains(kind)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_kind");
         }
+        Decoded d = decode(req.image(), RECEIPT_KIND.equals(kind));
+        String key = storage.store(d.data, d.contentType, kind);
+        return ResponseEntity.ok(new ImageKeyResponse(key));
+    }
+
+    /**
+     * Upload a SARA money receipt and immediately return what was auto-extracted — the receipt
+     * reference is the primary field. The client confirms/corrects it before submitting.
+     */
+    @PostMapping("/receipt")
+    public ResponseEntity<ReceiptUploadResponse> uploadReceipt(@Valid @RequestBody ImageUpload req) {
+        Decoded d = decode(req.image(), true);
+        String key = storage.store(d.data, d.contentType, RECEIPT_KIND);
+        SaraReceipt r = receiptExtractor.extract(d.data, d.contentType);
+        return ResponseEntity.ok(new ReceiptUploadResponse(key, r.reference(), r.payerPhone(), r.amount()));
+    }
+
+    /** Decode + validate a data URL / base64 payload. PDF is allowed only for receipts. */
+    private Decoded decode(String image, boolean isReceipt) {
         String contentType = "image/jpeg";
-        String b64 = req.image();
-        Matcher m = DATA_URL.matcher(req.image().trim());
+        String b64 = image;
+        Matcher m = DATA_URL.matcher(image.trim());
         if (m.matches()) {
             contentType = m.group(1);
             b64 = m.group(2);
         }
-        // PDF is allowed only for the SARA receipt; KYC images must stay images.
-        boolean isReceipt = RECEIPT_KIND.equals(kind);
         if ("application/pdf".equals(contentType) && !isReceipt) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pdf_not_allowed");
         }
@@ -65,7 +87,8 @@ public class KycController {
         if (data.length == 0 || data.length > max) {
             throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "image_too_large");
         }
-        String key = storage.store(data, contentType, kind);
-        return ResponseEntity.ok(new ImageKeyResponse(key));
+        return new Decoded(data, contentType);
     }
+
+    private record Decoded(byte[] data, String contentType) {}
 }
