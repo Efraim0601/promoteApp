@@ -77,10 +77,19 @@ public class SubscriptionService {
     /** Resolve a referrer (sales agent) by phone — ports app.jsx:findAgentByPhone. */
     public AppUser resolveAgentByPhone(String phone) {
         if (phone == null) return null;
-        String digits = phone.replaceAll("\\D", "");
+        // Match on the local 9-digit number so a client's "6XXXXXXXX" links to the agent
+        // regardless of how the agent's phone was stored (with/without the +237 country code).
+        String want = local9(phone);
+        if (want.isEmpty()) return null;
         return users.findByRole(Role.AGENT).stream()
-                .filter(a -> a.getPhone() != null && a.getPhone().replaceAll("\\D", "").equals(digits))
+                .filter(a -> a.getPhone() != null && local9(a.getPhone()).equals(want))
                 .findFirst().orElse(null);
+    }
+
+    /** Reduce a phone to its local Cameroon form (the last 9 digits), dropping any country code. */
+    private static String local9(String phone) {
+        String d = phone.replaceAll("\\D", "");
+        return d.length() > 9 ? d.substring(d.length() - 9) : d;
     }
 
     @Transactional

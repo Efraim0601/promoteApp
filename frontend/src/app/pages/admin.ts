@@ -149,7 +149,10 @@ import { SpinnerComponent } from '../shared/spinner';
           <field [label]="i18n.t('user_password')"><input class="input" type="text" [value]="nu().password" (input)="onNu('password', $event)" /></field>
           @if (nu().role === 'AGENT') {
             <field [label]="i18n.t('user_agency')"><input class="input" [value]="nu().agency || ''" (input)="onNu('agency', $event)" /></field>
-            <field [label]="i18n.t('user_phone')"><input class="input" inputmode="numeric" [value]="nu().phone || ''" (input)="onNu('phone', $event)" /></field>
+            <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
+                   [err]="(nu().phone || '') && !agentPhoneOk() ? i18n.t('user_phone_invalid') : null">
+              <input class="input" inputmode="numeric" maxlength="9" [value]="nu().phone || ''" (input)="onNu('phone', $event)" />
+            </field>
           }
           <button class="btn btn-primary" [disabled]="!userValid() || userBusy()" (click)="createUser()" style="padding:12px">
             @if (userBusy()) { <spinner></spinner> } @else { <ic name="plus" [size]="17"></ic> {{ i18n.t('user_create') }} }
@@ -275,9 +278,12 @@ export class AdminComponent implements OnInit {
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', password: '', agency: '', phone: '' });
   userMsg = signal<'' | 'created' | 'exists' | 'invalid'>('');
   userBusy = signal(false);
+  /** A commercial's phone must be a valid local 9-digit number (links client referrals to their stats). */
+  agentPhoneOk = computed(() => /^6\d{8}$/.test((this.nu().phone ?? '').replace(/\D/g, '')));
   userValid = computed(() => {
     const u = this.nu();
-    return !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && !!u.role && (u.password ?? '').length >= 4;
+    const base = !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && !!u.role && (u.password ?? '').length >= 4;
+    return base && (u.role !== 'AGENT' || this.agentPhoneOk());
   });
 
   // --- transaction filters ---

@@ -43,6 +43,14 @@ public class UserController {
         if (users.findByEmailIgnoreCase(req.email().trim()).isPresent()) {
             return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
         }
+        // Phone stored as the local 9-digit Cameroon number (country code stripped) so it always
+        // matches what a client types as their referrer's number → auto-attributed to the agent.
+        String phone = req.phone() == null ? "" : req.phone().replaceAll("\\D", "");
+        if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
+        // A commercial (agent) MUST have a valid phone — it links client referrals to their sales stats.
+        if (role == Role.AGENT && !phone.matches("6\\d{8}")) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("agent_phone_required"));
+        }
         AppUser u = AppUser.builder()
                 .id("u-" + UUID.randomUUID().toString().substring(0, 8))
                 .name(req.name().trim())
@@ -50,7 +58,7 @@ public class UserController {
                 .passwordHash(encoder.encode(req.password()))
                 .role(role)
                 .agency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim())
-                .phone(req.phone() == null || req.phone().isBlank() ? null : req.phone().replaceAll("\\D", ""))
+                .phone(phone.isBlank() ? null : phone)
                 .build();
         return ResponseEntity.ok(UserDto.of(users.save(u)));
     }
