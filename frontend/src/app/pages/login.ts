@@ -32,8 +32,13 @@ import { FieldComponent } from '../shared/fields';
       <field [label]="i18n.t('login_pw')" [err]="err() ? i18n.t('login_err') : null">
         <div class="input-prefix">
           <span class="pfx"><ic name="lock" [size]="16"></ic></span>
-          <input type="password" autocomplete="current-password" placeholder="••••••••"
+          <input [type]="showPw() ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••"
                  [value]="pw()" (input)="setPw($event)" (keydown.enter)="submit()" />
+          <button type="button" (click)="showPw.set(!showPw())"
+                  [title]="i18n.t(showPw() ? 'pw_hide' : 'pw_show')" [attr.aria-label]="i18n.t(showPw() ? 'pw_hide' : 'pw_show')"
+                  style="display:flex;align-items:center;padding:0 12px;background:transparent;border:none;cursor:pointer;color:var(--muted)">
+            <ic [name]="showPw() ? 'eyeOff' : 'eye'" [size]="18"></ic>
+          </button>
         </div>
       </field>
       <button class="btn btn-primary" (click)="submit()">{{ i18n.t('login_btn') }} <ic name="arrowR" [size]="18"></ic></button>
@@ -51,6 +56,7 @@ export class LoginComponent {
   email = signal('');
   pw = signal('');
   err = signal(false);
+  showPw = signal(false);
 
   setEmail(e: Event) { this.email.set((e.target as HTMLInputElement).value); this.err.set(false); }
   setPw(e: Event) { this.pw.set((e.target as HTMLInputElement).value); this.err.set(false); }
