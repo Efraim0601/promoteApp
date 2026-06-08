@@ -5,6 +5,7 @@ import { Api } from '../core/api';
 import { Subscription } from '../core/models';
 import { payById } from './constants';
 import { IconComponent } from './icon';
+import { SpinnerComponent } from './spinner';
 
 /**
  * Full detail of a subscription — every field the client filled in, plus the
@@ -15,7 +16,7 @@ import { IconComponent } from './icon';
 @Component({
   selector: 'tx-detail',
   standalone: true,
-  imports: [IconComponent],
+  imports: [IconComponent, SpinnerComponent],
   template: `
     <div class="card" style="margin:2px 2px 8px;padding:13px 14px;background:var(--surface-2)">
       <!-- Photos: client + CNI recto/verso (présence + aperçu) -->
@@ -23,6 +24,8 @@ import { IconComponent } from './icon';
         <div style="flex:1;text-align:center">
           @if (selfie()) {
             <img [src]="selfie()" alt="photo client" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+          } @else if (t.hasSelfie) {
+            <div style="width:100%;height:80px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="20"></spinner></div>
           } @else {
             <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="user" [size]="22"></ic></div>
           }
@@ -31,6 +34,8 @@ import { IconComponent } from './icon';
         <div style="flex:1;text-align:center">
           @if (recto()) {
             <img [src]="recto()" alt="CNI recto" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+          } @else if (t.hasCniRecto) {
+            <div style="width:100%;height:80px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="20"></spinner></div>
           } @else {
             <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
           }
@@ -39,6 +44,8 @@ import { IconComponent } from './icon';
         <div style="flex:1;text-align:center">
           @if (verso()) {
             <img [src]="verso()" alt="CNI verso" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+          } @else if (t.hasCniVerso) {
+            <div style="width:100%;height:80px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="20"></spinner></div>
           } @else {
             <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
           }

@@ -13,6 +13,7 @@ import { AvatarComponent } from '../shared/avatar';
 import { PhotoCaptureComponent } from '../shared/photo-capture';
 import { ReceiptUploadComponent } from '../shared/receipt-upload';
 import { TileChoiceComponent, TileOption } from '../shared/tile-choice';
+import { SpinnerComponent } from '../shared/spinner';
 import { PromoteCardComponent } from '../shared/promote-card';
 import { QrCodeComponent } from '../shared/qr-code';
 
@@ -52,6 +53,7 @@ const fmtExp = (d: string) => (d.length === 8 ? `${d.slice(0, 2)}/${d.slice(2, 4
     AppBarComponent, IconComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent,
     ExpiryFieldComponent, StepsComponent, StatusBadgeComponent, AvatarComponent,
     PhotoCaptureComponent, ReceiptUploadComponent, TileChoiceComponent, PromoteCardComponent, QrCodeComponent,
+    SpinnerComponent,
   ],
   templateUrl: './subscribe.html',
 })

@@ -10,11 +10,12 @@ import { AvatarComponent } from '../shared/avatar';
 import { FieldComponent } from '../shared/fields';
 import { TxRowComponent } from '../shared/tx-row';
 import { TxDetailComponent } from '../shared/tx-detail';
+import { SpinnerComponent } from '../shared/spinner';
 
 @Component({
   selector: 'page-admin',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxRowComponent, TxDetailComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxRowComponent, TxDetailComponent, SpinnerComponent],
   template: `
   <div class="scr">
     <app-bar class="appbar-wide">
@@ -49,6 +50,9 @@ import { TxDetailComponent } from '../shared/tx-detail';
       <!-- ========== OVERVIEW ========== -->
       @if (section() === 'overview') {
       <h1 style="font-size:21px">{{ i18n.t('nav_overview') }}</h1>
+      @if (statsLoading()) {
+      <div class="card load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+      } @else {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
@@ -83,6 +87,7 @@ import { TxDetailComponent } from '../shared/tx-detail';
           }
         </div>
       </div>
+      }
 
       }
 
@@ -97,6 +102,9 @@ import { TxDetailComponent } from '../shared/tx-detail';
             <p class="muted" style="font-size:11.5px;line-height:1.4;margin-top:3px">{{ i18n.t('config_sub') }}</p>
           </div>
         </div>
+        @if (cfgLoading()) {
+        <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else {
         <div style="display:flex;flex-direction:column;gap:12px">
           <field [label]="i18n.t('card_price')">
             <div class="input-prefix"><input inputmode="numeric" [value]="cfg().price" (input)="onCfg('price', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
@@ -107,11 +115,12 @@ import { TxDetailComponent } from '../shared/tx-detail';
           <field [label]="i18n.t('transport_fee')">
             <div class="input-prefix"><input inputmode="numeric" [value]="cfg().transport" (input)="onCfg('transport', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
           </field>
-          <button class="btn btn-primary" [disabled]="!changed()" (click)="saveCfg()" style="padding:12px">
-            @if (saved()) { <ic name="check" [size]="18" [sw]="2.5"></ic> {{ i18n.t('saved') }} } @else { {{ i18n.t('save') }} }
+          <button class="btn btn-primary" [disabled]="!changed() || saving()" (click)="saveCfg()" style="padding:12px">
+            @if (saving()) { <spinner></spinner> } @else if (saved()) { <ic name="check" [size]="18" [sw]="2.5"></ic> {{ i18n.t('saved') }} } @else { {{ i18n.t('save') }} }
           </button>
           @if (saveErr()) { <p class="err" style="font-size:12px;text-align:center;margin-top:2px">{{ i18n.t('save_error') }}</p> }
         </div>
+        }
       </div>
 
       }
@@ -143,7 +152,7 @@ import { TxDetailComponent } from '../shared/tx-detail';
             <field [label]="i18n.t('user_phone')"><input class="input" inputmode="numeric" [value]="nu().phone || ''" (input)="onNu('phone', $event)" /></field>
           }
           <button class="btn btn-primary" [disabled]="!userValid() || userBusy()" (click)="createUser()" style="padding:12px">
-            <ic name="plus" [size]="17"></ic> {{ i18n.t('user_create') }}
+            @if (userBusy()) { <spinner></spinner> } @else { <ic name="plus" [size]="17"></ic> {{ i18n.t('user_create') }} }
           </button>
           @if (userMsg() === 'created') { <p style="font-size:12px;text-align:center;color:var(--success);font-weight:700">{{ i18n.t('user_created') }}</p> }
           @if (userMsg() === 'exists') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_exists') }}</p> }
@@ -151,6 +160,9 @@ import { TxDetailComponent } from '../shared/tx-detail';
         </div>
 
         <div class="kicker" style="margin-top:16px;margin-bottom:6px">{{ i18n.t('users_list') }} · {{ usersList().length }}</div>
+        @if (usersLoading()) {
+        <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
+        } @else {
         <div style="display:flex;flex-direction:column">
           @for (u of usersList(); track u.id) {
             <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border)">
@@ -163,6 +175,7 @@ import { TxDetailComponent } from '../shared/tx-detail';
             </div>
           }
         </div>
+        }
       </div>
 
       }
@@ -208,7 +221,9 @@ import { TxDetailComponent } from '../shared/tx-detail';
           </div>
         </div>
         <div style="max-height:340px;overflow-y:auto;padding:0 6px 6px">
-          @if (filteredTxs().length === 0) {
+          @if (txLoading()) {
+            <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+          } @else if (filteredTxs().length === 0) {
             <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_empty') }}</p>
           } @else {
             <div style="display:flex;flex-direction:column">
@@ -239,6 +254,12 @@ export class AdminComponent implements OnInit {
 
   stats = signal<AdminStats | null>(null);
   txs = signal<Subscription[]>([]);
+  // Per-section loading flags so each panel can show a spinner while its request is in flight.
+  statsLoading = signal(true);
+  txLoading = signal(true);
+  usersLoading = signal(true);
+  cfgLoading = signal(true);
+  saving = signal(false);
   // Signals so the "save" button's [disabled] binding stays reactive (the app is zoneless).
   cfg = signal<CardConfig>({ price: 0, fees: 0, transport: 0 });
   private original = signal<CardConfig>({ price: 0, fees: 0, transport: 0 });
@@ -286,13 +307,16 @@ export class AdminComponent implements OnInit {
   });
 
   ngOnInit() {
-    this.api.adminStats().subscribe((s) => this.stats.set(s));
-    this.api.allSubscriptions().subscribe((t) => this.txs.set(t));
-    this.api.getConfig().subscribe((c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); });
+    this.api.adminStats().subscribe({ next: (s) => { this.stats.set(s); this.statsLoading.set(false); }, error: () => this.statsLoading.set(false) });
+    this.api.allSubscriptions().subscribe({ next: (t) => { this.txs.set(t); this.txLoading.set(false); }, error: () => this.txLoading.set(false) });
+    this.api.getConfig().subscribe({ next: (c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); this.cfgLoading.set(false); }, error: () => this.cfgLoading.set(false) });
     this.loadUsers();
   }
 
-  private loadUsers() { this.api.users().subscribe({ next: (u) => this.usersList.set(u), error: () => {} }); }
+  private loadUsers() {
+    this.usersLoading.set(true);
+    this.api.users().subscribe({ next: (u) => { this.usersList.set(u); this.usersLoading.set(false); }, error: () => this.usersLoading.set(false) });
+  }
   get agentUsers() { return this.usersList().filter((u) => u.role === 'AGENT'); }
 
   onNu(k: keyof CreateUserRequest, e: Event) {
@@ -361,13 +385,14 @@ export class AdminComponent implements OnInit {
     this.saved.set(false); this.saveErr.set(false);
   }
   saveCfg() {
-    this.saveErr.set(false);
+    if (this.saving()) return;
+    this.saveErr.set(false); this.saving.set(true);
     this.api.updateConfig(this.cfg()).subscribe({
       next: (c) => {
-        this.original.set({ ...c }); this.cfg.set({ ...c });
+        this.original.set({ ...c }); this.cfg.set({ ...c }); this.saving.set(false);
         this.saved.set(true); setTimeout(() => this.saved.set(false), 1600);
       },
-      error: () => this.saveErr.set(true),
+      error: () => { this.saveErr.set(true); this.saving.set(false); },
     });
   }
   openRef(ref: string) { this.router.navigate(['/print'], { queryParams: { ref } }); }

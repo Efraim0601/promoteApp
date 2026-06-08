@@ -11,12 +11,13 @@ import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
 import { PhotoCaptureComponent } from '../shared/photo-capture';
 import { StatusBadgeComponent } from '../shared/status-badge';
+import { SpinnerComponent } from '../shared/spinner';
 
 /** Print point — retrieve a KYC file by reference, then print & hand over the card. */
 @Component({
   selector: 'page-print-point',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -37,9 +38,15 @@ import { StatusBadgeComponent } from '../shared/status-badge';
             <input [placeholder]="i18n.t('pp_search_ph')" [value]="ref()" style="letter-spacing:.02em;font-weight:600"
                    (input)="onRef($event)" (keydown.enter)="doSearch()" />
           </div>
-          <button class="btn btn-primary" (click)="doSearch()" style="width:auto;padding:0 16px"><ic name="search" [size]="18"></ic></button>
+          <button class="btn btn-primary" (click)="doSearch()" [disabled]="loading()" style="width:auto;padding:0 16px">
+            @if (loading()) { <spinner [size]="18"></spinner> } @else { <ic name="search" [size]="18"></ic> }
+          </button>
         </div>
       </field>
+
+      @if (loading()) {
+        <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+      }
 
       @if (!rec() && results().length) {
         <div class="card" style="overflow:hidden">
@@ -146,7 +153,7 @@ import { StatusBadgeComponent } from '../shared/status-badge';
                   <span class="val" style="display:flex;gap:6px;align-items:center;justify-content:flex-end">
                     <input class="input" style="height:30px;padding:4px 9px;font-size:12.5px;max-width:160px" [placeholder]="i18n.t('niu_ph')"
                            [value]="niuDraft()" (input)="niuDraft.set($any($event.target).value)" (keydown.enter)="saveNiu(r.ref)" />
-                    <button class="icon-btn" (click)="saveNiu(r.ref)" [disabled]="savingNiu()" [title]="i18n.t('save')"><ic name="check" [size]="15" [sw]="2.4"></ic></button>
+                    <button class="icon-btn" (click)="saveNiu(r.ref)" [disabled]="savingNiu()" [title]="i18n.t('save')">@if (savingNiu()) { <spinner tone="primary" [size]="15"></spinner> } @else { <ic name="check" [size]="15" [sw]="2.4"></ic> }</button>
                     <button class="icon-btn" (click)="cancelNiu()" [title]="i18n.t('cancel')"><ic name="x" [size]="15"></ic></button>
                   </span>
                 } @else {
@@ -221,7 +228,9 @@ import { StatusBadgeComponent } from '../shared/status-badge';
       } @else if (r.payStatus === 'sara_pending') {
         <!-- Payment not yet confirmed: validate or reject the receipt before printing. -->
         <div class="scr-foot">
-          <button class="btn btn-primary" (click)="doValidateSara(r.ref)" [disabled]="validating()"><ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('pp_sara_validate') }}</button>
+          <button class="btn btn-primary" (click)="doValidateSara(r.ref)" [disabled]="validating()">
+            @if (validating()) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('pp_sara_validate') }} }
+          </button>
           <div style="display:flex;gap:10px">
             <button class="btn btn-ghost" (click)="doRejectSara(r.ref)" [disabled]="validating()" style="font-size:13px;color:var(--accent)"><ic name="x" [size]="16"></ic> {{ i18n.t('pp_sara_reject') }}</button>
             <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
@@ -229,7 +238,9 @@ import { StatusBadgeComponent } from '../shared/status-badge';
         </div>
       } @else {
         <div class="scr-foot">
-          <button class="btn btn-primary" (click)="doPrint(r.ref)" [disabled]="printing()"><ic name="printer" [size]="18"></ic> {{ i18n.t('pp_print') }}</button>
+          <button class="btn btn-primary" (click)="doPrint(r.ref)" [disabled]="printing()">
+            @if (printing()) { <spinner></spinner> } @else { <ic name="printer" [size]="18"></ic> {{ i18n.t('pp_print') }} }
+          </button>
           <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
         </div>
       }

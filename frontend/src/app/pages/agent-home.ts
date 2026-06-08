@@ -10,12 +10,13 @@ import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
 import { TxRowComponent } from '../shared/tx-row';
 import { TxDetailComponent } from '../shared/tx-detail';
+import { SpinnerComponent } from '../shared/spinner';
 import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../shared/fields';
 
 @Component({
   selector: 'page-agent-home',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -81,7 +82,9 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
         </div>
 
         <div style="max-height:360px;overflow-y:auto;padding:0 6px 6px">
-          @if (mine().length === 0) {
+          @if (loading()) {
+            <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+          } @else if (mine().length === 0) {
             <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_empty') }}</p>
           } @else if (filtered().length === 0) {
             <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_no_match') }}</p>
@@ -120,7 +123,9 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
             @if (res()) {
               <div class="feedback err-box"><ic name="alert" [size]="20" style="flex-shrink:0"></ic><div style="font-size:12px;font-weight:600;line-height:1.35">{{ i18n.t(failKey) }}</div></div>
             }
-            <button class="btn btn-primary" (click)="submit()" [disabled]="!canSubmit"><ic name="search" [size]="18"></ic> {{ i18n.t('claim_submit') }}</button>
+            <button class="btn btn-primary" (click)="submit()" [disabled]="!canSubmit || claimBusy()">
+              @if (claimBusy()) { <spinner></spinner> } @else { <ic name="search" [size]="18"></ic> {{ i18n.t('claim_submit') }} }
+            </button>
           } @else {
             <div class="feedback ok-box">
               <ic name="check" [size]="20" [sw]="2.6" style="flex-shrink:0"></ic>
@@ -152,6 +157,8 @@ export class AgentHomeComponent implements OnInit {
   stats = signal<AgentStats | null>(null);
   mine = signal<Subscription[]>([]);
   claiming = signal(false);
+  claimBusy = signal(false);
+  loading = signal(true);   // my-sales table while the request is in flight
   phone = signal('');
   cni = signal('');
   niu = signal('');
@@ -188,7 +195,11 @@ export class AgentHomeComponent implements OnInit {
   ngOnInit() { this.refresh(); }
   private refresh() {
     this.api.agentStats().subscribe((s) => this.stats.set(s));
-    this.api.mySubscriptions().subscribe((m) => this.mine.set(m));
+    this.loading.set(true);
+    this.api.mySubscriptions().subscribe({
+      next: (m) => { this.mine.set(m); this.loading.set(false); },
+      error: () => this.loading.set(false),
+    });
   }
 
   clearFilters() {
@@ -232,10 +243,14 @@ export class AgentHomeComponent implements OnInit {
   toggleExpand(ref: string) { this.expandedRef.set(this.expandedRef() === ref ? null : ref); }
 
   submit() {
-    if (!this.canSubmit) return;
-    this.api.claim(this.phone(), this.cni(), this.niu().trim() || undefined).subscribe((r) => {
-      this.res.set(r);
-      if (r.ok) this.refresh();
+    if (!this.canSubmit || this.claimBusy()) return;
+    this.claimBusy.set(true);
+    this.api.claim(this.phone(), this.cni(), this.niu().trim() || undefined).subscribe({
+      next: (r) => {
+        this.res.set(r); this.claimBusy.set(false);
+        if (r.ok) this.refresh();
+      },
+      error: () => this.claimBusy.set(false),
     });
   }
   close() { this.claiming.set(false); this.phone.set(''); this.cni.set(''); this.niu.set(''); this.res.set(null); }

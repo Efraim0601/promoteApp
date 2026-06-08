@@ -5,11 +5,12 @@ import { Auth } from '../core/auth';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
+import { SpinnerComponent } from '../shared/spinner';
 
 @Component({
   selector: 'page-login',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, SpinnerComponent],
   template: `
   <div class="scr">
     <app-bar></app-bar>
@@ -41,7 +42,9 @@ import { FieldComponent } from '../shared/fields';
           </button>
         </div>
       </field>
-      <button class="btn btn-primary" (click)="submit()">{{ i18n.t('login_btn') }} <ic name="arrowR" [size]="18"></ic></button>
+      <button class="btn btn-primary" (click)="submit()" [disabled]="busy()">
+        @if (busy()) { <spinner></spinner> } @else { {{ i18n.t('login_btn') }} <ic name="arrowR" [size]="18"></ic> }
+      </button>
 
       <div style="flex:1"></div>
       <button class="btn btn-outline" style="font-size:12.5px" (click)="clientPath()"><ic name="qr" [size]="16"></ic> {{ i18n.t('client_demo_link') }}</button>
@@ -57,14 +60,17 @@ export class LoginComponent {
   pw = signal('');
   err = signal(false);
   showPw = signal(false);
+  busy = signal(false);
 
   setEmail(e: Event) { this.email.set((e.target as HTMLInputElement).value); this.err.set(false); }
   setPw(e: Event) { this.pw.set((e.target as HTMLInputElement).value); this.err.set(false); }
 
   submit() {
+    if (this.busy()) return;
+    this.busy.set(true);
     this.auth.login(this.email().trim(), this.pw()).subscribe({
       next: () => this.router.navigateByUrl(this.auth.landingPath()),
-      error: () => this.err.set(true),
+      error: () => { this.err.set(true); this.busy.set(false); },
     });
   }
 

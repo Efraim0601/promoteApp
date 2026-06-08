@@ -262,7 +262,8 @@
         <button class="btn btn-primary" (click)="next()">{{ i18n.t('continue') }} <ic name="arrowR" [size]="19"></ic></button>
       } @else {
         <button class="btn btn-primary" (click)="confirm()" [disabled]="busy() || !formComplete">
-          @if (form.pay === 'cash') { <ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('confirm_cash') }} }
+          @if (busy()) { <spinner></spinner> }
+          @else if (form.pay === 'cash') { <ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('confirm_cash') }} }
           @else if (form.pay === 'sara') { <ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('confirm_sara') }} }
           @else { <ic name="phone" [size]="18"></ic> {{ i18n.t('pay_now') }} }
         </button>
