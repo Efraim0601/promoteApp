@@ -33,6 +33,7 @@ public class Subscription {
     private String phone;           // "+237 6XXXXXXXX"
     private String quartier;        // neighborhood
     private String region;          // administrative region
+    private String ville;           // city / town
 
     private String pay;             // om | mtn | cash | sara
     private String payPhone;        // "+237 6XXXXXXXX" — MoMo number used for payment (may differ from phone)

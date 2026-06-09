@@ -112,8 +112,8 @@ import { SpinnerComponent } from '../shared/spinner';
                 <div style="font-size:16px;font-weight:800">{{ r.fullName }}</div>
                 <div class="muted" style="font-size:12px;margin-top:3px">{{ i18n.t('cni_short') }} {{ r.cni }} · {{ i18n.t('validity') }} {{ r.cniExp }}</div>
                 <div class="muted" style="font-size:12px;margin-top:2px">{{ r.phone }}@if (r.email) { · {{ r.email }}}</div>
-                @if (r.quartier || r.region) {
-                  <div class="muted" style="font-size:12px;margin-top:2px">{{ r.quartier }}{{ r.quartier && r.region ? ' · ' : '' }}{{ r.region }}</div>
+                @if (r.quartier || r.ville || r.region) {
+                  <div class="muted" style="font-size:12px;margin-top:2px">{{ r.quartier }}{{ r.quartier && (r.ville || r.region) ? ' · ' : '' }}{{ r.ville }}{{ r.ville && r.region ? ' · ' : '' }}{{ r.region }}</div>
                 }
                 <div style="display:inline-flex;align-items:center;gap:6px;margin-top:7px;font-size:11.5px;color:var(--success);font-weight:700"><ic name="check" [size]="14" [sw]="2.6"></ic> {{ i18n.t('pp_selfie_ok') }}</div>
               </div>

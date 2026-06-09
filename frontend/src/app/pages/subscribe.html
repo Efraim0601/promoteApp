@@ -67,7 +67,7 @@
         </div>
         <div>
           <h1 style="font-size:22px">{{ i18n.t('failed_title') }}</h1>
-          <p class="muted" style="font-size:13.5px;line-height:1.5;max-width:290px;margin-top:8px">{{ i18n.t('failed_desc') }}</p>
+          <p class="muted" style="font-size:13.5px;line-height:1.5;max-width:290px;margin-top:8px">{{ i18n.t('failed_desc', { op: pm.name }) }}</p>
           @if (result()?.message) {
             <p style="font-size:13px;line-height:1.45;max-width:290px;margin-top:10px;color:var(--accent);font-weight:600">{{ result()!.message }}</p>
           }
@@ -178,6 +178,7 @@
             @for (r of REGIONS; track r) { <option [value]="r">{{ r }}</option> }
           </select>
         </field>
+        <field [label]="i18n.t('ville_label')" [err]="e('ville')"><input class="input" [placeholder]="i18n.t('ville_ph')" [value]="form.ville" (input)="set('ville', $any($event.target).value)" /></field>
 
         <div style="border-top:1px solid var(--border);padding-top:16px">
           <phone-field [label]="i18n.t('ref_phone_label3')" [value]="form.refPhone" (valueChange)="set('refPhone', $event)" [hint]="i18n.t('ref_phone_hint3')"></phone-field>
@@ -220,7 +221,7 @@
         <tile-choice [options]="payTiles" [value]="form.pay" (valueChange)="set('pay', $event)"></tile-choice>
         @if (isMomo) {
           <div style="margin-top:10px">
-            <phone-field [label]="i18n.t('pay_phone_label')" [value]="form.payPhone" (valueChange)="set('payPhone', $event)"
+            <phone-field [label]="i18n.t('pay_phone_label', { op: pm.name })" [value]="form.payPhone" (valueChange)="set('payPhone', $event)"
               [hint]="i18n.t('pay_phone_hint')" [err]="payPhoneErrorShown"></phone-field>
           </div>
         }
@@ -275,8 +276,9 @@
           <div class="srow"><span class="lbl">{{ i18n.t('email_label') }}</span><span class="val">{{ form.email }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('quartier') }}</span><span class="val">{{ form.quartier }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('region_label') }}</span><span class="val">{{ form.region }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('ville_label') }}</span><span class="val">{{ form.ville }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:22px;height:22px;font-size:9px;border-radius:6px;overflow:hidden">@if (pm.logo) { <img [src]="pm.logo" [alt]="pm.name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm.short }} }</span>{{ form.pay === 'cash' ? i18n.t('pay_cash_name') : pm.name }}</span></div>
-          @if (isMomo) { <div class="srow"><span class="lbl">{{ i18n.t('pay_phone_label') }}</span><span class="val">+237 {{ form.payPhone }}</span></div> }
+          @if (isMomo) { <div class="srow"><span class="lbl">{{ i18n.t('pay_phone_label', { op: pm.name }) }}</span><span class="val">+237 {{ form.payPhone }}</span></div> }
           @if (refAgent()) { <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ refAgent()!.name }}</span></div> }
         </div>
         <div class="card" style="padding:4px 16px">

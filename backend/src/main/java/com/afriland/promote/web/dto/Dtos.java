@@ -45,6 +45,7 @@ public final class Dtos {
             @NotBlank String email,
             @NotBlank String quartier,
             @NotBlank String region,
+            @NotBlank String ville,      // city / town
             @NotBlank String pay,        // om | mtn | cash | sara
             String payPhone,             // MoMo number used for payment (om/mtn) — may differ from phone
             String delivery,             // promote | agence | home (defaults to promote)
@@ -58,7 +59,7 @@ public final class Dtos {
 
     public record SubscriptionDto(
             String ref, String prenom, String nom, String fullName, String sexe, String email,
-            String cni, String niu, String cniExp, String phone, String quartier, String region,
+            String cni, String niu, String cniExp, String phone, String quartier, String region, String ville,
             String pay, String payPhone, String delivery, int amount, int transport,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
@@ -68,7 +69,7 @@ public final class Dtos {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
-                    s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(),
+                    s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
                     s.getPay(), s.getPayPhone(), s.getDelivery(), s.getAmount(), s.getTransport(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),

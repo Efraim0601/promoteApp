@@ -211,7 +211,7 @@ export class AgentHomeComponent implements OnInit {
     const rows = this.filtered();
     const head = [
       'Date', 'Reference', 'Nom', 'Sexe', 'CNI', 'Expiration CNI', 'NIU', 'Telephone contact', 'Email',
-      'Quartier', 'Region', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
+      'Quartier', 'Region', 'Ville', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
       'Paiement', 'Telephone paiement', 'Recommande par', 'Telephone parrain',
       'Livraison', 'Numero carte', 'PAN', 'Statut', 'Montant', 'Ref SARA',
     ];
@@ -220,7 +220,7 @@ export class AgentHomeComponent implements OnInit {
     const lines = [head.join(',')].concat(
       rows.map((t) => [
         t.createdAt, t.ref, t.fullName, t.sexe, t.cni, t.cniExp, t.niu ?? '',
-        t.phone, t.email, t.quartier, t.region,
+        t.phone, t.email, t.quartier, t.region, t.ville,
         yn(t.hasSelfie), yn(t.hasCniRecto), yn(t.hasCniVerso),
         t.pay, t.payPhone ?? '', t.referrerName ?? '', t.referrerPhone ?? '',
         t.delivery, t.cardNumber ?? '', t.pan ?? '', t.status, String(t.amount), t.saraRef ?? '',

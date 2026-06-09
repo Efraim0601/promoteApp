@@ -128,6 +128,7 @@ public class SubscriptionService {
                 .phone("+237 " + req.phone().replaceAll("\\D", ""))
                 .quartier(req.quartier() == null ? null : req.quartier().trim())
                 .region(req.region())
+                .ville(req.ville() == null ? null : req.ville().trim())
                 .pay(req.pay())
                 .payPhone(payPhone)
                 .delivery(delivery)

@@ -358,7 +358,7 @@ export class AdminComponent implements OnInit {
     const rows = this.filteredTxs();
     const head = [
       'Date', 'Reference', 'Nom', 'Sexe', 'CNI', 'Expiration CNI', 'NIU', 'Telephone contact', 'Email',
-      'Quartier', 'Region', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
+      'Quartier', 'Region', 'Ville', 'Photo client', 'Photo CNI recto', 'Photo CNI verso',
       'Paiement', 'Telephone paiement', 'Recommande par', 'Telephone parrain',
       'Livraison', 'Canal', 'Vendeur', 'Numero carte', 'PAN', 'Statut', 'Montant',
     ];
@@ -367,7 +367,7 @@ export class AdminComponent implements OnInit {
     const lines = [head.join(',')].concat(
       rows.map((t) => [
         this.fmtDateTime(t.createdAt), t.ref, t.fullName, t.sexe, t.cni, t.cniExp, t.niu ?? '',
-        t.phone, t.email, t.quartier, t.region,
+        t.phone, t.email, t.quartier, t.region, t.ville,
         yn(t.hasSelfie), yn(t.hasCniRecto), yn(t.hasCniVerso),
         t.pay, t.payPhone ?? '', t.referrerName ?? '', t.referrerPhone ?? '',
         t.delivery, t.channel === 'self' ? 'En ligne' : (this.agentName(t.agentId)), t.cardNumber ?? '', t.pan ?? '',

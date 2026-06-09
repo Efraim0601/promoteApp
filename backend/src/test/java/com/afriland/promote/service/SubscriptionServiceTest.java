@@ -28,7 +28,7 @@ class SubscriptionServiceTest {
     private CreateSubscriptionRequest req(String pay, String saraReceiptKey, String saraRef, String referrerPhone) {
         return new CreateSubscriptionRequest(
                 "Jean", "Kamga", "M", "1234ABCD", null, "12/04/2030", "677001122",
-                "jean@example.com", "Bonamoussadi", "Littoral",
+                "jean@example.com", "Bonamoussadi", "Littoral", "Douala",
                 pay, null, "promote", false, null, null, null, saraReceiptKey, saraRef, referrerPhone);
     }
 

@@ -62,7 +62,7 @@ import { SpinnerComponent } from './spinner';
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('niu_short') }}</span><span class="val">@if (t.niu) { {{ t.niu }} } @else { <span class="muted">{{ i18n.t('niu_none') }}</span> }</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_contact_phone') }}</span><span class="val">{{ t.phone || '—' }}</span></div>
         @if (t.email) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('email_label') }}</span><span class="val">{{ t.email }}</span></div> }
-        @if (t.quartier || t.region) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('quartier') }} / {{ i18n.t('region_label') }}</span><span class="val">{{ t.quartier }}{{ t.quartier && t.region ? ' · ' : '' }}{{ t.region }}</span></div> }
+        @if (t.quartier || t.ville || t.region) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('quartier') }} / {{ i18n.t('ville_label') }} / {{ i18n.t('region_label') }}</span><span class="val">{{ t.quartier }}{{ t.quartier && (t.ville || t.region) ? ' · ' : '' }}{{ t.ville }}{{ t.ville && t.region ? ' · ' : '' }}{{ t.region }}</span></div> }
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val">{{ t.pay === 'cash' ? i18n.t('pay_cash_name') : payName(t.pay) }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_pay_phone') }}</span><span class="val">{{ t.payPhone || '—' }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ t.referrerName || '—' }}</span></div>

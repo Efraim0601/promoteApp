@@ -23,7 +23,7 @@ const STEP_COUNT = STEP_KEYS.length;
 
 interface WizardForm {
   prenom: string; nom: string; sexe: string; cni: string; niu: string; cniExp: string; phone: string;
-  email: string; quartier: string; region: string;
+  email: string; quartier: string; region: string; ville: string;
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
   cniVersoData: string | null; cniVersoKey: string | null;
@@ -97,7 +97,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   form: WizardForm = {
     prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '',
-    email: '', quartier: '', region: '',
+    email: '', quartier: '', region: '', ville: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
     saraReceiptData: null, saraReceiptKey: null, saraRef: '',
@@ -190,15 +190,16 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       email: !f.email.trim() ? this.i18n.t('required') : !emailOk ? this.i18n.t('email_invalid') : null,
       quartier: !f.quartier.trim() ? this.i18n.t('required') : null,
       region: !f.region ? this.i18n.t('required') : null,
+      ville: !f.ville.trim() ? this.i18n.t('required') : null,
     };
   }
-  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'phone' | 'email' | 'quartier' | 'region'): string | null {
+  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'phone' | 'email' | 'quartier' | 'region' | 'ville'): string | null {
     return this.touched() ? this.errs[key] : null;
   }
 
   get step0ok() {
     const x = this.errs;
-    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.region;
+    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.region && !x.ville;
   }
   // Document / photo steps are satisfied by a local capture OR a restored upload key (so a
   // page reload mid-wizard doesn't force the client to retake what was already uploaded).
@@ -348,7 +349,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
       cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
-      email: this.form.email.trim(), quartier: this.form.quartier.trim(), region: this.form.region,
+      email: this.form.email.trim(), quartier: this.form.quartier.trim(), region: this.form.region, ville: this.form.ville.trim(),
       pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
@@ -435,7 +436,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     this.stopPolling();
     this.clearPersist();
     this.form = {
-      prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', region: '',
+      prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', region: '', ville: '',
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null, saraRef: '',
@@ -578,6 +579,6 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   }
 
   // waiting description split helpers
-  waitBefore() { return this.i18n.t('waiting_desc').split('{n}')[0]; }
-  waitAfter() { return this.i18n.t('waiting_desc').split('{n}')[1] ?? ''; }
+  waitBefore() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[0]; }
+  waitAfter() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[1] ?? ''; }
 }
