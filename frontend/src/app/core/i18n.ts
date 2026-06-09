@@ -236,6 +236,7 @@ const FR: Record<string, string> = {
   tx_all_status: 'Tous les statuts', tx_all_agents: 'Tous les vendeurs', tx_self: 'En ligne (client)',
   tx_all_pay: 'Tous les paiements', tx_no_match: 'Aucun résultat pour ces filtres.',
   tx_from: 'Du', tx_to: 'Au', tx_export: 'Exporter CSV', tx_clear: 'Réinitialiser', tx_count: 'résultat(s)',
+  tx_date: 'Date', tx_amount: 'Montant', tx_status: 'Statut',
   // Admin — détail complet d'une transaction (tous les champs saisis par le client)
   tx_detail: 'Détail de la transaction', tx_datetime: 'Date & heure',
   tx_contact_phone: 'Téléphone (contact)', tx_pay_phone: 'Téléphone du paiement',
@@ -457,6 +458,7 @@ const EN: Record<string, string> = {
   tx_all_status: 'All statuses', tx_all_agents: 'All sellers', tx_self: 'Online (client)',
   tx_all_pay: 'All payments', tx_no_match: 'No results for these filters.',
   tx_from: 'From', tx_to: 'To', tx_export: 'Export CSV', tx_clear: 'Reset', tx_count: 'result(s)',
+  tx_date: 'Date', tx_amount: 'Amount', tx_status: 'Status',
   // Admin — full transaction detail (every field filled by the client)
   tx_detail: 'Transaction detail', tx_datetime: 'Date & time',
   tx_contact_phone: 'Phone (contact)', tx_pay_phone: 'Payment phone',

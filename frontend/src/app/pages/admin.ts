@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -8,14 +8,16 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
 import { FieldComponent } from '../shared/fields';
-import { TxRowComponent } from '../shared/tx-row';
 import { TxDetailComponent } from '../shared/tx-detail';
 import { SpinnerComponent } from '../shared/spinner';
+import { StatusBadgeComponent } from '../shared/status-badge';
+import { ClientPhotoComponent } from '../shared/client-photo';
+import { payById, recordStatus } from '../shared/constants';
 
 @Component({
   selector: 'page-admin',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxRowComponent, TxDetailComponent, SpinnerComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent],
   template: `
   <div class="scr">
     <app-bar class="appbar-wide">
@@ -309,22 +311,54 @@ import { SpinnerComponent } from '../shared/spinner';
             <button class="btn btn-ghost" (click)="clearFilters()" style="flex:1;padding:9px;font-size:13px">{{ i18n.t('tx_clear') }}</button>
           </div>
         </div>
-        <div style="max-height:min(70vh,560px);overflow-y:auto;padding:0 6px 6px">
-          @if (txLoading()) {
-            <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
-          } @else if (filteredTxs().length === 0) {
-            <p class="muted" style="font-size:13px;padding:8px 14px 20px;text-align:center">{{ i18n.t('tx_empty') }}</p>
-          } @else {
-            <div style="display:flex;flex-direction:column">
-              @for (t of filteredTxs(); track t.ref) {
-                <tx-row [t]="t" [detailed]="true" (open)="toggleExpand(t.ref)"></tx-row>
-                @if (expandedRef() === t.ref) {
-                  <tx-detail [t]="t" [sellerName]="t.channel === 'self' ? null : agentName(t.agentId)" (openPrint)="openRef($event)"></tx-detail>
+        @if (txLoading()) {
+          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (filteredTxs().length === 0) {
+          <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('tx_empty') }}</p>
+        } @else {
+          <div style="overflow:auto;max-height:min(68vh,600px);padding:0 2px">
+            <table class="tx-table">
+              <thead>
+                <tr>
+                  <th style="width:46px"></th>
+                  <th>{{ i18n.t('client') }}</th>
+                  <th>{{ i18n.t('phone') }}</th>
+                  <th>{{ i18n.t('cni_short') }}</th>
+                  <th>{{ i18n.t('tx_date') }}</th>
+                  <th>{{ i18n.t('pay_method_label') }}</th>
+                  <th class="num">{{ i18n.t('tx_amount') }}</th>
+                  <th>{{ i18n.t('tx_status') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of pagedTxs(); track t.ref) {
+                  <tr class="tx-tr" (click)="toggleExpand(t.ref)">
+                    <td><client-photo [refId]="t.ref" [name]="t.fullName" [hasSelfie]="t.hasSelfie" [size]="38"></client-photo></td>
+                    <td><div class="cell-name">{{ t.fullName }}</div><div class="cell-sub">{{ t.ref }}@if (t.channel === 'self') { · {{ i18n.t('tx_self') }} }</div></td>
+                    <td class="nowrap">{{ t.phone || '—' }}</td>
+                    <td class="nowrap">{{ t.cni || '—' }}</td>
+                    <td class="nowrap">{{ txDate(t.createdAt) }}</td>
+                    <td class="nowrap"><span style="display:inline-flex;align-items:center;gap:6px"><span class="op-logo" [style.background]="pm(t).bg" [style.color]="pm(t).fg" style="width:20px;height:20px;font-size:8px;border-radius:5px;overflow:hidden;flex-shrink:0">@if (pm(t).logo) { <img [src]="pm(t).logo" [alt]="pm(t).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(t).short }} }</span>{{ t.pay === 'cash' ? i18n.t('pay_cash_name') : pm(t).name }}</span></td>
+                    <td class="num">{{ i18n.money(t.amount) }}</td>
+                    <td><status-badge [status]="rowStatus(t)"></status-badge></td>
+                  </tr>
+                  @if (expandedRef() === t.ref) {
+                    <tr class="tx-expand"><td colspan="8" style="padding:0 6px 10px;background:var(--surface-2)">
+                      <tx-detail [t]="t" [sellerName]="t.channel === 'self' ? null : agentName(t.agentId)" (openPrint)="openRef($event)"></tx-detail>
+                    </td></tr>
+                  }
                 }
-              }
+              </tbody>
+            </table>
+          </div>
+          <div class="tx-pager">
+            <span class="muted" style="font-size:11.5px">{{ filteredTxs().length }} {{ i18n.t('tx_count') }} · {{ i18n.t('step') }} {{ txPage() + 1 }} {{ i18n.t('of') }} {{ txPageCount() }}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" (click)="txPrev()" [disabled]="txPage() === 0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
+              <button class="btn btn-outline" (click)="txNext()" [disabled]="txPage() >= txPageCount() - 1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
             </div>
-          }
-        </div>
+          </div>
+        }
       </div>
       }
 
@@ -397,6 +431,25 @@ export class AdminComponent implements OnInit {
       return true;
     });
   });
+
+  // --- transactions table pagination ---
+  txPage = signal(0);
+  readonly txPageSize = 12;
+  txPageCount = computed(() => Math.max(1, Math.ceil(this.filteredTxs().length / this.txPageSize)));
+  pagedTxs = computed(() => {
+    const all = this.filteredTxs();
+    const p = Math.min(this.txPage(), this.txPageCount() - 1);
+    return all.slice(p * this.txPageSize, p * this.txPageSize + this.txPageSize);
+  });
+  // Any filter change (or fresh data) → back to the first page.
+  private readonly _txPageReset = effect(() => { this.filteredTxs(); this.txPage.set(0); });
+  txPrev() { this.txPage.update((p) => Math.max(0, p - 1)); }
+  txNext() { this.txPage.update((p) => Math.min(this.txPageCount() - 1, p + 1)); }
+
+  // Row helpers for the table cells.
+  pm = (t: Subscription) => payById(t.pay);
+  rowStatus = (t: Subscription) => recordStatus(t);
+  txDate = (iso: string) => this.fmtDateTime(iso);
 
   ngOnInit() {
     this.api.adminStats().subscribe({ next: (s) => { this.stats.set(s); this.statsLoading.set(false); }, error: () => this.statsLoading.set(false) });
