@@ -24,19 +24,13 @@ const STEP_COUNT = STEP_KEYS.length;
 
 interface WizardForm {
   prenom: string; nom: string; sexe: string; cni: string; niu: string; cniExp: string; phone: string;
-  email: string; quartier: string; region: string; ville: string;
+  email: string; quartier: string; ville: string;
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
   cniVersoData: string | null; cniVersoKey: string | null;
   saraReceiptData: string | null; saraReceiptKey: string | null; saraRef: string;
   pay: string; payPhone: string; delivery: string; refPhone: string;
 }
-
-/** Cameroon administrative regions (for the Région dropdown). */
-const REGIONS = [
-  'Adamaoua', 'Centre', 'Est', 'Extrême-Nord', 'Littoral',
-  'Nord', 'Nord-Ouest', 'Ouest', 'Sud', 'Sud-Ouest',
-];
 
 function parseExp(d: string): Date | null {
   if (d.length !== 8) return null;
@@ -92,13 +86,12 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
 
-  readonly REGIONS = REGIONS;
   /** Progressive guidance shown on the CNI capture (i18n keys, rendered as a checklist). */
   readonly cniTips = ['cni_tip_flat', 'cni_tip_light', 'cni_tip_glare', 'cni_tip_frame'];
 
   form: WizardForm = {
     prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '',
-    email: '', quartier: '', region: '', ville: '',
+    email: '', quartier: '', ville: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
     saraReceiptData: null, saraReceiptKey: null, saraRef: '',
@@ -190,17 +183,16 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       phone: !f.phone ? this.i18n.t('required') : !phoneOk ? this.i18n.t('invalid_phone') : null,
       email: !f.email.trim() ? this.i18n.t('required') : !emailOk ? this.i18n.t('email_invalid') : null,
       quartier: !f.quartier.trim() ? this.i18n.t('required') : null,
-      region: !f.region ? this.i18n.t('required') : null,
       ville: !f.ville.trim() ? this.i18n.t('required') : null,
     };
   }
-  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'phone' | 'email' | 'quartier' | 'region' | 'ville'): string | null {
+  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'phone' | 'email' | 'quartier' | 'ville'): string | null {
     return this.touched() ? this.errs[key] : null;
   }
 
   get step0ok() {
     const x = this.errs;
-    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.region && !x.ville;
+    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.ville;
   }
   // Document / photo steps are satisfied by a local capture OR a restored upload key (so a
   // page reload mid-wizard doesn't force the client to retake what was already uploaded).
@@ -355,7 +347,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
       cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
-      email: this.form.email.trim(), quartier: this.form.quartier.trim(), region: this.form.region, ville: this.form.ville.trim(),
+      email: this.form.email.trim(), quartier: this.form.quartier.trim(), ville: this.form.ville.trim(),
       pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
@@ -445,7 +437,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     this.stopPolling();
     this.clearPersist();
     this.form = {
-      prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', region: '', ville: '',
+      prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', ville: '',
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null, saraRef: '',

@@ -179,14 +179,6 @@
         <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
         <field [label]="i18n.t('email_label')" [err]="e('email')"><div class="input-prefix"><span class="pfx"><ic name="mail" [size]="17"></ic></span><input type="email" [placeholder]="i18n.t('email_ph')" [value]="form.email" (input)="set('email', $any($event.target).value)" /></div></field>
         <field [label]="i18n.t('quartier')" [err]="e('quartier')"><div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span><input [placeholder]="i18n.t('quartier_ph')" [value]="form.quartier" (input)="set('quartier', $any($event.target).value)" /></div></field>
-        <field [label]="i18n.t('region_label')" [err]="e('region')">
-          <div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span>
-            <select [value]="form.region" (change)="set('region', $any($event.target).value)">
-              <option value="" disabled>{{ i18n.t('region_ph') }}</option>
-              @for (r of REGIONS; track r) { <option [value]="r">{{ r }}</option> }
-            </select>
-          </div>
-        </field>
         <field [label]="i18n.t('ville_label')" [err]="e('ville')"><div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span><input [placeholder]="i18n.t('ville_ph')" [value]="form.ville" (input)="set('ville', $any($event.target).value)" /></div></field>
 
         <div style="border-top:1px solid var(--border);padding-top:16px">
@@ -293,7 +285,6 @@
           <div class="srow"><span class="lbl">{{ i18n.t('phone') }}</span><span class="val">{{ fmtPhone(form.phone) }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('email_label') }}</span><span class="val">{{ form.email }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('quartier') }}</span><span class="val">{{ form.quartier }}</span></div>
-          <div class="srow"><span class="lbl">{{ i18n.t('region_label') }}</span><span class="val">{{ form.region }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('ville_label') }}</span><span class="val">{{ form.ville }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:22px;height:22px;font-size:9px;border-radius:6px;overflow:hidden">@if (pm.logo) { <img [src]="pm.logo" [alt]="pm.name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm.short }} }</span>{{ form.pay === 'cash' ? i18n.t('pay_cash_name') : pm.name }}</span></div>
           @if (isMomo) { <div class="srow"><span class="lbl">{{ i18n.t('pay_phone_label', { op: pm.name }) }}</span><span class="val">{{ fmtPhone(form.payPhone) }}</span></div> }

@@ -62,7 +62,7 @@ public final class Dtos {
             @NotBlank String phone,
             @NotBlank String email,
             @NotBlank String quartier,
-            @NotBlank String region,
+            String region,               // optional — no longer captured in the form (kept for legacy data)
             @NotBlank String ville,      // city / town
             @NotBlank String pay,        // om | mtn | cash | sara
             String payPhone,             // MoMo number used for payment (om/mtn) — may differ from phone

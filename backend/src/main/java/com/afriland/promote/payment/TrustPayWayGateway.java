@@ -192,14 +192,25 @@ public class TrustPayWayGateway implements PaymentGateway {
         return digits.startsWith("237") ? digits : "237" + digits;
     }
 
-    /** Map TrustPayWay status strings to our internal enum (empty = still pending). */
+    /**
+     * Map a TrustPayWay status string to our internal enum (empty = still pending). Matched by
+     * keyword rather than exact value so any provider variant of a decline/cancel/timeout is caught
+     * — this is what lets a USSD cancellation auto-notify the platform (via webhook / get-status
+     * polling) without the client pressing "Cancel". Unknown/PENDING/PROCESSING leave the state as-is.
+     */
     public static Optional<PayStatus> map(String status) {
         if (status == null) return Optional.empty();
-        return switch (status.toUpperCase()) {
-            case "COMPLETED", "SUCCESS", "SUCCESSFUL" -> Optional.of(PayStatus.paid);
-            case "FAILED", "CANCELLED", "CANCELED", "EXPIRED", "REJECTED" -> Optional.of(PayStatus.failed);
-            default -> Optional.empty(); // PENDING / PROCESSING / unknown → leave as-is
-        };
+        String s = status.trim().toUpperCase();
+        if (s.isEmpty()) return Optional.empty();
+        if (s.contains("SUCCES") || s.contains("COMPLET") || s.contains("APPROV") || s.equals("PAID") || s.equals("OK")) {
+            return Optional.of(PayStatus.paid);
+        }
+        if (s.contains("FAIL") || s.contains("CANCEL") || s.contains("DECLIN") || s.contains("REJECT")
+                || s.contains("EXPIR") || s.contains("ABORT") || s.contains("TIMEOUT") || s.contains("TIMED")
+                || s.contains("INSUFFIC") || s.contains("REFUS") || s.contains("DENIED") || s.contains("ERROR")) {
+            return Optional.of(PayStatus.failed);
+        }
+        return Optional.empty(); // PENDING / PROCESSING / INITIATED / unknown → leave as-is
     }
 
     // ---- API response shapes (only the fields we need) -------------------

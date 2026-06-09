@@ -74,7 +74,6 @@ export interface CreateSubscriptionRequest {
   phone: string;      // 9 digits
   email: string;
   quartier: string;
-  region: string;
   ville: string;
   pay: string;
   payPhone?: string | null;

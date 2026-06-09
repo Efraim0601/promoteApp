@@ -76,6 +76,20 @@ class PaymentFlowTest {
     }
 
     @Test
+    void ussdCancellationVariantIsDetectedAsFailed() throws Exception {
+        // A non-standard cancel label (client aborted the USSD prompt) must still flip to failed,
+        // so the platform is notified automatically — no need to press "Cancel".
+        String ref = createPendingMomo("PAYWH0003", "+237690005555");
+        mvc.perform(post("/api/payment/webhook/trustpayway").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":\"" + ref + "\",\"status\":\"USER_CANCELLED\",\"confirmationStatus\":\"Transaction annulée\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/subscriptions/{ref}/status", ref))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payStatus").value("failed"))
+                .andExpect(jsonPath("$.message").value("Transaction annulée"));
+    }
+
+    @Test
     void webhookSuccessMarksPaid() throws Exception {
         String ref = createPendingMomo("PAYWH0002", "+237690004444");
         mvc.perform(post("/api/payment/webhook/trustpayway").contentType(MediaType.APPLICATION_JSON)
