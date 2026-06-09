@@ -180,11 +180,15 @@ public class TrustPayWayGateway implements PaymentGateway {
         };
     }
 
-    /** MoMo number to charge → digits "2376XXXXXXXX" expected by the API. Uses the payment
-     *  number the client gave for this operator (payPhone), falling back to the KYC phone. */
+    /** MoMo number to charge → digits with country code (e.g. "2376XXXXXXXX") expected by the API.
+     *  Uses the payment number the client gave for this operator (payPhone), falling back to the KYC
+     *  phone. Numbers carry their country code (E.164, "+CC…"); a bare national number is assumed
+     *  Cameroon for backward compatibility. */
     private String msisdn(Subscription sub) {
         String raw = sub.getPayPhone() != null && !sub.getPayPhone().isBlank() ? sub.getPayPhone() : sub.getPhone();
+        boolean hasCountryCode = raw != null && raw.trim().startsWith("+");
         String digits = raw == null ? "" : raw.replaceAll("\\D", "");
+        if (hasCountryCode) return digits;
         return digits.startsWith("237") ? digits : "237" + digits;
     }
 

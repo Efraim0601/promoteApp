@@ -4,6 +4,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { AgentStats, ClaimResult, Subscription } from '../core/models';
+import { isValidPhoneNumber } from 'libphonenumber-js';
 import { PAY_METHODS } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
@@ -232,7 +233,7 @@ export class AgentHomeComponent implements OnInit {
     a.href = url; a.download = 'mes-ventes.csv'; a.click();
     URL.revokeObjectURL(url);
   }
-  get canSubmit() { return /^6\d{8}$/.test(this.phone()) && this.cni().length >= 6; }
+  get canSubmit() { return isValidPhoneNumber(this.phone()) && this.cni().length >= 6; }
   get failKey() {
     const r = this.res();
     return r?.reason === 'unpaid' ? 'claim_unpaid' : r?.reason === 'taken' ? 'claim_taken' : 'claim_notfound';

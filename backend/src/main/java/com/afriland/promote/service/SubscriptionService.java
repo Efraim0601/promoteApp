@@ -112,8 +112,9 @@ public class SubscriptionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sara_receipt_required");
         }
         // MoMo: the payment number may differ from the KYC phone. Require it, fall back to phone.
+        // Numbers arrive in E.164 form ("+CC…") carrying their own country code — stored as-is.
         String payRaw = req.payPhone() != null && !req.payPhone().isBlank() ? req.payPhone() : req.phone();
-        String payPhone = momo ? "+237 " + payRaw.replaceAll("\\D", "") : null;
+        String payPhone = momo ? payRaw.trim() : null;
 
         Subscription s = Subscription.builder()
                 .ref(newRef())
@@ -125,7 +126,7 @@ public class SubscriptionService {
                 .cni(req.cni())
                 .niu(normNiu(req.niu()))
                 .cniExp(req.cniExp())
-                .phone("+237 " + req.phone().replaceAll("\\D", ""))
+                .phone(req.phone().trim())
                 .quartier(req.quartier() == null ? null : req.quartier().trim())
                 .region(req.region())
                 .ville(req.ville() == null ? null : req.ville().trim())
@@ -138,7 +139,7 @@ public class SubscriptionService {
                 .agentId(isSelf ? (referrer != null ? referrer.getId() : null) : agentId)
                 .referrerName(referrer != null ? referrer.getName() : null)
                 .referrerPhone(req.referrerPhone() != null && !req.referrerPhone().isBlank()
-                        ? "+237 " + req.referrerPhone().replaceAll("\\D", "") : null)
+                        ? req.referrerPhone().trim() : null)
                 .payStatus(cash ? PayStatus.cash : sara ? PayStatus.sara_pending : PayStatus.pending)
                 .printed(false)
                 .selfieVerified(req.selfie() || req.selfieKey() != null)

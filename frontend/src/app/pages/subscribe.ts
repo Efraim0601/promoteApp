@@ -4,7 +4,8 @@ import * as QRCode from 'qrcode';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Agent, CardConfig, Subscription } from '../core/models';
-import { PAY_METHODS, payById, matchesOperator } from '../shared/constants';
+import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
+import { PAY_METHODS, payById, matchesOperator, formatPhone } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent, PhoneFieldComponent, CniFieldComponent, ExpiryFieldComponent } from '../shared/fields';
@@ -160,7 +161,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   private onRefPhone(v: string) {
     // Resolve & show the referrer's NAME only on the client/QR path. In the commercial
     // (agent) flow the number is still captured & stored, but the name is never revealed.
-    if (this.isSelf && v.length === 9) {
+    if (this.isSelf && isValidPhoneNumber(v)) {
       this.api.resolveAgent(v).subscribe((a) => { this.refAgent.set(a); this.refUnknown.set(!a); });
     } else {
       this.refAgent.set(null); this.refUnknown.set(false);
@@ -176,7 +177,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get errs() {
     const f = this.form;
     const expDate = parseExp(f.cniExp);
-    const phoneOk = /^6\d{8}$/.test(f.phone);
+    const phoneOk = isValidPhoneNumber(f.phone);
     const emailOk = /^\S+@\S+\.\S+$/.test(f.email);
     const cniOk = /^[0-9A-F]{6,}$/.test(f.cni); // hexadecimal, at least 6 chars
     return {
@@ -210,15 +211,20 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get selfieOk() { return !!this.form.selfieData || !!this.form.selfieKey; }
   /** Mobile Money methods that need a payment number + USSD push. */
   get isMomo() { return this.form.pay === 'om' || this.form.pay === 'mtn'; }
-  /** Valid = 9-digit Cameroon number AND it belongs to the chosen operator (MTN/Orange). */
+  /** Valid = a real number for the chosen country; for Cameroon it must also match the operator (MTN/Orange). */
   get payPhoneOk() {
-    return /^6\d{8}$/.test(this.form.payPhone) && matchesOperator(this.form.pay, this.form.payPhone);
+    const v = this.form.payPhone;
+    if (!isValidPhoneNumber(v)) return false;
+    const p = parsePhoneNumberFromString(v);
+    return p?.country === 'CM' ? matchesOperator(this.form.pay, p.nationalNumber as string) : true;
   }
-  /** Error to show under the payment number: bad format, or right format but wrong operator. */
+  /** Error to show under the payment number: invalid number, or (Cameroon only) wrong operator. */
   get payPhoneError(): string | null {
     if (!this.isMomo) return null;
-    if (!/^6\d{8}$/.test(this.form.payPhone)) return this.i18n.t('invalid_phone');
-    if (!matchesOperator(this.form.pay, this.form.payPhone)) {
+    const v = this.form.payPhone;
+    if (!isValidPhoneNumber(v)) return this.i18n.t('invalid_phone');
+    const p = parsePhoneNumberFromString(v);
+    if (p?.country === 'CM' && !matchesOperator(this.form.pay, p.nationalNumber as string)) {
       return this.i18n.t(this.form.pay === 'mtn' ? 'pay_phone_not_mtn' : 'pay_phone_not_om');
     }
     return null;
@@ -581,4 +587,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   // waiting description split helpers
   waitBefore() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[0]; }
   waitAfter() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[1] ?? ''; }
+
+  /** Display an E.164 number in pretty international form (the value already carries its country code). */
+  fmtPhone(v: string) { return formatPhone(v); }
 }

@@ -1,3 +1,4 @@
+import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { Subscription } from '../core/models';
 
 /** Payment methods, ported from components.jsx PAY_METHODS. */
@@ -20,10 +21,18 @@ export const OPERATOR_PHONE: Record<string, RegExp> = {
   mtn: /^6(7\d{7}|5[0-4]\d{6}|8[0-4]\d{6})$/,
   om: /^6(9\d{7}|5[5-9]\d{6}|8[5-9]\d{6})$/,
 };
-/** True if a 9-digit number belongs to the given operator (om | mtn). Unknown operator → not checked. */
+/** True if a 9-digit Cameroon number belongs to the given operator (om | mtn). Unknown operator → not checked.
+ *  Only meaningful for Cameroon numbers; callers skip it for other countries. */
 export const matchesOperator = (operator: string, phone: string): boolean => {
   const re = OPERATOR_PHONE[operator];
   return re ? re.test(phone) : true;
+};
+
+/** Pretty international form of an E.164 number for display (e.g. "+237 6 99 00 00 00"). */
+export const formatPhone = (v: string): string => {
+  if (!v) return '';
+  const p = parsePhoneNumberFromString(v);
+  return p ? p.formatInternational() : v;
 };
 
 export const DELIVERY_MODES = ['promote', 'agence', 'home'];
