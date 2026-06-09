@@ -171,10 +171,13 @@ export class CniFieldComponent {
 @Component({
   selector: 'expiry-field',
   standalone: true,
-  imports: [FieldComponent],
+  imports: [FieldComponent, IconComponent],
   template: `
     <field [label]="label" [err]="err">
-      <input class="input" type="date" [value]="isoValue" [min]="minIso" (change)="onChange($event)" />
+      <div class="input-prefix">
+        <span class="pfx"><ic name="calendar" [size]="17"></ic></span>
+        <input type="date" [value]="isoValue" [min]="minIso" (change)="onChange($event)" />
+      </div>
     </field>`,
 })
 export class ExpiryFieldComponent {
