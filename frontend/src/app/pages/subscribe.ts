@@ -82,6 +82,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   // SARA receipt: extraction in flight + the auto-extracted payer/amount shown alongside the reference.
   saraExtracting = signal(false);
   saraExtract = signal<{ payerPhone: string | null; amount: number | null } | null>(null);
+  // True once the receipt's transaction number was auto-read from the upload (vs typed by hand).
+  saraRefDetected = signal(false);
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
@@ -329,12 +331,13 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   /** SARA money receipt picked (image or PDF): keep preview + upload, store its key. */
   onSaraReceipt(dataUrl: string) {
     this.form.saraReceiptData = dataUrl; this.form.saraReceiptKey = null;
-    this.saraExtract.set(null); this.saraExtracting.set(true);
+    this.saraExtract.set(null); this.saraRefDetected.set(false); this.saraExtracting.set(true);
     // Upload + auto-extract: the receipt reference is the primary field; the client confirms/corrects it.
     this.api.uploadReceipt(dataUrl).subscribe({
       next: (r) => {
         this.form.saraReceiptKey = r.key;
         this.form.saraRef = r.reference ?? '';
+        this.saraRefDetected.set(!!(r.reference && r.reference.trim()));
         this.saraExtract.set({ payerPhone: r.payerPhone, amount: r.amount });
         this.saraExtracting.set(false);
         this.persist();

@@ -254,6 +254,21 @@
                 <ic name="scan" [size]="16" style="color:var(--primary)"></ic>
                 <span style="font-size:13px;font-weight:800">{{ i18n.t('receipt_info_title') }}</span>
               </div>
+              <!-- Confirm to the client that the transaction number was read off the receipt. -->
+              @if (saraRefDetected()) {
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);background:var(--success-soft, color-mix(in srgb, var(--success) 14%, transparent));border:1px solid color-mix(in srgb, var(--success) 45%, transparent)">
+                  <ic name="check" [size]="18" [sw]="2.6" style="color:var(--success);flex-shrink:0"></ic>
+                  <div style="display:flex;flex-direction:column;gap:1px;min-width:0">
+                    <span style="font-size:11px;font-weight:700;color:var(--success)">{{ i18n.t('sara_txn_detected') }}</span>
+                    <span style="font-size:15px;font-weight:800;letter-spacing:.03em;word-break:break-all">{{ form.saraRef }}</span>
+                  </div>
+                </div>
+              } @else {
+                <div style="display:flex;gap:8px;align-items:flex-start;font-size:11.5px;line-height:1.4;color:var(--accent)">
+                  <ic name="alert" [size]="15" style="flex-shrink:0;margin-top:1px"></ic>
+                  <span>{{ i18n.t('sara_txn_not_detected') }}</span>
+                </div>
+              }
               <field [label]="i18n.t('receipt_ref_label')" [hint]="i18n.t('receipt_ref_hint')"
                      [err]="touched() && !form.saraRef.trim() ? i18n.t('receipt_ref_required') : null">
                 <div class="input-prefix">
