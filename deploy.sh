@@ -4,7 +4,8 @@
 #
 # Usage:
 #   ./deploy.sh                 # pull, build, (re)start the stack (HTTP on WEB_PORT)
-#   ./deploy.sh --tls           # same, but with the Caddy HTTPS reverse proxy
+#   ./deploy.sh --tls           # same, but with the Caddy HTTPS reverse proxy (self-signed, custom port)
+#   ./deploy.sh --le            # HTTPS via Let's Encrypt (trusted cert on ports 80/443, real DOMAIN)
 #   ./deploy.sh --fresh         # WIPE the database & MinIO volumes, then deploy (clean reseed)
 #   ./deploy.sh --no-build      # restart without rebuilding images
 #   ./deploy.sh --no-pull       # skip 'git pull'
@@ -13,10 +14,11 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-TLS=0; FRESH=0; BUILD=1; PULL=1
+TLS=0; LE=0; FRESH=0; BUILD=1; PULL=1
 for arg in "$@"; do
   case "$arg" in
     --tls) TLS=1 ;;
+    --le) LE=1 ;;
     --fresh) FRESH=1 ;;
     --no-build) BUILD=0 ;;
     --no-pull) PULL=0 ;;
@@ -56,10 +58,15 @@ if [ -n "$JWT" ] && [ "${#JWT}" -lt 32 ]; then err "JWT_SECRET must be at least 
 [ "$INSECURE" = 1 ] && { err "Refusing to deploy with missing/insecure secrets. Edit .env and re-run."; exit 1; }
 
 # ---- 3. compose files ----
+[ "$TLS" = 1 ] && [ "$LE" = 1 ] && { err "--tls and --le are mutually exclusive (pick one HTTPS mode)."; exit 1; }
 FILES=(-f docker-compose.yml)
 if [ "$TLS" = 1 ]; then
   FILES+=(-f docker-compose.tls.yml)
   [ -z "$(envval DOMAIN)" ] && { err "--tls requires DOMAIN set in .env (and a DNS A record to this server)."; exit 1; }
+fi
+if [ "$LE" = 1 ]; then
+  FILES+=(-f docker-compose.le.yml)
+  [ -z "$(envval DOMAIN)" ] && { err "--le requires DOMAIN set in .env (a real domain with a DNS A record to this server, ports 80/443 open)."; exit 1; }
 fi
 dc() { docker compose "${FILES[@]}" "$@"; }
 
@@ -94,7 +101,9 @@ else
   err "API did not answer 200 yet. Check logs:  docker compose ${FILES[*]} logs --tail=60 backend"
 fi
 
-if [ "$TLS" = 1 ]; then
+if [ "$LE" = 1 ]; then
+  echo "  Public URL : https://$(envval DOMAIN)   (Let's Encrypt; open 80 and 443 in the firewall — cert issues automatically)"
+elif [ "$TLS" = 1 ]; then
   CP="$(envval CADDY_HTTPS_PORT)"; CP="${CP:-8443}"
   echo "  Public URL : https://$(envval DOMAIN):${CP}   (open ${CP} in the firewall; accept the one-time cert warning)"
 else

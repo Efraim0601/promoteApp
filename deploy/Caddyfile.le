@@ -1,0 +1,18 @@
+# Caddy avec un VRAI certificat Let's Encrypt (ports standard 80 + 443).
+# Caddy obtient et renouvelle automatiquement le certificat via ACME, à condition que :
+#   - DOMAIN soit un nom de domaine public pointant (enregistrement A/AAAA) vers ce serveur,
+#   - les ports 80 et 443 soient libres et ouverts dans le pare-feu.
+# Aucun avertissement navigateur : le certificat est de confiance. DOMAIN / ACME_EMAIL
+# proviennent de .env.
+{
+	email {$ACME_EMAIL}
+}
+
+{$DOMAIN} {
+	encode zstd gzip
+	request_body {
+		max_size 8MB
+	}
+	# le nginx du frontend (qui proxifie lui-même /api -> backend) sur le réseau interne
+	reverse_proxy frontend:80
+}
