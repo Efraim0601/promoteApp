@@ -6,6 +6,7 @@ import { Subscription } from '../core/models';
 import { payById } from './constants';
 import { IconComponent } from './icon';
 import { SpinnerComponent } from './spinner';
+import { ImagePreview } from './image-preview';
 
 /**
  * Full detail of a subscription — every field the client filled in, plus the
@@ -23,7 +24,7 @@ import { SpinnerComponent } from './spinner';
       <div style="display:flex;gap:10px;margin-bottom:8px">
         <div style="flex:1;text-align:center">
           @if (selfie()) {
-            <img [src]="selfie()" alt="photo client" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+            <img [src]="selfie()" alt="photo client" (click)="preview.open(selfie())" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
           } @else if (t.hasSelfie) {
             <div style="width:100%;height:80px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="20"></spinner></div>
           } @else {
@@ -33,7 +34,7 @@ import { SpinnerComponent } from './spinner';
         </div>
         <div style="flex:1;text-align:center">
           @if (recto()) {
-            <img [src]="recto()" alt="CNI recto" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+            <img [src]="recto()" alt="CNI recto" (click)="preview.open(recto())" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
           } @else if (t.hasCniRecto) {
             <div style="width:100%;height:80px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="20"></spinner></div>
           } @else {
@@ -43,7 +44,7 @@ import { SpinnerComponent } from './spinner';
         </div>
         <div style="flex:1;text-align:center">
           @if (verso()) {
-            <img [src]="verso()" alt="CNI verso" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+            <img [src]="verso()" alt="CNI verso" (click)="preview.open(verso())" style="width:100%;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
           } @else if (t.hasCniVerso) {
             <div style="width:100%;height:80px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="20"></spinner></div>
           } @else {
@@ -81,6 +82,7 @@ import { SpinnerComponent } from './spinner';
 })
 export class TxDetailComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
+  preview = inject(ImagePreview);
   private api = inject(Api);
   private sanitizer = inject(DomSanitizer);
 

@@ -1,5 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl, SafeUrl } from '@angular/platform-browser';
+import { ImagePreview } from '../shared/image-preview';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -102,7 +103,7 @@ import { SpinnerComponent } from '../shared/spinner';
             <div style="padding:16px;display:flex;gap:14px">
               <div style="width:78px;height:78px;border-radius:14px;overflow:hidden;flex-shrink:0;position:relative;box-shadow:var(--shadow)">
                 @if (selfieUrl()) {
-                  <img [src]="selfieUrl()" alt="selfie" style="width:78px;height:78px;object-fit:cover" />
+                  <img [src]="selfieUrl()" alt="selfie" (click)="preview.open(selfieUrl())" style="width:78px;height:78px;object-fit:cover;cursor:zoom-in" />
                 } @else {
                   <svg viewBox="0 0 78 78" width="78" height="78"><rect width="78" height="78" fill="#cfe6da"/><circle cx="39" cy="31" r="16" fill="#5b7d6f"/><path d="M14 78 q0 -22 25 -22 q25 0 25 22z" fill="#5b7d6f"/></svg>
                 }
@@ -136,13 +137,13 @@ import { SpinnerComponent } from '../shared/spinner';
               <div style="padding:0 16px 12px;display:flex;gap:10px">
                 @if (rectoUrl()) {
                   <div style="flex:1;text-align:center">
-                    <img [src]="rectoUrl()" alt="CNI recto" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+                    <img [src]="rectoUrl()" alt="CNI recto" (click)="preview.open(rectoUrl())" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
                     <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_recto') }}</div>
                   </div>
                 }
                 @if (versoUrl()) {
                   <div style="flex:1;text-align:center">
-                    <img [src]="versoUrl()" alt="CNI verso" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border)" />
+                    <img [src]="versoUrl()" alt="CNI verso" (click)="preview.open(versoUrl())" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
                     <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_verso') }}</div>
                   </div>
                 }
@@ -187,7 +188,7 @@ import { SpinnerComponent } from '../shared/spinner';
                 @if (receiptPdf()) {
                   <iframe [src]="receiptPdf()" style="width:100%;height:360px;border:1px solid var(--border);border-radius:10px"></iframe>
                 } @else if (receiptImg()) {
-                  <img [src]="receiptImg()" alt="reçu SARA" style="width:100%;max-height:380px;object-fit:contain;background:var(--surface-2);border:1px solid var(--border);border-radius:10px" />
+                  <img [src]="receiptImg()" alt="reçu SARA" (click)="preview.open(receiptImg())" style="width:100%;max-height:380px;object-fit:contain;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;cursor:zoom-in" />
                 }
                 @if (receiptOpenUrl()) {
                   <a [href]="receiptOpenUrl()" target="_blank" rel="noopener" class="btn btn-ghost" style="margin-top:8px;width:auto;padding:8px 12px;font-size:12.5px;text-decoration:none"><ic name="scan" [size]="15"></ic> {{ i18n.t('pp_sara_open') }}</a>
@@ -265,6 +266,7 @@ export class PrintPointComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private sanitizer = inject(DomSanitizer);
+  preview = inject(ImagePreview);
 
   ref = signal('');
   searched = signal(false);

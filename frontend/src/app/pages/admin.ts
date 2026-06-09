@@ -271,10 +271,10 @@ import { payById, recordStatus } from '../shared/constants';
 
       }
 
-      <!-- ========== TRANSACTIONS ========== -->
+      <!-- ========== TRANSACTIONS (wider than the 760px content cap, for the detailed table) ========== -->
       @if (section() === 'transactions') {
       <h1 style="font-size:21px">{{ i18n.t('nav_transactions') }}</h1>
-      <div class="card" style="overflow:hidden">
+      <div class="card" style="overflow:hidden;max-width:1180px">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('all_sales') }}</h3>

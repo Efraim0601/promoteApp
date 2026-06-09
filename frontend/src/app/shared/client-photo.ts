@@ -2,6 +2,7 @@ import { AfterViewInit, Component, ElementRef, Input, OnDestroy, inject, signal 
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { Api } from '../core/api';
 import { AvatarComponent } from './avatar';
+import { ImagePreview } from './image-preview';
 
 /**
  * Client selfie thumbnail (KYC) loaded by subscription ref, with an avatar-initials fallback.
@@ -15,8 +16,8 @@ import { AvatarComponent } from './avatar';
   imports: [AvatarComponent],
   template: `
     @if (url()) {
-      <img [src]="url()" alt="" [style.width.px]="size" [style.height.px]="size"
-           style="object-fit:cover;border-radius:50%;display:block;flex-shrink:0;border:1.5px solid var(--border)" />
+      <img [src]="url()" alt="" [style.width.px]="size" [style.height.px]="size" (click)="openPreview($event)"
+           style="object-fit:cover;border-radius:50%;display:block;flex-shrink:0;border:1.5px solid var(--border);cursor:zoom-in" />
     } @else {
       <avatar [name]="name" [size]="size"></avatar>
     }`,
@@ -24,6 +25,7 @@ import { AvatarComponent } from './avatar';
 export class ClientPhotoComponent implements AfterViewInit, OnDestroy {
   private api = inject(Api);
   private sanitizer = inject(DomSanitizer);
+  private preview = inject(ImagePreview);
   private host: ElementRef<HTMLElement> = inject(ElementRef);
 
   @Input() refId = '';
@@ -54,6 +56,9 @@ export class ClientPhotoComponent implements AfterViewInit, OnDestroy {
       error: () => { this.revoke(); this.url.set(null); },
     });
   }
+
+  /** Open the full image in the app-wide lightbox (don't trigger the row click). */
+  openPreview(e: Event) { e.stopPropagation(); this.preview.open(this.url()); }
 
   private revoke() { if (this.objectUrl) { URL.revokeObjectURL(this.objectUrl); this.objectUrl = null; } }
   ngOnDestroy() { this.observer?.disconnect(); this.revoke(); }
