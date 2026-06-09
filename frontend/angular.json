@@ -43,7 +43,9 @@
           "options": {
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
-            "allowedCommonJsDependencies": ["qrcode"],
+            "allowedCommonJsDependencies": [
+              "qrcode"
+            ],
             "assets": [
               {
                 "glob": "**/*",
@@ -97,6 +99,19 @@
             }
           },
           "defaultConfiguration": "development"
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "tsconfig.spec.json",
+            "buildTarget": "frontend:build",
+            "runner": "vitest",
+            "coverage": true,
+            "coverageReporters": [
+              "lcovonly",
+              "text-summary"
+            ]
+          }
         }
       }
     }
