@@ -309,7 +309,7 @@ import { SpinnerComponent } from '../shared/spinner';
             <button class="btn btn-ghost" (click)="clearFilters()" style="flex:1;padding:9px;font-size:13px">{{ i18n.t('tx_clear') }}</button>
           </div>
         </div>
-        <div style="max-height:340px;overflow-y:auto;padding:0 6px 6px">
+        <div style="max-height:min(70vh,560px);overflow-y:auto;padding:0 6px 6px">
           @if (txLoading()) {
             <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
           } @else if (filteredTxs().length === 0) {
@@ -317,7 +317,7 @@ import { SpinnerComponent } from '../shared/spinner';
           } @else {
             <div style="display:flex;flex-direction:column">
               @for (t of filteredTxs(); track t.ref) {
-                <tx-row [t]="t" (open)="toggleExpand(t.ref)"></tx-row>
+                <tx-row [t]="t" [detailed]="true" (open)="toggleExpand(t.ref)"></tx-row>
                 @if (expandedRef() === t.ref) {
                   <tx-detail [t]="t" [sellerName]="t.channel === 'self' ? null : agentName(t.agentId)" (openPrint)="openRef($event)"></tx-detail>
                 }
