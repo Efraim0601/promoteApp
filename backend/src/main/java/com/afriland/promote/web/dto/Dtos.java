@@ -4,6 +4,8 @@ import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Subscription;
 import jakarta.validation.constraints.NotBlank;
 
+import java.util.List;
+
 /** Request/response payloads exchanged with the Angular frontend. */
 public final class Dtos {
 
@@ -11,6 +13,22 @@ public final class Dtos {
 
     // ---- auth ----
     public record LoginRequest(@NotBlank String email, @NotBlank String password) {}
+
+    // ---- bulk user import ----
+    /** One row to import. Password is generated server-side for new accounts. */
+    public record ImportUserRow(String name, String email, String role, String phone, String agency) {}
+
+    /** Import payload + duplicate policy. updateExisting=false → existing emails are skipped. */
+    public record ImportUsersRequest(List<ImportUserRow> rows, boolean updateExisting) {}
+
+    /** Per-row outcome. status = created | updated | skipped | invalid.
+     *  tempPassword is set only for a freshly created account (to hand to the user). */
+    public record ImportRowResult(String email, String name, String role, String status,
+                                  String reason, String tempPassword) {}
+
+    /** Import summary: counts + per-row detail (same order as input). */
+    public record ImportUsersResult(int created, int updated, int skipped, int invalid,
+                                    List<ImportRowResult> rows) {}
 
     public record UserDto(String id, String name, String email, String role, String agency, String phone) {
         public static UserDto of(AppUser u) {
@@ -88,7 +106,7 @@ public final class Dtos {
     public record PhotoUpdateRequest(String kind, String key) {}
 
     /** Result of a MoMo simulation. {@code outcome} = "validate" | "fail". */
-    public record PayRequest(String outcome) {}
+    public record PayRequest(String outcome, String reason) {}
 
     /** Staff decision on a SARA money receipt. {@code outcome} = "validate" | "reject".
      *  The sara* fields carry the agent's confirmed/corrected receipt values (prefilled from extraction). */
@@ -96,7 +114,7 @@ public final class Dtos {
                                       String saraRef, String saraPayerPhone, Integer saraAmount) {}
 
     /** Lightweight, public payment status for the client polling the result. */
-    public record PaymentStatusDto(String ref, String payStatus) {}
+    public record PaymentStatusDto(String ref, String payStatus, String message) {}
 
     /** Tells the frontend which gateway is live, so the UI can adapt (e.g. demo buttons). */
     public record PaymentProviderDto(String provider) {}

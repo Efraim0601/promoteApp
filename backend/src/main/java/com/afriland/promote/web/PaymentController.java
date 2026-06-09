@@ -53,8 +53,18 @@ public class PaymentController {
         }
 
         PayStatus status = TrustPayWayGateway.map(body.status()).orElse(null);
-        log.info("TrustPayWay webhook orderId={} status={} -> {}", body.orderId(), body.status(), status);
-        service.applyWebhook(body.orderId(), status);
+        // The decline reason (e.g. "Solde insuffisant") may ride in confirmationStatus or description;
+        // log the full body so the exact field is always visible, and keep it for the client UI.
+        String reason = firstNonBlank(body.confirmationStatus(), body.description());
+        log.info("TrustPayWay webhook orderId={} status={} -> {} reason={} amount={} txId={} description={} confirmationStatus={}",
+                body.orderId(), body.status(), status, reason, body.amount(), body.transactionId(),
+                body.description(), body.confirmationStatus());
+        service.applyWebhook(body.orderId(), status, reason);
         return ResponseEntity.ok().build();
+    }
+
+    private static String firstNonBlank(String... values) {
+        for (String v : values) if (v != null && !v.isBlank()) return v.trim();
+        return null;
     }
 }

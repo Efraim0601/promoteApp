@@ -66,8 +66,13 @@
           <ic name="alert" [size]="42" [sw]="2.5"></ic>
         </div>
         <div>
-          <h1 style="font-size:22px">{{ i18n.t('failed_title') }}</h1>
-          <p class="muted" style="font-size:13.5px;line-height:1.5;max-width:290px;margin-top:8px">{{ i18n.t('failed_desc', { op: pm.name }) }}</p>
+          @if (insufficientBalance) {
+            <h1 style="font-size:22px">{{ i18n.t('failed_insufficient_title') }}</h1>
+            <p class="muted" style="font-size:13.5px;line-height:1.5;max-width:300px;margin-top:8px">{{ i18n.t('failed_insufficient_desc', { op: pm.name, amount: i18n.money(failAmount) }) }}</p>
+          } @else {
+            <h1 style="font-size:22px">{{ i18n.t('failed_title') }}</h1>
+            <p class="muted" style="font-size:13.5px;line-height:1.5;max-width:290px;margin-top:8px">{{ i18n.t('failed_desc', { op: pm.name }) }}</p>
+          }
           @if (result()?.message) {
             <p style="font-size:13px;line-height:1.45;max-width:290px;margin-top:10px;color:var(--accent);font-weight:600">{{ result()!.message }}</p>
           }
@@ -93,7 +98,7 @@
           <ic [name]="(isCash || isSaraPending) ? 'clock' : 'check'" [size]="32" [sw]="2.5"></ic>
         </div>
         <div>
-          <h1 style="font-size:22px">{{ i18n.t('ref_done_title') }}</h1>
+          <h1 style="font-size:22px">{{ i18n.t((isCash || isSaraPending) ? 'ref_done_title' : 'paid_success_title') }}</h1>
           <p class="muted" style="font-size:13px;line-height:1.5;max-width:300px;margin-top:7px">{{ i18n.t(isSaraPending ? 'ref_done_sara' : isCash ? 'ref_done_cash' : 'ref_done_paid') }}</p>
         </div>
 
@@ -230,6 +235,15 @@
           <div class="card" style="padding:12px 14px;margin-top:10px;display:flex;gap:9px;align-items:flex-start;background:var(--surface-2)">
             <ic name="alert" [size]="18" style="color:var(--af-gold);flex-shrink:0;margin-top:1px"></ic>
             <span style="font-size:12px;line-height:1.5">{{ i18n.t('sara_flow_notice') }}</span>
+          </div>
+          <!-- Collection account the client must credit in the SARA app before uploading the receipt. -->
+          <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--primary)">
+            <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--primary)">{{ i18n.t('sara_account_title') }}</div>
+            <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+              <span style="font-size:22px;font-weight:800;letter-spacing:.04em">{{ i18n.t('sara_account_number') }}</span>
+              <span class="muted" style="font-size:12.5px;font-weight:600">{{ i18n.t('sara_account_label') }}</span>
+            </div>
+            <p class="muted" style="font-size:11.5px;line-height:1.45;margin:0">{{ i18n.t('sara_account_hint') }}</p>
           </div>
           <div style="font-size:13px;font-weight:700;margin-top:12px">{{ i18n.t('sara_receipt_label') }}</div>
           <receipt-upload [imageData]="form.saraReceiptData" [guide]="i18n.t('sara_receipt_guide')" (captured)="onSaraReceipt($event)"></receipt-upload>

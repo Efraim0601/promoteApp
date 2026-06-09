@@ -3,7 +3,8 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminStats, Agent, AgentStats, CardConfig, ClaimResult,
-  CreateSubscriptionRequest, CreateUserRequest, LoginResponse, PayStatus, Subscription, User,
+  CreateSubscriptionRequest, CreateUserRequest, ImportUserRow, ImportUsersResult,
+  LoginResponse, PayStatus, Subscription, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -45,9 +46,9 @@ export class Api {
   searchSubscriptions(q: string): Observable<Subscription[]> {
     return this.http.get<Subscription[]>(`${this.base}/subscriptions/search`, { params: { q } });
   }
-  /** Poll the live payment status of a subscription (public, lightweight). */
-  paymentStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus }> {
-    return this.http.get<{ ref: string; payStatus: PayStatus }>(`${this.base}/subscriptions/${ref}/status`);
+  /** Poll the live payment status of a subscription (public, lightweight). Carries the decline reason. */
+  paymentStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus; message?: string | null }> {
+    return this.http.get<{ ref: string; payStatus: PayStatus; message?: string | null }>(`${this.base}/subscriptions/${ref}/status`);
   }
 
   /** Upload a captured KYC image (data URL); kind = selfie | cni-recto | cni-verso. */
@@ -98,6 +99,10 @@ export class Api {
   /** Admin — create a staff account. */
   createUser(req: CreateUserRequest): Observable<User> {
     return this.http.post<User>(`${this.base}/users`, req);
+  }
+  /** Admin — bulk-import staff accounts; duplicates skipped or updated per updateExisting. */
+  importUsers(rows: ImportUserRow[], updateExisting: boolean): Observable<ImportUsersResult> {
+    return this.http.post<ImportUsersResult>(`${this.base}/users/import`, { rows, updateExisting });
   }
   resolveAgent(phone: string): Observable<Agent | null> {
     return this.http.get<Agent | null>(`${this.base}/agents/resolve`, { params: { phone } });

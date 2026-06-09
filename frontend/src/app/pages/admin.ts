@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, CardConfig, CreateUserRequest, Role, Subscription, User } from '../core/models';
+import { AdminStats, CardConfig, CreateUserRequest, ImportUserRow, ImportUsersResult, Role, Subscription, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -181,6 +181,92 @@ import { SpinnerComponent } from '../shared/spinner';
         }
       </div>
 
+      <!-- Bulk import users -->
+      <div class="card" style="padding:16px;margin-top:12px">
+        <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
+          <ic name="download" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
+          <div style="min-width:0">
+            <h3 style="font-size:15px;line-height:1.2">{{ i18n.t('import_title') }}</h3>
+            <p class="muted" style="font-size:11.5px;line-height:1.4;margin-top:3px">{{ i18n.t('import_sub') }}</p>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-outline" (click)="importFile.click()" style="flex:1;min-width:140px;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('import_pick') }}</button>
+          <button class="btn btn-ghost" (click)="downloadTemplate()" style="flex:1;min-width:120px;padding:9px;font-size:13px"><ic name="download" [size]="15"></ic> {{ i18n.t('import_template') }}</button>
+        </div>
+        <input #importFile type="file" accept=".csv,text/csv,text/plain" (change)="onImportFile($event)" style="display:none" />
+
+        <field [label]="i18n.t('import_paste_label')">
+          <textarea class="input" rows="4" [placeholder]="i18n.t('import_paste_ph')" [value]="importText()" (input)="onImportText($event)" style="resize:vertical;font-family:var(--font);line-height:1.5"></textarea>
+        </field>
+
+        @if (preview().length) {
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;font-weight:700">
+            <span style="color:var(--success)">{{ importCounts().created }} {{ i18n.t('import_new') }}</span>
+            <span style="color:var(--af-gold)">{{ importCounts().dup }} {{ i18n.t('import_dup') }}</span>
+            @if (importCounts().invalid) { <span style="color:var(--accent)">{{ importCounts().invalid }} {{ i18n.t('import_invalid') }}</span> }
+          </div>
+
+          <div style="margin-top:10px">
+            <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:5px">{{ i18n.t('import_dup_policy') }}</div>
+            <div style="display:flex;gap:6px">
+              <button class="btn" [class.btn-primary]="!importUpdate()" [class.btn-outline]="importUpdate()" (click)="importUpdate.set(false)" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('import_skip') }}</button>
+              <button class="btn" [class.btn-primary]="importUpdate()" [class.btn-outline]="!importUpdate()" (click)="importUpdate.set(true)" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('import_update') }}</button>
+            </div>
+          </div>
+
+          <div style="max-height:220px;overflow-y:auto;margin-top:10px;border:1px solid var(--border);border-radius:var(--radius)">
+            @for (r of preview(); track $index) {
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--border)">
+                @switch (r.status) {
+                  @case ('new') { <span class="badge" style="background:color-mix(in srgb, var(--success) 18%, transparent);color:var(--success);font-size:10px;flex-shrink:0">{{ i18n.t('import_new') }}</span> }
+                  @case ('duplicate') { <span class="badge" style="background:color-mix(in srgb, var(--af-gold) 22%, transparent);color:#8a6400;font-size:10px;flex-shrink:0">{{ i18n.t('import_dup') }}</span> }
+                  @case ('invalid') { <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px;flex-shrink:0">{{ i18n.t('import_invalid') }}</span> }
+                }
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name || '—' }} <span class="muted" style="font-weight:500">· {{ r.role || '—' }}</span></div>
+                  <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.email || '—' }}@if (r.status === 'invalid') { · <span style="color:var(--accent)">{{ impReason(r.reason) }}</span> }</div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-primary" [disabled]="importBusy() || !importActionable()" (click)="runImport()" style="flex:1;padding:11px">
+              @if (importBusy()) { <spinner></spinner> } @else { <ic name="check" [size]="17"></ic> {{ i18n.t('import_run') }} {{ importActionable() }} {{ i18n.t('import_lines') }} }
+            </button>
+            <button class="btn btn-ghost" (click)="clearImport()" [disabled]="importBusy()" style="padding:11px">{{ i18n.t('tx_clear') }}</button>
+          </div>
+          @if (importErr()) { <p class="err" style="font-size:12px;text-align:center;margin-top:6px">{{ i18n.t('import_error') }}</p> }
+        }
+
+        @if (importResult(); as res) {
+          <div class="card" style="background:var(--surface-2);padding:12px 14px;margin-top:12px">
+            <div style="font-size:13px;font-weight:800;margin-bottom:6px"><ic name="check" [size]="15" style="color:var(--success);vertical-align:-2px"></ic> {{ i18n.t('import_done') }}</div>
+            <div style="font-size:12.5px;line-height:1.7">
+              <b style="color:var(--success)">{{ res.created }}</b> {{ i18n.t('import_created') }} ·
+              <b>{{ res.updated }}</b> {{ i18n.t('import_updated') }} ·
+              <b>{{ res.skipped }}</b> {{ i18n.t('import_skipped') }}@if (res.invalid) { · <b style="color:var(--accent)">{{ res.invalid }}</b> {{ i18n.t('import_invalid_n') }} }
+            </div>
+
+            @if (importCreds().length) {
+              <div class="kicker" style="margin-top:12px;margin-bottom:4px">{{ i18n.t('import_creds_title') }}</div>
+              <p class="muted" style="font-size:11px;line-height:1.4;margin-bottom:8px">{{ i18n.t('import_creds_hint') }}</p>
+              <div style="max-height:160px;overflow-y:auto;font-size:12px">
+                @for (c of importCreds(); track c.email) {
+                  <div style="display:flex;justify-content:space-between;gap:8px;padding:4px 0;border-top:1px solid var(--border)">
+                    <span class="muted" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.email }}</span>
+                    <code style="font-weight:800;flex-shrink:0">{{ c.tempPassword }}</code>
+                  </div>
+                }
+              </div>
+              <button class="btn btn-outline" (click)="downloadCredentials()" style="width:100%;padding:9px;font-size:13px;margin-top:8px"><ic name="download" [size]="15"></ic> {{ i18n.t('import_creds_download') }}</button>
+            }
+          </div>
+        }
+      </div>
+
       }
 
       <!-- ========== TRANSACTIONS ========== -->
@@ -349,6 +435,137 @@ export class AdminComponent implements OnInit {
   }
   roleLabel(role: Role) {
     return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print' : 'role_agent');
+  }
+
+  // --- bulk user import ---
+  importText = signal('');
+  importUpdate = signal(false);     // false = skip duplicates, true = update them
+  importBusy = signal(false);
+  importErr = signal(false);
+  importResult = signal<ImportUsersResult | null>(null);
+
+  /** Parsed rows from the pasted text / loaded CSV. */
+  parsedRows = computed<ImportUserRow[]>(() => this.parseImport(this.importText()));
+
+  /** Per-row preview status (client-side, for guidance — the backend is authoritative). */
+  preview = computed(() => {
+    const existing = new Set(this.usersList().map((u) => u.email.toLowerCase()));
+    const seen = new Set<string>();
+    return this.parsedRows().map((r) => {
+      const name = (r.name || '').trim();
+      const email = (r.email || '').trim();
+      const role = (r.role || '').trim().toUpperCase();
+      const phone9 = (r.phone || '').replace(/\D/g, '').slice(-9);
+      let status: 'new' | 'duplicate' | 'invalid' = 'new';
+      let reason = '';
+      if (!name || !/\S+@\S+\.\S+/.test(email)) { status = 'invalid'; reason = 'name_email'; }
+      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT') { status = 'invalid'; reason = 'role'; }
+      else if (role === 'AGENT' && !/^6\d{8}$/.test(phone9)) { status = 'invalid'; reason = 'phone'; }
+      else {
+        const key = email.toLowerCase();
+        if (existing.has(key) || seen.has(key)) status = 'duplicate';
+        seen.add(key);
+      }
+      return { name, email, role, status, reason };
+    });
+  });
+  importCounts = computed(() => {
+    const p = this.preview();
+    return {
+      created: p.filter((r) => r.status === 'new').length,
+      dup: p.filter((r) => r.status === 'duplicate').length,
+      invalid: p.filter((r) => r.status === 'invalid').length,
+    };
+  });
+  /** How many rows the import will actually act on (new + duplicates only if "update" is on). */
+  importActionable = computed(() => this.importCounts().created + (this.importUpdate() ? this.importCounts().dup : 0));
+  /** Created accounts with their generated temp password, to hand out / export. */
+  importCreds = computed(() => this.importResult()?.rows.filter((r) => r.status === 'created' && r.tempPassword) ?? []);
+
+  /** Parse pasted/CSV text. Accepts a header line (mapped by column name) or positional
+   *  columns: name, email, role, phone, agency. Delimiter detected: tab, ';' or ','. */
+  private parseImport(text: string): ImportUserRow[] {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length);
+    if (!lines.length) return [];
+    const delim = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+    const cells = (l: string) => l.split(delim).map((c) => c.trim().replace(/^"(.*)"$/, '$1'));
+    let rows = lines.map(cells);
+    let idx = { name: 0, email: 1, role: 2, phone: 3, agency: 4 };
+    const head = rows[0].map((c) => c.toLowerCase());
+    const isHeader = head.some((c) => /e-?mail|courriel/.test(c)) || head.some((c) => /^(nom|name)$/.test(c));
+    if (isHeader) {
+      const at = (...re: RegExp[]) => head.findIndex((c) => re.some((r) => r.test(c)));
+      idx = {
+        name: at(/^(nom|name|nom complet|full ?name)$/),
+        email: at(/e-?mail|courriel/),
+        role: at(/^(role|rôle|profil)$/),
+        phone: at(/^(tel|tél|telephone|téléphone|phone|numero|numéro)/),
+        agency: at(/^(agence|agency)$/),
+      };
+      rows = rows.slice(1);
+    }
+    const g = (row: string[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
+    return rows.map((row) => ({
+      name: g(row, idx.name), email: g(row, idx.email), role: this.normRole(g(row, idx.role)),
+      phone: g(row, idx.phone), agency: g(row, idx.agency),
+    }));
+  }
+  /** Map free-text / localized role labels to the enum code. */
+  private normRole(r: string): string {
+    const s = (r || '').trim().toLowerCase();
+    if (/admin/.test(s)) return 'ADMIN';
+    if (/print|impr/.test(s)) return 'PRINT_AGENT';
+    if (/agent|commerc|client/.test(s)) return 'AGENT';
+    return (r || '').trim().toUpperCase();
+  }
+  impReason(code: string) {
+    return code === 'name_email' ? this.i18n.t('imp_r_name_email')
+      : code === 'role' ? this.i18n.t('imp_r_role')
+      : code === 'phone' ? this.i18n.t('imp_r_phone') : '';
+  }
+
+  onImportText(e: Event) {
+    this.importText.set((e.target as HTMLTextAreaElement).value);
+    this.importResult.set(null); this.importErr.set(false);
+  }
+  onImportFile(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const f = input.files?.[0];
+    input.value = '';                 // allow re-selecting the same file
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { this.importText.set(String(reader.result ?? '')); this.importResult.set(null); this.importErr.set(false); };
+    reader.readAsText(f);
+  }
+  clearImport() { this.importText.set(''); this.importResult.set(null); this.importErr.set(false); }
+  runImport() {
+    const rows = this.parsedRows();
+    if (!rows.length || this.importBusy()) return;
+    this.importBusy.set(true); this.importErr.set(false);
+    this.api.importUsers(rows, this.importUpdate()).subscribe({
+      next: (res) => { this.importBusy.set(false); this.importResult.set(res); this.loadUsers(); },
+      error: () => { this.importBusy.set(false); this.importErr.set(true); },
+    });
+  }
+  downloadTemplate() {
+    this.downloadCsv('modele-utilisateurs.csv',
+      '﻿nom,email,role,telephone,agence\r\n'
+      + 'Yvan Ngameni,yvan.ngameni@afrilandfirstbank.com,AGENT,690112233,Akwa\r\n'
+      + 'Paul Mbarga,paul.mbarga@afrilandfirstbank.com,PRINT_AGENT,,\r\n');
+  }
+  downloadCredentials() {
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const lines = [['Nom', 'Email', 'Role', 'Mot de passe temporaire'].join(',')].concat(
+      this.importCreds().map((r) => [r.name, r.email, r.role, r.tempPassword ?? ''].map((v) => esc(String(v))).join(',')),
+    );
+    this.downloadCsv('identifiants-importes.csv', '﻿' + lines.join('\r\n'));
+  }
+  private downloadCsv(name: string, content: string) {
+    const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
   }
 
   clearFilters() {

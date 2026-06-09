@@ -103,6 +103,30 @@ export interface Agent {
   phone: string | null;
 }
 
+// ---- bulk user import ----
+export interface ImportUserRow {
+  name: string;
+  email: string;
+  role: string;
+  phone?: string | null;
+  agency?: string | null;
+}
+export interface ImportRowResult {
+  email: string;
+  name: string;
+  role: string;
+  status: 'created' | 'updated' | 'skipped' | 'invalid';
+  reason?: string | null;
+  tempPassword?: string | null;
+}
+export interface ImportUsersResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  invalid: number;
+  rows: ImportRowResult[];
+}
+
 export interface AgentBreakdown {
   id: string;
   name: string;

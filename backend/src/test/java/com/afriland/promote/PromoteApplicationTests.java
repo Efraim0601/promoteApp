@@ -36,7 +36,7 @@ class PromoteApplicationTests {
                 "test@client.cm", "Bonamoussadi", "Littoral", "Douala",
                 "om", null, "promote", true, null, null, null, null, null, null);
         Subscription s = service.create(req, "self", null);
-        service.applyPayment(s.getRef(), "validate");
+        service.applyPayment(s.getRef(), "validate", null);
 
         // claiming captures the optional NIU on the linked record
         ClaimResult ok = service.claim("a1", "618641969", "445566778", "P099887766001X");

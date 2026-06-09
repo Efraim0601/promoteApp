@@ -414,9 +414,12 @@ export class SubscribeComponent implements OnInit, OnDestroy {
             this.proc.set('reference');
           } else if (s.payStatus === 'failed') {
             this.polling = false;
+            // Keep the decline reason (e.g. "Solde insuffisant") so the failure screen can explain it.
+            this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: s.message ?? this.result()?.message });
             this.proc.set('failed');
           } else if (++attempts >= 40) {
             this.polling = false;
+            this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: this.i18n.t('failed_timeout') });
             this.proc.set('failed'); // timed out waiting for the PIN
           } else {
             this.pollTimer = setTimeout(tick, 3000);
@@ -590,4 +593,12 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   /** Display an E.164 number in pretty international form (the value already carries its country code). */
   fmtPhone(v: string) { return formatPhone(v); }
+
+  /** True when the decline reason indicates the Mobile Money account lacked funds → show a clear, dedicated notice. */
+  get insufficientBalance() {
+    const m = (this.result()?.message || '').toLowerCase();
+    return /insuffisan|insufficient|\bsolde\b|provision|\bfonds?\b|\bfunds?\b|not enough/.test(m);
+  }
+  /** Amount the client tried to pay (for the failure message). */
+  get failAmount() { return this.result()?.amount ?? this.total; }
 }

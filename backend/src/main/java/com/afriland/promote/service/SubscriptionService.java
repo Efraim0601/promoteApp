@@ -222,9 +222,12 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public Subscription applyPayment(String ref, String outcome) {
+    public Subscription applyPayment(String ref, String outcome, String reason) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
-        s.setPayStatus("validate".equalsIgnoreCase(outcome) ? PayStatus.paid : PayStatus.failed);
+        boolean ok = "validate".equalsIgnoreCase(outcome);
+        s.setPayStatus(ok ? PayStatus.paid : PayStatus.failed);
+        // Keep the decline reason (e.g. "Solde insuffisant") so the client UI can explain why; clear it on success.
+        s.setPaymentMessage(ok ? null : (reason == null || reason.isBlank() ? null : reason.trim()));
         return subs.save(s);
     }
 
@@ -235,12 +238,16 @@ public class SubscriptionService {
      * still {@code pending}, so a late/duplicate webhook can't overturn a final state.
      */
     @Transactional
-    public Subscription applyWebhook(String orderId, PayStatus newStatus) {
+    public Subscription applyWebhook(String orderId, PayStatus newStatus, String reason) {
         if (orderId == null || newStatus == null) return null;
         Subscription s = subs.findByRefIgnoreCase(orderId).orElse(null);
         if (s == null) return null;
         if (s.getPayStatus() == PayStatus.pending) {
             s.setPayStatus(newStatus);
+            // On a decline, keep the aggregator's reason (e.g. "Solde insuffisant") for the client UI.
+            if (newStatus == PayStatus.failed && reason != null && !reason.isBlank()) {
+                s.setPaymentMessage(reason.trim());
+            }
             subs.save(s);
         }
         return s;
@@ -252,7 +259,7 @@ public class SubscriptionService {
      * the webhook hasn't arrived (e.g. no public URL in dev).
      */
     @Transactional
-    public PayStatus statusOf(String ref) {
+    public Subscription refreshStatus(String ref) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
         if (s == null) return null;
         if (s.getPayStatus() == PayStatus.pending) {
@@ -262,7 +269,7 @@ public class SubscriptionService {
                 subs.save(s);
             }
         }
-        return s.getPayStatus();
+        return s;
     }
 
     @Transactional

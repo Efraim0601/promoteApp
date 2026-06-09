@@ -1,4 +1,4 @@
-import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
+import { Component, EventEmitter, HostListener, Input, OnChanges, Output, SimpleChanges, inject } from '@angular/core';
 import { CountryCode, getCountries, getCountryCallingCode, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { IconComponent } from './icon';
 import { I18n } from '../core/i18n';
@@ -48,17 +48,37 @@ function buildCountries(lang: string): CountryOption[] {
   imports: [FieldComponent],
   template: `
     <field [label]="label" [hint]="hint" [err]="err">
-      <div class="input-prefix">
-        <select class="phone-cc" [value]="country" (change)="onCountry($any($event.target).value)" aria-label="Indicatif pays">
-          @for (c of countries; track c.iso) { <option [value]="c.iso">{{ c.flag }} +{{ c.dial }}</option> }
-        </select>
-        <input inputmode="tel" maxlength="18" [placeholder]="placeholder" [value]="national"
-               (input)="onInput($event)" />
+      <div style="position:relative">
+        <div class="input-prefix">
+          <!-- Collapsed: flag + dial code only. A native <select> can't show the name in the list yet the
+               code in the field, and its selected option is unreliable with @for — hence a custom menu. -->
+          <button type="button" class="phone-cc" (click)="toggleOpen($event)" [attr.aria-expanded]="open" aria-label="Indicatif pays">
+            <span style="font-size:15px;line-height:1">{{ selectedFlag }}</span>
+            <span>+{{ dial }}</span>
+            <span style="opacity:.55;font-size:11px">▾</span>
+          </button>
+          <input inputmode="tel" maxlength="18" [placeholder]="placeholder" [value]="national" (input)="onInput($event)" />
+        </div>
+        @if (open) {
+          <div class="cc-menu" (click)="$event.stopPropagation()">
+            <input class="cc-search" [placeholder]="i18n.t('cc_search')" [value]="filter"
+                   (input)="filter = $any($event.target).value" autofocus />
+            <div class="cc-list">
+              @for (c of filteredCountries; track c.iso) {
+                <button type="button" (click)="choose(c.iso)" [class.cc-active]="c.iso === country">
+                  <span style="font-size:15px;line-height:1">{{ c.flag }}</span>
+                  <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ c.name }}</span>
+                  <span class="cc-dial">+{{ c.dial }}</span>
+                </button>
+              }
+            </div>
+          </div>
+        }
       </div>
     </field>`,
 })
 export class PhoneFieldComponent implements OnChanges {
-  private i18n = inject(I18n);
+  i18n = inject(I18n);
   @Input() label = '';
   @Input() hint = '';
   @Input() err: string | null = null;
@@ -67,11 +87,21 @@ export class PhoneFieldComponent implements OnChanges {
   @Output() valueChange = new EventEmitter<string>();
 
   countries = buildCountries(this.i18n.lang());
-  country: CountryCode = 'CM';
+  country: CountryCode = 'CM';   // default: Cameroon
   national = '';
+  open = false;
+  filter = '';
   private lastEmitted = '';
 
+  get dial() { return getCountryCallingCode(this.country); }
+  get selectedFlag() { return flagEmoji(this.country); }
   get placeholder() { return this.country === 'CM' ? '6 99 00 00 00' : '000 000 000'; }
+  get filteredCountries(): CountryOption[] {
+    const q = this.filter.trim().toLowerCase();
+    if (!q) return this.countries;
+    return this.countries.filter((c) =>
+      c.name.toLowerCase().includes(q) || c.dial.includes(q) || c.iso.toLowerCase().includes(q));
+  }
 
   ngOnChanges(ch: SimpleChanges) {
     if (ch['defaultCountry'] && !this.value) this.country = this.defaultCountry;
@@ -86,7 +116,12 @@ export class PhoneFieldComponent implements OnChanges {
     else { this.national = v.replace(/\D/g, ''); }  // legacy national-only drafts
   }
 
-  onCountry(iso: string) { this.country = iso as CountryCode; this.emit(); }
+  toggleOpen(e: Event) { e.stopPropagation(); this.open = !this.open; this.filter = ''; }
+  choose(iso: string) { this.country = iso as CountryCode; this.open = false; this.filter = ''; this.emit(); }
+
+  /** Close the menu on any click outside it (the toggle/menu stop propagation). */
+  @HostListener('document:click')
+  closeMenu() { this.open = false; }
 
   onInput(e: Event) {
     this.national = (e.target as HTMLInputElement).value.replace(/\D/g, '');
@@ -129,17 +164,17 @@ export class CniFieldComponent {
   }
 }
 
-/** Expiry date input — stores ddmmyyyy digits, displays JJ/MM/AAAA. */
+/**
+ * Expiry date input — a native date picker for a friendly calendar UX, while keeping the existing
+ * {@code ddmmyyyy} digit contract used by the form (validation, payload, drafts) unchanged.
+ */
 @Component({
   selector: 'expiry-field',
   standalone: true,
-  imports: [FieldComponent, IconComponent],
+  imports: [FieldComponent],
   template: `
     <field [label]="label" [err]="err">
-      <div class="input-prefix">
-        <span class="pfx"><ic name="calendar" [size]="17"></ic></span>
-        <input inputmode="numeric" placeholder="JJ / MM / AAAA" [value]="display" (input)="onInput($event)" />
-      </div>
+      <input class="input" type="date" [value]="isoValue" [min]="minIso" (change)="onChange($event)" />
     </field>`,
 })
 export class ExpiryFieldComponent {
@@ -148,16 +183,20 @@ export class ExpiryFieldComponent {
   @Input() value = ''; // ddmmyyyy digits
   @Output() valueChange = new EventEmitter<string>();
 
-  get display(): string {
-    const s = this.value.replace(/\D/g, '').slice(0, 8);
-    let out = s.slice(0, 2);
-    if (s.length > 2) out += '/' + s.slice(2, 4);
-    if (s.length > 4) out += '/' + s.slice(4, 8);
-    return out;
+  /** Earliest selectable day = today (an ID-card expiry must be in the future). */
+  get minIso(): string { return new Date().toISOString().slice(0, 10); }
+
+  /** ddmmyyyy → yyyy-mm-dd for the native date input. */
+  get isoValue(): string {
+    const s = (this.value || '').replace(/\D/g, '');
+    if (s.length !== 8) return '';
+    return `${s.slice(4, 8)}-${s.slice(2, 4)}-${s.slice(0, 2)}`;
   }
-  onInput(e: Event) {
-    const v = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 8);
-    this.value = v;
-    this.valueChange.emit(v);
+  onChange(e: Event) {
+    const iso = (e.target as HTMLInputElement).value; // yyyy-mm-dd (or '' when cleared)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) { this.value = ''; this.valueChange.emit(''); return; }
+    const [yyyy, mm, dd] = iso.split('-');
+    this.value = `${dd}${mm}${yyyy}`;
+    this.valueChange.emit(this.value);
   }
 }

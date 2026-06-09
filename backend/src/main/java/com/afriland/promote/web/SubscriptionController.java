@@ -85,16 +85,16 @@ public class SubscriptionController {
     /** MoMo simulation — public (client validates/declines on their phone). */
     @PatchMapping("/{ref}/pay")
     public SubscriptionDto pay(@PathVariable String ref, @RequestBody PayRequest req) {
-        return SubscriptionDto.of(service.applyPayment(ref, req.outcome()));
+        return SubscriptionDto.of(service.applyPayment(ref, req.outcome(), req.reason()));
     }
 
     /** Public, lightweight payment status — polled by the client while awaiting confirmation.
-     *  Exposes only the status (no KYC data), and pulls a live status as a fallback. */
+     *  Exposes only the status + the decline reason (no KYC data), and pulls a live status as a fallback. */
     @GetMapping("/{ref}/status")
     public ResponseEntity<PaymentStatusDto> status(@PathVariable String ref) {
-        PayStatus st = service.statusOf(ref);
-        return st == null ? ResponseEntity.notFound().build()
-                : ResponseEntity.ok(new PaymentStatusDto(ref, st.name()));
+        Subscription s = service.refreshStatus(ref);
+        return s == null ? ResponseEntity.notFound().build()
+                : ResponseEntity.ok(new PaymentStatusDto(s.getRef(), s.getPayStatus().name(), s.getPaymentMessage()));
     }
 
     /** Print point — mark a card printed & handed over. */
