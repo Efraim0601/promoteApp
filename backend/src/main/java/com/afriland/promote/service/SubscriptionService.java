@@ -71,7 +71,8 @@ public class SubscriptionService {
     /** total = price + fees + (transport if delivery == home). Ports kyc.jsx:37. */
     private int total(CardConfig cfg, String delivery) {
         int transport = "home".equals(delivery) ? cfg.getTransport() : 0;
-        return cfg.getPrice() + cfg.getFees() + transport;
+        // The client pays the card price only (issuance fee is no longer charged).
+        return cfg.getPrice() + transport;
     }
 
     /** Resolve a referrer (sales agent) by phone — ports app.jsx:findAgentByPhone. */
