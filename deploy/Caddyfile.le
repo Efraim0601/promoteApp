@@ -13,6 +13,16 @@
 	request_body {
 		max_size 8MB
 	}
+	# En-têtes de sécurité (certificat de confiance → HSTS activable sans risque).
+	header {
+		# Force HTTPS pendant 1 an. Pas de includeSubDomains/preload : on ne veut pas
+		# engager les autres sous-domaines de afrilandfirstbank.com.
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
 	# le nginx du frontend (qui proxifie lui-même /api -> backend) sur le réseau interne
 	reverse_proxy frontend:80
 }

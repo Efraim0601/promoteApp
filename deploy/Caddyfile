@@ -12,6 +12,14 @@
 	request_body {
 		max_size 8MB
 	}
+	# Security headers. No HSTS here: with a self-signed (internal) cert, HSTS would make
+	# the untrusted-cert warning impossible to bypass and lock users out.
+	header {
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "SAMEORIGIN"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
 	# the frontend nginx (which itself proxies /api -> backend) on the internal network
 	reverse_proxy frontend:80
 }

@@ -228,9 +228,14 @@ if have systemctl; then
 fi
 
 if [ "$IS_ROOT" = 1 ]; then
-  ww="$(find / -xdev -type f -perm -0002 -not -path '/proc/*' -not -path '/sys/*' 2>/dev/null | head -5)"
-  [ -z "$ww" ] && ok "Aucun fichier world-writable suspect (échantillon)." \
-    || { warn "Fichiers modifiables par tous détectés (échantillon) :" "Revoir les permissions (chmod o-w)."; echo "$ww" | sed 's/^/         /'; }
+  # On exclut les couches d'images de conteneurs (containerd/docker) : leurs permissions
+  # internes ne concernent pas l'hôte et généreraient des faux positifs en masse.
+  ww="$(find / -xdev -type f -perm -0002 \
+        -not -path '/proc/*' -not -path '/sys/*' \
+        -not -path '/var/lib/docker/*' -not -path '/var/lib/containerd/*' \
+        2>/dev/null | head -5)"
+  [ -z "$ww" ] && ok "Aucun fichier world-writable suspect sur l'hôte (échantillon)." \
+    || { warn "Fichiers modifiables par tous sur l'hôte (échantillon) :" "Revoir les permissions (chmod o-w)."; echo "$ww" | sed 's/^/         /'; }
 else skip "Recherche world-writable / SUID — nécessite root."; fi
 
 if have lynis; then note "Lynis présent : 'sudo lynis audit system' pour un audit système approfondi."
