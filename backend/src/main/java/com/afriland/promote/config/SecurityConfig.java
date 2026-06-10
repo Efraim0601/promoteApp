@@ -65,6 +65,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/subscriptions/claim").hasRole("AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/niu").hasAnyRole("AGENT", "ADMIN")
                 .requestMatchers("/api/stats/agent").hasRole("AGENT")
+                .requestMatchers("/api/stats/print").hasAnyRole("PRINT_AGENT", "ADMIN")
+                .requestMatchers("/api/stats/cashier").hasAnyRole("CASHIER", "ADMIN")
 
                 // ---- print point + cashier (also reachable by admin/agent) ----
                 // The cashier looks a record up (search/fetch + selfie) to verify identity before taking cash.

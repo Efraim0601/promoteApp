@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl, SafeUrl } from '@angular/platform-browser';
 import { ImagePreview } from '../shared/image-preview';
 import { ClientPhotoComponent } from '../shared/client-photo';
@@ -6,8 +6,8 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { Subscription } from '../core/models';
-import { payById, recordStatus } from '../shared/constants';
+import { PrintStats, Subscription } from '../core/models';
+import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -24,7 +24,7 @@ import { SpinnerComponent } from '../shared/spinner';
   <div class="scr">
     <app-bar>
       <button appbar-left class="back-link" (click)="exit()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
-      <span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)"><ic name="printer" [size]="13"></ic> {{ i18n.t('pp_title') }}</span>
+      <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
     <div class="scr-body">
       <div>
@@ -32,6 +32,16 @@ import { SpinnerComponent } from '../shared/spinner';
         <h1 style="font-size:23px;margin-top:6px">{{ i18n.t('pp_title') }}</h1>
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('pp_sub') }}</p>
       </div>
+
+      <!-- Print-point KPIs (hidden while viewing a single record) -->
+      @if (!rec() && stats(); as st) {
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="kpi"><div class="kv" style="color:var(--primary)">{{ st.myPrinted }}</div><div class="kl">{{ i18n.t('pp_kpi_mine') }}</div></div>
+          <div class="kpi"><div class="kv" style="color:var(--success)">{{ st.myPrintedToday }}</div><div class="kl">{{ i18n.t('kpi_today') }}</div></div>
+          <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.queue }}</div><div class="kl">{{ i18n.t('pp_kpi_queue') }}</div></div>
+        </div>
+        <p class="muted" style="font-size:10.5px;margin-top:-4px;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</p>
+      }
 
       <field [label]="i18n.t('pp_input')">
         <div style="display:flex;gap:8px">
@@ -272,7 +282,7 @@ import { SpinnerComponent } from '../shared/spinner';
     }
   </div>`,
 })
-export class PrintPointComponent implements OnInit {
+export class PrintPointComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   auth = inject(Auth);
   private api = inject(Api);
@@ -286,6 +296,7 @@ export class PrintPointComponent implements OnInit {
   loading = signal(false);
   results = signal<Subscription[]>([]);
   rec = signal<Subscription | null>(null);
+  stats = signal<PrintStats | null>(null);
   selfieUrl = signal<SafeUrl | null>(null);
   rectoUrl = signal<SafeUrl | null>(null);
   versoUrl = signal<SafeUrl | null>(null);
@@ -320,9 +331,36 @@ export class PrintPointComponent implements OnInit {
   /** Only relationship officers / admins may add or correct a NIU (print agents view only). */
   get canEditNiu() { return this.auth.hasRole('AGENT', 'ADMIN'); }
 
+  private poll?: ReturnType<typeof setInterval>;
+  /** The last executed search query, so the live refresh re-runs the SAME search. */
+  private lastQuery = '';
+
   ngOnInit() {
+    this.loadStats();
+    // Keep the queue/counters, the search results AND the open record live without a manual reload.
+    this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
     const prefill = this.route.snapshot.queryParamMap.get('ref');
     if (prefill) { this.ref.set(prefill.toUpperCase()); this.open(prefill); }
+  }
+  ngOnDestroy() { if (this.poll) clearInterval(this.poll); this.clearSelfie(); }
+  private loadStats() { this.api.printStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} }); }
+
+  /** Silent background refresh: KPIs always; plus the open record's status OR the search
+   *  results, so a payment becoming "payée — à imprimer" surfaces in near real-time. Skips any
+   *  in-flight action / edit (printing, SARA validation, NIU edit, photo retake) and never
+   *  reloads images or resets the agent's drafts (card number, PAN, SARA fields). */
+  private refreshLive() {
+    this.loadStats();
+    if (this.loading() || this.printing() || this.validating() || this.savingNiu()
+        || this.photoBusy() || this.retaking() || this.editingNiu()) return;
+    const r = this.rec();
+    if (r) {
+      if (r.printed) return; // success screen — nothing left to update
+      // Refresh the record's status/amount only; setRecord is NOT called, so images and drafts survive.
+      this.api.byRef(r.ref).subscribe({ next: (s) => { if (this.rec()?.ref === s.ref && !this.rec()?.printed) this.rec.set(s); }, error: () => {} });
+    } else if (this.results().length && this.ref().trim() === this.lastQuery && this.lastQuery) {
+      this.api.searchSubscriptions(this.lastQuery).subscribe({ next: (list) => { if (!this.rec()) this.results.set(list); }, error: () => {} });
+    }
   }
 
   onRef(e: Event) {
@@ -334,6 +372,7 @@ export class PrintPointComponent implements OnInit {
   doSearch() {
     const q = this.ref().trim();
     if (!q) return;
+    this.lastQuery = q;
     this.searched.set(true); this.loading.set(true); this.clearSelfie(); this.rec.set(null); this.results.set([]);
     this.api.searchSubscriptions(q).subscribe({
       next: (list) => {
@@ -364,7 +403,7 @@ export class PrintPointComponent implements OnInit {
     if (!this.cardNumberOk || this.printing()) return;
     this.printing.set(true);
     this.api.print(ref, this.cardNumber().trim(), this.pan().trim() || undefined).subscribe({
-      next: (s) => { this.rec.set(s); this.printing.set(false); },
+      next: (s) => { this.rec.set(s); this.printing.set(false); this.loadStats(); },
       // 409 = the backend refused because the payment is not settled (defence in depth).
       error: (e) => { this.printing.set(false); this.printErr.set(e?.status === 409 ? 'pp_not_payable' : 'pp_print_error'); },
     });

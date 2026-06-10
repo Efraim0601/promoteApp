@@ -3,6 +3,8 @@ package com.afriland.promote.web;
 import com.afriland.promote.service.StatsService;
 import com.afriland.promote.web.dto.Dtos.AdminStats;
 import com.afriland.promote.web.dto.Dtos.AgentStats;
+import com.afriland.promote.web.dto.Dtos.CashierStats;
+import com.afriland.promote.web.dto.Dtos.PrintStats;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,5 +28,15 @@ public class StatsController {
     @GetMapping("/agent")
     public AgentStats agent(Authentication auth) {
         return stats.agentStats((String) auth.getPrincipal());
+    }
+
+    @GetMapping("/print")
+    public PrintStats print(Authentication auth) {
+        return stats.printStats((String) auth.getPrincipal());
+    }
+
+    @GetMapping("/cashier")
+    public CashierStats cashier(Authentication auth) {
+        return stats.cashierStats((String) auth.getPrincipal());
     }
 }

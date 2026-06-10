@@ -5,14 +5,19 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.service.SubscriptionService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Seeds demo accounts, default config and the 8 demo sales (ports app.jsx:seedTx)
@@ -22,12 +27,14 @@ import java.util.List;
 public class DataSeeder implements CommandLineRunner {
 
     private static final long DAY = 86_400_000L;
+    private static final Logger log = LoggerFactory.getLogger(DataSeeder.class);
 
     private final AppUserRepository users;
     private final CardConfigRepository configs;
     private final SubscriptionRepository subs;
     private final SubscriptionService service;
     private final PasswordEncoder encoder;
+    private final JdbcTemplate jdbc;
 
     // Real administrator account — set ADMIN_EMAIL / ADMIN_PASSWORD / ADMIN_NAME in production.
     private final String adminEmail;
@@ -46,7 +53,7 @@ public class DataSeeder implements CommandLineRunner {
     private final String cashierName;
 
     public DataSeeder(AppUserRepository users, CardConfigRepository configs, SubscriptionRepository subs,
-                      SubscriptionService service, PasswordEncoder encoder,
+                      SubscriptionService service, PasswordEncoder encoder, JdbcTemplate jdbc,
                       @Value("${app.admin.email}") String adminEmail,
                       @Value("${app.admin.password}") String adminPassword,
                       @Value("${app.admin.name:Administrateur Promote}") String adminName,
@@ -62,6 +69,7 @@ public class DataSeeder implements CommandLineRunner {
         this.subs = subs;
         this.service = service;
         this.encoder = encoder;
+        this.jdbc = jdbc;
         this.adminEmail = adminEmail;
         this.adminPassword = adminPassword;
         this.adminName = adminName;
@@ -76,12 +84,34 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
+        syncRoleCheckConstraint(); // must run BEFORE seeding any new-role account (e.g. CASHIER)
         seedConfig();
         seedUsers();
         seedPrintAgent(); // independent of the first-boot guard, so it appears on existing deployments
         seedCashier();    // idem — completes the four roles on existing deployments too
         // No demo client-journey data is seeded: subscriptions start empty.
         service.initSequence();
+    }
+
+    /**
+     * Hibernate generates a {@code CHECK (role IN (...))} constraint on {@code app_user} from the
+     * {@link Role} enum when the table is first created. With {@code ddl-auto: update} that constraint
+     * is NEVER updated, so adding a new role (e.g. CASHIER) breaks inserts on an existing Postgres
+     * database. We rebuild the constraint from the current enum values on each startup — idempotent
+     * and self-maintaining for any future role. Best-effort: never blocks startup (e.g. on H2 in tests).
+     */
+    private void syncRoleCheckConstraint() {
+        String values = Arrays.stream(Role.values())
+                .map(r -> "'" + r.name() + "'")
+                .collect(Collectors.joining(", "));
+        try {
+            jdbc.execute("ALTER TABLE app_user DROP CONSTRAINT IF EXISTS app_user_role_check");
+            jdbc.execute("ALTER TABLE app_user ADD CONSTRAINT app_user_role_check CHECK (role IN (" + values + "))");
+            log.info("app_user role check constraint synced to {}", values);
+        } catch (RuntimeException ex) {
+            // Different dialect / constraint not present / insufficient privileges — log and continue.
+            log.warn("Could not sync app_user role check constraint ({}): {}", values, ex.getMessage());
+        }
     }
 
     private void seedConfig() {

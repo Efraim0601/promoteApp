@@ -87,8 +87,10 @@ public class SubscriptionService {
                 .findFirst().orElse(null);
     }
 
-    /** Reduce a phone to its local Cameroon form (the last 9 digits), dropping any country code. */
+    /** Reduce a phone to its local Cameroon form (the last 9 digits), dropping any country code.
+     *  Null-safe: a missing number yields an empty string (never matches). */
     private static String local9(String phone) {
+        if (phone == null) return "";
         String d = phone.replaceAll("\\D", "");
         return d.length() > 9 ? d.substring(d.length() - 9) : d;
     }
@@ -197,8 +199,18 @@ public class SubscriptionService {
         return subs.findAllByOrderByCreatedAtAsc();
     }
 
+    /** An agent's portfolio: sales they OWN (agentId) PLUS every sale that names their phone as
+     *  the referrer ("parrain"), even when another agent created it or it came in via QR. This is
+     *  what feeds both the "my sales" list and the agent KPIs, so a referred client is credited to
+     *  the commercial who recommended them. Matched on the local 9-digit phone (country-code-safe). */
     public List<Subscription> mine(String agentId) {
-        return subs.findByAgentIdOrderByCreatedAtAsc(agentId);
+        AppUser me = users.findById(agentId).orElse(null);
+        String myPhone9 = me != null ? local9(me.getPhone()) : "";
+        return subs.findAll().stream()
+                .filter(s -> agentId.equals(s.getAgentId())
+                        || (!myPhone9.isEmpty() && myPhone9.equals(local9(s.getReferrerPhone()))))
+                .sorted(java.util.Comparator.comparing(Subscription::getCreatedAt))
+                .toList();
     }
 
     public Subscription byRef(String ref) {
@@ -275,7 +287,7 @@ public class SubscriptionService {
     }
 
     @Transactional
-    public Subscription markPrinted(String ref, String cardNumber, String pan) {
+    public Subscription markPrinted(String ref, String cardNumber, String pan, String printerId) {
         // The physical card number is mandatory: it ties the printed card to the subscription.
         if (cardNumber == null || cardNumber.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "card_number_required");
@@ -290,6 +302,9 @@ public class SubscriptionService {
         // PAN (Primary Account Number) — captured at activation, optional.
         if (pan != null && !pan.isBlank()) s.setPan(pan.trim());
         s.setPrinted(true);
+        // Trace who printed and when, for the print-point statistics.
+        s.setPrintedById(printerId);
+        s.setPrintedAt(Instant.now());
         return subs.save(s);
     }
 
@@ -344,8 +359,9 @@ public class SubscriptionService {
         if ("validate".equalsIgnoreCase(outcome)) {
             s.setPayStatus(PayStatus.paid);
             s.setPaymentMessage(null);
-            // Trace the collection: store the cashier's name (readable) and the timestamp.
+            // Trace the collection: cashier name (readable, for screens), id (stats), and timestamp.
             s.setCashCollectedBy(cashierName(cashierId));
+            s.setCashCollectedById(cashierId);
             s.setCashCollectedAt(Instant.now());
         } else {
             s.setPayStatus(PayStatus.failed);
@@ -368,18 +384,17 @@ public class SubscriptionService {
      *  {@code niu} is optionally captured at claim time and stored on the matched record. */
     @Transactional
     public ClaimResult claim(String agentId, String phone, String cni, String niu) {
-        String ph = phone.replaceAll("\\D", "");
-        String last9 = ph.length() > 9 ? ph.substring(ph.length() - 9) : ph;
-        String cn = cni.replaceAll("\\D", "");
+        String wantPhone = local9(phone);
+        String wantCni = normCniMatch(cni);
 
         Subscription match = subs.findAll().stream()
                 .filter(s -> "self".equals(s.getChannel()))
-                .filter(s -> {
-                    String p = s.getPhone() == null ? "" : s.getPhone().replaceAll("\\D", "");
-                    String pl9 = p.length() > 9 ? p.substring(p.length() - 9) : p;
-                    return pl9.equals(last9);
-                })
-                .filter(s -> (s.getCni() == null ? "" : s.getCni().replaceAll("\\D", "")).equals(cn))
+                // Look the client up by ANY of their numbers: contact, Mobile Money payer, or SARA payer
+                // (the agent often only knows the number the client paid with, not the contact number).
+                .filter(s -> phoneMatches(s, wantPhone))
+                // ID number compared alphanumerically (a CNI is hexadecimal; a passport/récépissé carries
+                // other letters too) — never digits-only, which would drop the letters and mismatch.
+                .filter(s -> wantCni.isEmpty() || wantCni.equals(normCniMatch(s.getCni())))
                 .findFirst().orElse(null);
 
         if (match == null) return new ClaimResult(false, "notfound", null);
@@ -391,6 +406,20 @@ public class SubscriptionService {
         if (niuNorm != null) match.setNiu(niuNorm);   // capture/correct the NIU while linking the sale
         subs.save(match);
         return new ClaimResult(true, null, SubscriptionDto.of(match));
+    }
+
+    /** A subscription matches the looked-up number if it equals (last 9 digits) the contact phone,
+     *  the Mobile Money payer number, or the SARA payer number. */
+    private static boolean phoneMatches(Subscription s, String want) {
+        if (want.isEmpty()) return false;
+        return want.equals(local9(s.getPhone()))
+                || want.equals(local9(s.getPayPhone()))
+                || want.equals(local9(s.getSaraPayerPhone()));
+    }
+
+    /** Normalise an ID-document number for matching: keep only alphanumerics, upper-cased. */
+    private static String normCniMatch(String cni) {
+        return cni == null ? "" : cni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
     }
 
     /**

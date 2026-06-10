@@ -63,6 +63,8 @@ public class Subscription {
     private boolean printed;
     private String cardNumber;      // physical card number, entered at the print point before printing
     private String pan;             // PAN (Primary Account Number) captured when the card is activated
+    private String printedById;     // staff id who printed the card (print-point stats attribution)
+    private Instant printedAt;      // when the card was printed
     private boolean selfieVerified;
 
     /** Object-storage keys of the captured KYC images (null if not captured). */
@@ -81,7 +83,8 @@ public class Subscription {
 
     /** Cash collection trace: who (cashier name) confirmed the in-person cash payment, and when.
      *  Set when a CASHIER validates a {@code cash} subscription (cash → paid). */
-    private String cashCollectedBy;
+    private String cashCollectedBy;     // cashier display name (shown on screens)
+    private String cashCollectedById;   // cashier id (stats attribution)
     private Instant cashCollectedAt;
 
     /** Resolve a stored image key by kind. */

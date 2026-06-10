@@ -3,6 +3,7 @@ package com.afriland.promote.service;
 import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.storage.ImageStorage;
+import com.afriland.promote.web.dto.Dtos.ClaimResult;
 import com.afriland.promote.web.dto.Dtos.CreateSubscriptionRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,7 +83,7 @@ class SubscriptionServiceTest {
     @Test
     void markPrintedStoresCardNumberAndPan() {
         Subscription s = service.create(req("cash", null, null, null), "self", null);
-        Subscription printed = service.markPrinted(s.getRef(), "CARD-001", "PAN-12345");
+        Subscription printed = service.markPrinted(s.getRef(), "CARD-001", "PAN-12345", "print");
         assertTrue(printed.isPrinted());
         assertEquals("CARD-001", printed.getCardNumber());
         assertEquals("PAN-12345", printed.getPan());
@@ -91,13 +92,13 @@ class SubscriptionServiceTest {
     @Test
     void markPrintedRejectsBlankCardNumber() {
         Subscription s = service.create(req("cash", null, null, null), "self", null);
-        assertThrows(ResponseStatusException.class, () -> service.markPrinted(s.getRef(), "  ", "PAN-1"));
+        assertThrows(ResponseStatusException.class, () -> service.markPrinted(s.getRef(), "  ", "PAN-1", "print"));
     }
 
     @Test
     void panIsOptionalAtActivation() {
         Subscription s = service.create(req("cash", null, null, null), "self", null);
-        Subscription printed = service.markPrinted(s.getRef(), "CARD-002", null);
+        Subscription printed = service.markPrinted(s.getRef(), "CARD-002", null, "print");
         assertTrue(printed.isPrinted());
         assertNull(printed.getPan());
     }
@@ -126,6 +127,36 @@ class SubscriptionServiceTest {
         assertEquals(PayStatus.failed, failed.getPayStatus());
         assertEquals("Client jamais venu payer", failed.getPaymentMessage());
         assertNull(failed.getCashCollectedBy(), "a rejected cash payment is not traced as collected");
+    }
+
+    @Test
+    void claimMatchesByPaymentNumberAndAlphanumericCni() {
+        // A QR (self) sale whose Mobile Money payer number differs from the contact phone, with a
+        // hexadecimal CNI carrying letters.
+        CreateSubscriptionRequest req = new CreateSubscriptionRequest(
+                "QR", "Client", "M", "cni", "12AB34CD", null, "01/01/2031", "677001122",
+                "qr@client.cm", "Bonamoussadi", "Littoral", "Douala",
+                "om", "699888777", "promote", false, null, null, null, null, null, null);
+        Subscription s = service.create(req, "self", null);
+        service.applyPayment(s.getRef(), "validate", null);   // QR payment succeeds → paid
+
+        // The agent only has the number the client PAID with, and types the CNI loosely (space + lowercase).
+        ClaimResult r = service.claim("a1", "+237 699 888 777", "12ab 34cd", null);
+        assertTrue(r.ok(), "should match by the payment number and alphanumeric CNI");
+        assertEquals("a1", r.record().agentId(), "the sale is linked to the claiming agent");
+    }
+
+    @Test
+    void claimRejectsAWrongCni() {
+        CreateSubscriptionRequest req = new CreateSubscriptionRequest(
+                "QR", "Client", "M", "cni", "AAAA1111", null, "01/01/2031", "677001133",
+                "qr2@client.cm", "Bonamoussadi", "Littoral", "Douala",
+                "om", null, "promote", false, null, null, null, null, null, null);
+        Subscription s = service.create(req, "self", null);
+        service.applyPayment(s.getRef(), "validate", null);
+        ClaimResult r = service.claim("a1", "677001133", "BBBB2222", null);
+        assertFalse(r.ok());
+        assertEquals("notfound", r.reason(), "a non-matching CNI must not be linked");
     }
 
     @Test

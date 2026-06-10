@@ -1,4 +1,4 @@
-import { Component, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -12,7 +12,7 @@ import { TxDetailComponent } from '../shared/tx-detail';
 import { SpinnerComponent } from '../shared/spinner';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { ClientPhotoComponent } from '../shared/client-photo';
-import { payById, recordStatus } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
 
 @Component({
   selector: 'page-admin',
@@ -287,7 +287,8 @@ import { payById, recordStatus } from '../shared/constants';
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('all_sales') }}</h3>
-          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredTxs().length }} {{ i18n.t('tx_count') }}</span>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
+          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredTxs().length }} {{ i18n.t('tx_count') }}</span>
         </div>
         <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
           <div class="input-prefix">
@@ -395,11 +396,12 @@ import { payById, recordStatus } from '../shared/constants';
     </div>
   </div>`,
 })
-export class AdminComponent implements OnInit {
+export class AdminComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
+  private poll?: ReturnType<typeof setInterval>;
 
   /** Active sidebar section. */
   section = signal<'overview' | 'config' | 'users' | 'transactions'>('overview');
@@ -491,6 +493,13 @@ export class AdminComponent implements OnInit {
     this.api.allSubscriptions().subscribe({ next: (t) => { this.txs.set(t); this.txLoading.set(false); }, error: () => this.txLoading.set(false) });
     this.api.getConfig().subscribe({ next: (c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); this.cfgLoading.set(false); }, error: () => this.cfgLoading.set(false) });
     this.loadUsers();
+    // Silent background refresh of the KPIs + transactions table (no spinner, keeps filters intact).
+    this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
+  }
+  ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
+  private refreshLive() {
+    this.api.adminStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
+    this.api.allSubscriptions().subscribe({ next: (t) => this.txs.set(t), error: () => {} });
   }
 
   private loadUsers() {

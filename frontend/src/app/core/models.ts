@@ -152,6 +152,21 @@ export interface AgentStats {
   collected: number;
 }
 
+export interface PrintStats {
+  myPrinted: number;       // cards I printed (all-time)
+  myPrintedToday: number;  // cards I printed today
+  queue: number;           // paid but not yet printed (waiting for a card)
+  totalPrinted: number;    // all printed cards (global)
+}
+
+export interface CashierStats {
+  myCount: number;         // cash payments I validated (all-time)
+  myCollected: number;     // total amount I collected (XAF)
+  myCountToday: number;    // cash payments I validated today
+  pendingCount: number;    // cash subscriptions still awaiting collection
+  pendingAmount: number;   // total amount still to collect (XAF)
+}
+
 export interface ClaimResult {
   ok: boolean;
   reason: string | null;

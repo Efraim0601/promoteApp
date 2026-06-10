@@ -7,6 +7,7 @@ import { payById } from './constants';
 import { IconComponent } from './icon';
 import { SpinnerComponent } from './spinner';
 import { ImagePreview } from './image-preview';
+import { ReceiptService } from './receipt';
 
 /**
  * Full detail of a subscription — every field the client filled in, plus the
@@ -75,8 +76,11 @@ import { ImagePreview } from './image-preview';
         <div class="srow total" style="padding:8px 0"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(t.amount) }}</span></div>
       </div>
 
+      <button class="btn btn-outline" (click)="downloadReceipt()" [disabled]="receiptBusy()" style="margin-top:10px;padding:9px;font-size:13px">
+        @if (receiptBusy()) { <spinner tone="primary"></spinner> } @else { <ic name="download" [size]="15"></ic> {{ i18n.t('receipt_download') }} }
+      </button>
       @if (showPrint) {
-        <button class="btn btn-outline" (click)="openPrint.emit(t.ref)" style="margin-top:10px;padding:9px;font-size:13px"><ic name="printer" [size]="15"></ic> {{ i18n.t('tx_open_print') }}</button>
+        <button class="btn btn-outline" (click)="openPrint.emit(t.ref)" style="margin-top:8px;padding:9px;font-size:13px"><ic name="printer" [size]="15"></ic> {{ i18n.t('tx_open_print') }}</button>
       }
     </div>`,
 })
@@ -85,6 +89,8 @@ export class TxDetailComponent implements OnInit, OnDestroy {
   preview = inject(ImagePreview);
   private api = inject(Api);
   private sanitizer = inject(DomSanitizer);
+  private receipt = inject(ReceiptService);
+  receiptBusy = signal(false);
 
   @Input() t!: Subscription;
   /** Resolved seller name (admin view); leave null when irrelevant (agent's own sales). */
@@ -129,4 +135,18 @@ export class TxDetailComponent implements OnInit, OnDestroy {
   }
   sexeLabel(s: string) { return s === 'M' ? this.i18n.t('sexe_m') : s === 'F' ? this.i18n.t('sexe_f') : (s || '—'); }
   payName(pay: string) { return payById(pay).name; }
+
+  /** Download a PNG receipt for this record (re-printable from any list). */
+  async downloadReceipt() {
+    if (this.receiptBusy()) return;
+    this.receiptBusy.set(true);
+    try {
+      await this.receipt.download({
+        ref: this.t.ref, fullName: this.t.fullName, pay: this.t.pay, payPhone: this.t.payPhone,
+        payStatus: this.t.payStatus, amount: this.t.amount, createdAt: this.t.createdAt,
+      });
+    } finally {
+      this.receiptBusy.set(false);
+    }
+  }
 }

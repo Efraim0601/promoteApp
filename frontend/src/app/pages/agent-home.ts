@@ -1,23 +1,25 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { AgentStats, ClaimResult, Subscription } from '../core/models';
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { PAY_METHODS } from '../shared/constants';
+import { LIVE_REFRESH_MS, PAY_METHODS, recordStatus } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
 import { TxRowComponent } from '../shared/tx-row';
 import { TxDetailComponent } from '../shared/tx-detail';
+import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
-import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../shared/fields';
+import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
+import { ReceiptService } from '../shared/receipt';
 
 @Component({
   selector: 'page-agent-home',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, StatusBadgeComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -35,6 +37,7 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
 
       <button class="btn btn-primary" (click)="newSub()"><ic name="plus" [size]="19"></ic> {{ i18n.t('new_sub_btn') }}</button>
       <button class="btn btn-outline" (click)="claiming.set(true)" style="margin-top:-4px"><ic name="qr" [size]="18"></ic> {{ i18n.t('claim_btn') }}</button>
+      <button class="btn btn-ghost" (click)="openVerify()" style="margin-top:-4px;font-size:13.5px"><ic name="search" [size]="17"></ic> {{ i18n.t('verify_ref_btn') }}</button>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_my_subs') }}</div></div>
@@ -47,7 +50,8 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('my_sales') }}</h3>
-          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filtered().length }} {{ i18n.t('tx_count') }}</span>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
+          <span class="muted" style="font-size:12px;font-weight:700">{{ filtered().length }} {{ i18n.t('tx_count') }}</span>
         </div>
 
         <!-- multi-level filters + advanced search over my own sales -->
@@ -118,8 +122,12 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
           </div>
 
           @if (!res() || !res()!.ok) {
-            <phone-field [label]="i18n.t('tel')" [value]="phone()" (valueChange)="phone.set($event); res.set(null)"></phone-field>
-            <cni-field [label]="i18n.t('cni')" [value]="cni()" (valueChange)="cni.set($event); res.set(null)"></cni-field>
+            <phone-field [label]="i18n.t('tel')" [hint]="i18n.t('claim_phone_hint')" [value]="phone()" (valueChange)="phone.set($event); res.set(null)"></phone-field>
+            <field [label]="i18n.t('cni')">
+              <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
+                <input autocapitalize="characters" style="text-transform:uppercase" [placeholder]="i18n.t('doc_num_ph')"
+                       [value]="cni()" (input)="cni.set($any($event.target).value.replace(/[^0-9A-Za-z]/g,'').toUpperCase()); res.set(null)" /></div>
+            </field>
             <field [label]="i18n.t('niu_label')" [hint]="i18n.t('claim_niu_hint')"><input class="input" [placeholder]="i18n.t('niu_ph')" [value]="niu()" (input)="niu.set($any($event.target).value)" /></field>
             @if (res()) {
               <div class="feedback err-box"><ic name="alert" [size]="20" style="flex-shrink:0"></ic><div style="font-size:12px;font-weight:600;line-height:1.35">{{ i18n.t(failKey) }}</div></div>
@@ -137,6 +145,59 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
         </div>
       </div>
     }
+
+    @if (verifying()) {
+      <div class="modal-overlay" (click)="closeVerify()">
+        <div class="modal-sheet" (click)="$event.stopPropagation()">
+          <div style="display:flex;align-items:flex-start;gap:10px">
+            <span class="tile-ic" style="width:40px;height:40px;border-radius:11px;flex-shrink:0"><ic name="search" [size]="20"></ic></span>
+            <div style="min-width:0;flex:1">
+              <h2 style="font-size:17px;line-height:1.2">{{ i18n.t('verify_ref_title') }}</h2>
+              <p class="muted" style="font-size:11.5px;line-height:1.4;margin-top:4px">{{ i18n.t('verify_ref_sub') }}</p>
+            </div>
+            <button class="back-link" (click)="closeVerify()" style="flex-shrink:0"><ic name="x" [size]="20"></ic></button>
+          </div>
+
+          <div style="display:flex;gap:8px">
+            <div class="input-prefix" style="flex:1">
+              <span class="pfx"><ic name="search" [size]="16"></ic></span>
+              <input [placeholder]="i18n.t('pp_search_ph')" [value]="vQuery()" style="letter-spacing:.02em;font-weight:600"
+                     (input)="vQuery.set($any($event.target).value)" (keydown.enter)="verify()" />
+            </div>
+            <button class="btn btn-primary" (click)="verify()" [disabled]="vBusy() || !vQuery().trim()" style="width:auto;padding:0 16px">
+              @if (vBusy()) { <spinner [size]="18"></spinner> } @else { <ic name="search" [size]="18"></ic> }
+            </button>
+          </div>
+
+          <div style="max-height:48vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px">
+            @if (vBusy()) {
+              <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
+            } @else if (vSearched() && !vResults().length) {
+              <p class="muted" style="font-size:13px;padding:12px;text-align:center">{{ i18n.t('pp_notfound') }}</p>
+            } @else {
+              @for (s of vResults(); track s.ref) {
+                <div class="card" style="padding:12px 13px;display:flex;flex-direction:column;gap:8px;background:var(--surface-2)">
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <div style="min-width:0;flex:1">
+                      <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.fullName }}</div>
+                      <div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.ref }} · {{ s.phone }}</div>
+                    </div>
+                    <status-badge [status]="vStatus(s)"></status-badge>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:10px">
+                    <span style="font-size:14px;font-weight:800">{{ i18n.money(s.amount) }}</span>
+                    <span class="muted" style="font-size:11.5px">{{ payLabel(s.pay) }}</span>
+                    <button class="btn btn-outline" (click)="downloadReceipt(s)" [disabled]="vReceiptBusy() === s.ref" style="margin-left:auto;width:auto;padding:7px 11px;font-size:12.5px">
+                      @if (vReceiptBusy() === s.ref) { <spinner tone="primary" [size]="15"></spinner> } @else { <ic name="download" [size]="15"></ic> {{ i18n.t('receipt_download') }} }
+                    </button>
+                  </div>
+                </div>
+              }
+            }
+          </div>
+        </div>
+      </div>
+    }
   </div>`,
   styles: [`
     .modal-overlay{ position:absolute; inset:0; z-index:50; display:flex; flex-direction:column; justify-content:flex-end; align-items:center;
@@ -149,16 +210,25 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
     .err-box{ background:var(--accent-soft); color:var(--accent); }
   `],
 })
-export class AgentHomeComponent implements OnInit {
+export class AgentHomeComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
+  private receipt = inject(ReceiptService);
+  private poll?: ReturnType<typeof setInterval>;
 
   stats = signal<AgentStats | null>(null);
   mine = signal<Subscription[]>([]);
   claiming = signal(false);
   claimBusy = signal(false);
+  // Whole-DB reference verification (any record, not just the agent's own portfolio).
+  verifying = signal(false);
+  vQuery = signal('');
+  vResults = signal<Subscription[]>([]);
+  vBusy = signal(false);
+  vSearched = signal(false);
+  vReceiptBusy = signal<string | null>(null);
   loading = signal(true);   // my-sales table while the request is in flight
   phone = signal('');
   cni = signal('');
@@ -193,10 +263,15 @@ export class AgentHomeComponent implements OnInit {
     });
   });
 
-  ngOnInit() { this.refresh(); }
-  private refresh() {
+  ngOnInit() {
+    this.refresh();
+    // Silent background refresh so newly paid / printed sales appear without a manual reload.
+    this.poll = setInterval(() => this.refresh(true), LIVE_REFRESH_MS);
+  }
+  ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
+  private refresh(silent = false) {
     this.api.agentStats().subscribe((s) => this.stats.set(s));
-    this.loading.set(true);
+    if (!silent) this.loading.set(true);
     this.api.mySubscriptions().subscribe({
       next: (m) => { this.mine.set(m); this.loading.set(false); },
       error: () => this.loading.set(false),
@@ -255,4 +330,36 @@ export class AgentHomeComponent implements OnInit {
     });
   }
   close() { this.claiming.set(false); this.phone.set(''); this.cni.set(''); this.niu.set(''); this.res.set(null); }
+
+  // ---- whole-DB reference verification ----
+  openVerify() { this.verifying.set(true); }
+  closeVerify() { this.verifying.set(false); this.vQuery.set(''); this.vResults.set([]); this.vSearched.set(false); }
+  vStatus = (s: Subscription) => recordStatus(s);
+  payLabel(pay: string) { return pay === 'cash' ? this.i18n.t('pay_cash_name') : (PAY_METHODS.find((p) => p.id === pay)?.name ?? pay); }
+
+  /** Look a reference / name / phone up across the WHOLE database (not just the agent's own sales)
+   *  to verify a payment. Uses the shared search endpoint, available to any authenticated staff. */
+  verify() {
+    const q = this.vQuery().trim();
+    if (!q || this.vBusy()) return;
+    this.vBusy.set(true); this.vSearched.set(true);
+    this.api.searchSubscriptions(q).subscribe({
+      next: (list) => { this.vResults.set(list); this.vBusy.set(false); },
+      error: () => { this.vResults.set([]); this.vBusy.set(false); },
+    });
+  }
+
+  /** Download the PNG receipt for a verified record. */
+  async downloadReceipt(s: Subscription) {
+    if (this.vReceiptBusy()) return;
+    this.vReceiptBusy.set(s.ref);
+    try {
+      await this.receipt.download({
+        ref: s.ref, fullName: s.fullName, pay: s.pay, payPhone: s.payPhone,
+        payStatus: s.payStatus, amount: s.amount, createdAt: s.createdAt,
+      });
+    } finally {
+      this.vReceiptBusy.set(null);
+    }
+  }
 }

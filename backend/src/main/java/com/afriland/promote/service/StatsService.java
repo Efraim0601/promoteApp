@@ -8,6 +8,9 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -56,5 +59,40 @@ public class StatsService {
         long paid = mine.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
         long pending = mine.stream().filter(this::isPending).count();
         return new AgentStats(mine.size(), paid, pending, collected(mine));
+    }
+
+    /** Start of the current day in the server's zone — the cut-off for "today" counters. */
+    private Instant startOfToday() {
+        return LocalDate.now(ZoneId.systemDefault()).atStartOfDay(ZoneId.systemDefault()).toInstant();
+    }
+
+    /** Print-point statistics for a given staff member. */
+    public PrintStats printStats(String printerId) {
+        List<Subscription> all = subscriptions.all();
+        Instant today = startOfToday();
+        long myPrinted = all.stream().filter(s -> printerId.equals(s.getPrintedById())).count();
+        long myToday = all.stream()
+                .filter(s -> printerId.equals(s.getPrintedById()) && s.getPrintedAt() != null && !s.getPrintedAt().isBefore(today))
+                .count();
+        // Queue = settled payments still waiting for a card (paid, not yet printed).
+        long queue = all.stream().filter(s -> !s.isPrinted() && s.getPayStatus() == PayStatus.paid).count();
+        long totalPrinted = all.stream().filter(Subscription::isPrinted).count();
+        return new PrintStats(myPrinted, myToday, queue, totalPrinted);
+    }
+
+    /** Cashier statistics for a given staff member. */
+    public CashierStats cashierStats(String cashierId) {
+        List<Subscription> all = subscriptions.all();
+        Instant today = startOfToday();
+        List<Subscription> mine = all.stream().filter(s -> cashierId.equals(s.getCashCollectedById())).toList();
+        long myCount = mine.size();
+        long myCollected = mine.stream().mapToLong(Subscription::getAmount).sum();
+        long myToday = mine.stream()
+                .filter(s -> s.getCashCollectedAt() != null && !s.getCashCollectedAt().isBefore(today))
+                .count();
+        // Queue = cash subscriptions still awaiting collection.
+        List<Subscription> pending = all.stream().filter(s -> s.getPayStatus() == PayStatus.cash).toList();
+        long pendingAmount = pending.stream().mapToLong(Subscription::getAmount).sum();
+        return new CashierStats(myCount, myCollected, myToday, pending.size(), pendingAmount);
     }
 }

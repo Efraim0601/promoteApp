@@ -168,4 +168,13 @@ public final class Dtos {
     public record AdminStats(long total, long paid, long pending, long collected, java.util.List<AgentBreakdown> byAgent) {}
 
     public record AgentStats(long total, long paid, long pending, long collected) {}
+
+    /** Print-point KPIs: cards I printed (all-time + today) and the queue still waiting to be printed
+     *  (paid but not yet printed), plus the global printed total. */
+    public record PrintStats(long myPrinted, long myPrintedToday, long queue, long totalPrinted) {}
+
+    /** Cashier KPIs: cash payments I validated (count + amount, all-time + today) and the queue of
+     *  cash subscriptions still awaiting collection (count + amount). */
+    public record CashierStats(long myCount, long myCollected, long myCountToday,
+                               long pendingCount, long pendingAmount) {}
 }

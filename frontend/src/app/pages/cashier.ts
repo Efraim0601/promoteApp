@@ -1,12 +1,12 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { ImagePreview } from '../shared/image-preview';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { Subscription } from '../core/models';
-import { payById, recordStatus } from '../shared/constants';
+import { CashierStats, Subscription } from '../core/models';
+import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -23,7 +23,7 @@ import { SpinnerComponent } from '../shared/spinner';
   <div class="scr">
     <app-bar>
       <button appbar-left class="back-link" (click)="exit()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
-      <span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)"><ic name="store" [size]="13"></ic> {{ i18n.t('cash_title') }}</span>
+      <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
     <div class="scr-body">
       <div>
@@ -31,6 +31,20 @@ import { SpinnerComponent } from '../shared/spinner';
         <h1 style="font-size:23px;margin-top:6px">{{ i18n.t('cash_title') }}</h1>
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('cash_sub') }}</p>
       </div>
+
+      <!-- Cashier KPIs (hidden while viewing a single record) -->
+      @if (!rec() && stats(); as st) {
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="kpi"><div class="kv" style="color:var(--primary)">{{ st.myCount }}</div><div class="kl">{{ i18n.t('cash_kpi_mine') }}</div></div>
+          <div class="kpi"><div class="kv" style="color:var(--success)">{{ st.myCountToday }}</div><div class="kl">{{ i18n.t('kpi_today') }}</div></div>
+          <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.pendingCount }}</div><div class="kl">{{ i18n.t('cash_kpi_queue') }}</div></div>
+        </div>
+        <p class="muted" style="font-size:11.5px;margin-top:-4px;text-align:center">
+          {{ i18n.t('cash_kpi_collected') }} : <b style="color:var(--text)">{{ i18n.money(st.myCollected) }}</b>
+          · {{ i18n.t('cash_kpi_pending_amount') }} : <b style="color:var(--accent)">{{ i18n.money(st.pendingAmount) }}</b>
+        </p>
+        <p class="muted" style="font-size:10.5px;margin-top:-8px;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</p>
+      }
 
       <field [label]="i18n.t('pp_input')">
         <div style="display:flex;gap:8px">
@@ -157,7 +171,7 @@ import { SpinnerComponent } from '../shared/spinner';
     }
   </div>`,
 })
-export class CashierComponent implements OnInit {
+export class CashierComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   auth = inject(Auth);
   private api = inject(Api);
@@ -171,6 +185,7 @@ export class CashierComponent implements OnInit {
   loading = signal(false);
   results = signal<Subscription[]>([]);
   rec = signal<Subscription | null>(null);
+  stats = signal<CashierStats | null>(null);
   selfieUrl = signal<SafeUrl | null>(null);
   busy = signal(false);
   err = signal(false);
@@ -180,9 +195,33 @@ export class CashierComponent implements OnInit {
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
 
+  private poll?: ReturnType<typeof setInterval>;
+  /** The last executed search query, so the live refresh re-runs the SAME search. */
+  private lastQuery = '';
+
   ngOnInit() {
+    this.loadStats();
+    // Keep the queue/counters, the search results AND the open record live without a manual reload.
+    this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
     const prefill = this.route.snapshot.queryParamMap.get('ref');
     if (prefill) { this.ref.set(prefill.toUpperCase()); this.open(prefill); }
+  }
+  ngOnDestroy() { if (this.poll) clearInterval(this.poll); this.clear(); }
+  private loadStats() { this.api.cashierStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} }); }
+
+  /** Silent background refresh: KPIs always; plus the open record's status OR the search
+   *  results, so a payment moving (cash → payée) shows in near real-time. Never disturbs an
+   *  in-flight action, the success screen, or the already-loaded selfie image. */
+  private refreshLive() {
+    this.loadStats();
+    if (this.busy() || this.loading() || this.justValidated()) return;
+    const r = this.rec();
+    if (r) {
+      // Refresh the record's data (status, amount…) only; leave the selfie image untouched.
+      this.api.byRef(r.ref).subscribe({ next: (s) => { if (this.rec()?.ref === s.ref && !this.justValidated()) this.rec.set(s); }, error: () => {} });
+    } else if (this.results().length && this.ref().trim() === this.lastQuery && this.lastQuery) {
+      this.api.searchSubscriptions(this.lastQuery).subscribe({ next: (list) => { if (!this.rec()) this.results.set(list); }, error: () => {} });
+    }
   }
 
   onRef(e: Event) {
@@ -194,6 +233,7 @@ export class CashierComponent implements OnInit {
   doSearch() {
     const q = this.ref().trim();
     if (!q) return;
+    this.lastQuery = q;
     this.searched.set(true); this.loading.set(true); this.clear(); this.rec.set(null); this.results.set([]);
     this.api.searchSubscriptions(q).subscribe({
       next: (list) => {
@@ -225,7 +265,7 @@ export class CashierComponent implements OnInit {
     if (this.busy()) return;
     this.busy.set(true); this.err.set(false);
     this.api.cashValidate(ref, 'validate').subscribe({
-      next: (s) => { this.rec.set(s); this.busy.set(false); this.justValidated.set(true); },
+      next: (s) => { this.rec.set(s); this.busy.set(false); this.justValidated.set(true); this.loadStats(); },
       error: () => { this.busy.set(false); this.err.set(true); },
     });
   }

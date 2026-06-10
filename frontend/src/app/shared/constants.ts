@@ -11,6 +11,11 @@ export const PAY_METHODS: PayMethod[] = [
 ];
 export const payById = (id: string): PayMethod => PAY_METHODS.find((p) => p.id === id) ?? PAY_METHODS[0];
 
+/** Interval (ms) for the silent background refresh of payment data on the staff dashboards.
+ *  Kept short so every status transition (initiée → en attente → payée → payée à imprimer)
+ *  surfaces in the tables in near real-time across all roles. */
+export const LIVE_REFRESH_MS = 3000;
+
 /**
  * Cameroon mobile prefixes per operator (9 digits, starting with 6). Used to ensure the
  * Mobile Money number entered matches the chosen operator before letting the client continue.

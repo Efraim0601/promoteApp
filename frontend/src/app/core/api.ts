@@ -2,9 +2,9 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AdminStats, Agent, AgentStats, CardConfig, ClaimResult,
+  AdminStats, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
   CreateSubscriptionRequest, CreateUserRequest, ImportUserRow, ImportUsersResult,
-  LoginResponse, PayStatus, Subscription, User,
+  LoginResponse, PayStatus, PrintStats, Subscription, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -117,5 +117,13 @@ export class Api {
   }
   agentStats(): Observable<AgentStats> {
     return this.http.get<AgentStats>(`${this.base}/stats/agent`);
+  }
+  /** Print-point KPIs for the logged-in printer (cards printed + queue). */
+  printStats(): Observable<PrintStats> {
+    return this.http.get<PrintStats>(`${this.base}/stats/print`);
+  }
+  /** Cashier KPIs for the logged-in cashier (cash validated + queue). */
+  cashierStats(): Observable<CashierStats> {
+    return this.http.get<CashierStats>(`${this.base}/stats/cashier`);
   }
 }
