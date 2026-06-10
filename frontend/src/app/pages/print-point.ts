@@ -1,6 +1,7 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DomSanitizer, SafeResourceUrl, SafeUrl } from '@angular/platform-browser';
 import { ImagePreview } from '../shared/image-preview';
+import { ClientPhotoComponent } from '../shared/client-photo';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -18,7 +19,7 @@ import { SpinnerComponent } from '../shared/spinner';
 @Component({
   selector: 'page-print-point',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent, ClientPhotoComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -53,10 +54,11 @@ import { SpinnerComponent } from '../shared/spinner';
         <div class="card" style="overflow:hidden">
           <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px">{{ results().length }} {{ i18n.t('pp_results') }}</div>
           @for (s of results(); track s.ref) {
-            <button (click)="open(s.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:10px;padding:12px 14px;border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer">
+            <button (click)="open(s.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:11px;padding:11px 14px;border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer">
+              <client-photo [refId]="s.ref" [name]="s.fullName" [hasSelfie]="s.hasSelfie" [size]="44"></client-photo>
               <div style="min-width:0;flex:1">
-                <div style="font-size:14px;font-weight:700">{{ s.fullName }}</div>
-                <div class="muted" style="font-size:11.5px">{{ s.ref }} · {{ s.phone }}</div>
+                <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.fullName }}</div>
+                <div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.ref }} · {{ s.phone }}@if (s.cni) { · {{ i18n.t('cni_short') }} {{ s.cni }} }</div>
               </div>
               <status-badge [status]="status(s)"></status-badge>
               <ic name="chevR" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>

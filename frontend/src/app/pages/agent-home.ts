@@ -92,7 +92,7 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
           } @else {
             <div style="display:flex;flex-direction:column">
               @for (t of filtered(); track t.ref) {
-                <tx-row [t]="t" (open)="toggleExpand(t.ref)"></tx-row>
+                <tx-row [t]="t" [detailed]="true" (open)="toggleExpand(t.ref)"></tx-row>
                 @if (expandedRef() === t.ref) {
                   <tx-detail [t]="t" (openPrint)="openRef($event)"></tx-detail>
                 }
