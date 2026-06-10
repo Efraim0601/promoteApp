@@ -39,8 +39,9 @@ export const DELIVERY_MODES = ['promote', 'agence', 'home'];
 
 /** Overall record status for badges — ports components.jsx recordStatus(). */
 export function recordStatus(r: Subscription): string {
-  if (r.printed) return 'printed';
+  // A failed payment must never be hidden by a (mistaken) print — surface the failure first.
   if (r.payStatus === 'failed') return 'failed';
+  if (r.printed) return 'printed';
   if (r.payStatus === 'cash') return 'cash';
   if (r.payStatus === 'sara_pending') return 'sara_pending';
   return 'awaiting';

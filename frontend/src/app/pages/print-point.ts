@@ -209,8 +209,9 @@ import { SpinnerComponent } from '../shared/spinner';
               </div>
             }
 
-            <!-- Card number — required before printing the activated card -->
-            @if (r.payStatus !== 'sara_pending') {
+            <!-- Card number — required before printing. Only when the payment is settled (paid/cash);
+                 never for a failed / pending payment. -->
+            @if (canPrint(r)) {
               <div style="padding:0 16px 16px;border-top:1px solid var(--border);padding-top:14px">
                 <field [label]="i18n.t('pp_card_number')" [hint]="i18n.t('pp_card_number_hint')"
                        [err]="cardTouched() && !cardNumberOk ? i18n.t('pp_card_number_required') : null">
@@ -250,11 +251,21 @@ import { SpinnerComponent } from '../shared/spinner';
             <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
           </div>
         </div>
-      } @else {
+      } @else if (canPrint(r)) {
         <div class="scr-foot">
+          @if (printErr()) { <div class="feedback err-box" style="font-size:12.5px"><ic name="alert" [size]="18" style="flex-shrink:0"></ic> {{ i18n.t(printErr()!) }}</div> }
           <button class="btn btn-primary" (click)="doPrint(r.ref)" [disabled]="printing()">
             @if (printing()) { <spinner></spinner> } @else { <ic name="printer" [size]="18"></ic> {{ i18n.t('pp_print') }} }
           </button>
+          <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
+        </div>
+      } @else {
+        <!-- Payment failed / still pending: card activation is blocked. -->
+        <div class="scr-foot">
+          <div style="display:flex;gap:9px;align-items:flex-start;padding:11px 13px;border-radius:var(--radius);background:var(--accent-soft);color:var(--accent)">
+            <ic name="alert" [size]="18" style="flex-shrink:0;margin-top:1px"></ic>
+            <span style="font-size:12.5px;line-height:1.4;font-weight:600">{{ i18n.t('pp_not_payable') }}</span>
+          </div>
           <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
         </div>
       }
@@ -293,6 +304,7 @@ export class PrintPointComponent implements OnInit {
   retaking = signal(false);
   photoBusy = signal(false);
   printing = signal(false);
+  printErr = signal<string | null>(null);
   cardNumber = signal('');
   pan = signal('');
   cardTouched = signal(false);
@@ -303,6 +315,8 @@ export class PrintPointComponent implements OnInit {
 
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
+  /** A card may be activated only when the payment is settled (MoMo paid, or cash to collect here). */
+  canPrint = (r: Subscription) => r.payStatus === 'paid' || r.payStatus === 'cash';
   /** Only relationship officers / admins may add or correct a NIU (print agents view only). */
   get canEditNiu() { return this.auth.hasRole('AGENT', 'ADMIN'); }
 
@@ -346,11 +360,13 @@ export class PrintPointComponent implements OnInit {
   /** Validate the print — card number is required and stored with the record. */
   doPrint(ref: string) {
     this.cardTouched.set(true);
+    this.printErr.set(null);
     if (!this.cardNumberOk || this.printing()) return;
     this.printing.set(true);
     this.api.print(ref, this.cardNumber().trim(), this.pan().trim() || undefined).subscribe({
       next: (s) => { this.rec.set(s); this.printing.set(false); },
-      error: () => this.printing.set(false),
+      // 409 = the backend refused because the payment is not settled (defence in depth).
+      error: (e) => { this.printing.set(false); this.printErr.set(e?.status === 409 ? 'pp_not_payable' : 'pp_print_error'); },
     });
   }
 

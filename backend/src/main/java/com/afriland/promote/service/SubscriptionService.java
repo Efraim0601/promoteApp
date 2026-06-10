@@ -280,6 +280,11 @@ public class SubscriptionService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "card_number_required");
         }
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
+        // A card may only be activated once the payment is settled: MoMo paid, or cash to be
+        // collected at the print point. Never for a failed / pending / SARA-pending transaction.
+        if (s.getPayStatus() != PayStatus.paid && s.getPayStatus() != PayStatus.cash) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "payment_not_settled");
+        }
         s.setCardNumber(cardNumber.trim());
         // PAN (Primary Account Number) — captured at activation, optional.
         if (pan != null && !pan.isBlank()) s.setPan(pan.trim());
