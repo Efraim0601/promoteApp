@@ -316,8 +316,18 @@ import { payById, recordStatus } from '../shared/constants';
         } @else if (filteredTxs().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('tx_empty') }}</p>
         } @else {
-          <div style="overflow:auto;max-height:min(68vh,600px);padding:0 2px">
+          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(68vh,600px);padding:0 2px">
             <table class="tx-table">
+              <colgroup>
+                <col style="width:44px" />
+                <col />
+                <col style="width:120px" />
+                <col style="width:104px" />
+                <col style="width:112px" />
+                <col style="width:140px" />
+                <col style="width:96px" />
+                <col style="width:116px" />
+              </colgroup>
               <thead>
                 <tr>
                   <th style="width:46px"></th>
@@ -336,9 +346,9 @@ import { payById, recordStatus } from '../shared/constants';
                     <td><client-photo [refId]="t.ref" [name]="t.fullName" [hasSelfie]="t.hasSelfie" [size]="38"></client-photo></td>
                     <td><div class="cell-name">{{ t.fullName }}</div><div class="cell-sub">{{ t.ref }}@if (t.channel === 'self') { · {{ i18n.t('tx_self') }} }</div></td>
                     <td class="nowrap">{{ t.phone || '—' }}</td>
-                    <td class="nowrap">{{ t.cni || '—' }}</td>
+                    <td class="brk">{{ t.cni || '—' }}</td>
                     <td class="nowrap">{{ txDate(t.createdAt) }}</td>
-                    <td class="nowrap"><span style="display:inline-flex;align-items:center;gap:6px"><span class="op-logo" [style.background]="pm(t).bg" [style.color]="pm(t).fg" style="width:20px;height:20px;font-size:8px;border-radius:5px;overflow:hidden;flex-shrink:0">@if (pm(t).logo) { <img [src]="pm(t).logo" [alt]="pm(t).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(t).short }} }</span>{{ t.pay === 'cash' ? i18n.t('pay_cash_name') : pm(t).name }}</span></td>
+                    <td><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="op-logo" [style.background]="pm(t).bg" [style.color]="pm(t).fg" style="width:20px;height:20px;font-size:8px;border-radius:5px;overflow:hidden;flex-shrink:0">@if (pm(t).logo) { <img [src]="pm(t).logo" [alt]="pm(t).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(t).short }} }</span><span style="overflow-wrap:anywhere;line-height:1.25">{{ t.pay === 'cash' ? i18n.t('pay_cash_short') : pm(t).name }}</span></span></td>
                     <td class="num">{{ i18n.money(t.amount) }}</td>
                     <td><status-badge [status]="rowStatus(t)"></status-badge></td>
                   </tr>
