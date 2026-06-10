@@ -285,6 +285,16 @@ import { payById, recordStatus } from '../shared/constants';
             <span class="pfx"><ic name="search" [size]="15"></ic></span>
             <input [placeholder]="i18n.t('tx_search_ph')" [value]="txSearch()" (input)="txSearch.set($any($event.target).value)" />
           </div>
+          <!-- Quick filter: failed payments in one click -->
+          <button (click)="toggleFailedFilter()"
+                  [style.background]="txStatus() === 'failed' ? 'var(--accent)' : 'var(--accent-soft)'"
+                  [style.color]="txStatus() === 'failed' ? '#fff' : 'var(--accent)'"
+                  style="align-self:flex-start;border:none;border-radius:var(--radius-pill);padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-family:var(--font)">
+            <ic name="alert" [size]="15"></ic> {{ i18n.t('tx_quick_failed') }}
+            <span [style.background]="txStatus() === 'failed' ? 'rgba(255,255,255,.25)' : 'var(--accent)'"
+                  [style.color]="txStatus() === 'failed' ? '#fff' : '#fff'"
+                  style="min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;display:inline-flex;align-items:center;justify-content:center">{{ failedCount() }}</span>
+          </button>
           <div style="display:flex;gap:8px">
             <select class="input" [value]="txStatus()" (change)="txStatus.set($any($event.target).value)" style="flex:1">
               <option value="all">{{ i18n.t('tx_all_status') }}</option>
@@ -453,6 +463,10 @@ export class AdminComponent implements OnInit {
   });
   // Any filter change (or fresh data) → back to the first page.
   private readonly _txPageReset = effect(() => { this.filteredTxs(); this.txPage.set(0); });
+  /** Number of failed transactions (for the quick "Échouées" filter chip). */
+  failedCount = computed(() => this.txs().filter((t) => t.payStatus === 'failed' || t.status === 'failed').length);
+  /** One-click toggle of the failed-only view. */
+  toggleFailedFilter() { this.txStatus.set(this.txStatus() === 'failed' ? 'all' : 'failed'); }
   txPrev() { this.txPage.update((p) => Math.max(0, p - 1)); }
   txNext() { this.txPage.update((p) => Math.min(this.txPageCount() - 1, p + 1)); }
 
