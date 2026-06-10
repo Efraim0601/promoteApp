@@ -57,9 +57,17 @@ import { payById, recordStatus } from '../shared/constants';
       } @else {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}</div></div>
+        <div class="kpi"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(stats()?.collected ?? 0) }}</div><div class="kl">{{ i18n.t('kpi_collected') }}</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
         <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
-        <div class="kpi"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(stats()?.collected ?? 0) }}</div><div class="kl">{{ i18n.t('kpi_collected') }}</div></div>
+        <!-- Failed payments — click to jump to the filtered transactions table. -->
+        <div class="kpi" (click)="showFailed()" style="cursor:pointer"
+             [style.borderColor]="failedCount() ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'"
+             [style.background]="failedCount() ? 'var(--accent-soft)' : 'var(--surface)'">
+          <div class="kv" style="color:var(--accent)">{{ failedCount() }}</div><div class="kl">{{ i18n.t('kpi_failed') }}</div>
+        </div>
       </div>
 
       <div class="card" style="padding:16px">
@@ -467,6 +475,8 @@ export class AdminComponent implements OnInit {
   failedCount = computed(() => this.txs().filter((t) => t.payStatus === 'failed' || t.status === 'failed').length);
   /** One-click toggle of the failed-only view. */
   toggleFailedFilter() { this.txStatus.set(this.txStatus() === 'failed' ? 'all' : 'failed'); }
+  /** Overview KPI → open the transactions table filtered on failed payments. */
+  showFailed() { this.txStatus.set('failed'); this.section.set('transactions'); }
   txPrev() { this.txPage.update((p) => Math.max(0, p - 1)); }
   txNext() { this.txPage.update((p) => Math.min(this.txPageCount() - 1, p + 1)); }
 
