@@ -10,4 +10,5 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findAllByOrderByCreatedAtAsc();
     List<Subscription> findByAgentIdOrderByCreatedAtAsc(String agentId);
     Optional<Subscription> findByRefIgnoreCase(String ref);
+    Optional<Subscription> findByGatewayRef(String gatewayRef);
 }

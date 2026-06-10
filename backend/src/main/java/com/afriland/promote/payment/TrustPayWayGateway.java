@@ -60,25 +60,30 @@ public class TrustPayWayGateway implements PaymentGateway {
     public PaymentRequest requestPayment(Subscription sub, String operator) {
         String network = network(operator);
         String msisdn = msisdn(sub);
+        // Send the globally-unique gateway order id (falls back to the bare ref for safety). It is
+        // echoed back in the webhook and avoids "Duplicate transaction detected" after DB resets.
+        String orderId = sub.getGatewayRef() != null && !sub.getGatewayRef().isBlank()
+                ? sub.getGatewayRef() : sub.getRef();
+        Map<String, String> payload = Map.of(
+                "amount", String.valueOf(sub.getAmount()),
+                "currency", "XAF",
+                "subscriberMsisdn", msisdn,
+                "description", "Carte Promote " + sub.getRef(),
+                "orderId", orderId,
+                "notifUrl", props.getNotifUrl()
+        );
         // Capture the raw body + HTTP status ourselves: on failure the API may answer either a
         // structured 417 ({data.status, message}) OR a bare {"error": "..."} — the latter has no
         // data/message, so without the raw body the cause is invisible (logged as null/null).
-        ResponseEntity<String> entity = http.post()
-                .uri("/api/{network}/process-payment", network)
-                .header("Authorization", "Bearer " + token())
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of(
-                        "amount", String.valueOf(sub.getAmount()),
-                        "currency", "XAF",
-                        "subscriberMsisdn", msisdn,
-                        "description", "Carte Promote " + sub.getRef(),
-                        "orderId", sub.getRef(),          // our reference — echoed back in the webhook
-                        "notifUrl", props.getNotifUrl()
-                ))
-                .retrieve()
-                // Don't let RestClient throw on 4xx/5xx — we read the body regardless of status.
-                .onStatus(HttpStatusCode::isError, (req, res) -> { })
-                .toEntity(String.class);
+        ResponseEntity<String> entity = postProcessPayment(network, payload);
+        // One retry on a transient 5xx (e.g. nginx 502/503/504): the request didn't reach the app,
+        // so re-sending the SAME orderId is idempotent. Business declines (4xx) are never retried.
+        if (entity.getStatusCode().is5xxServerError()) {
+            log.warn("TrustPayWay process-payment {} for ref={} — retry once after a short delay",
+                    entity.getStatusCode().value(), sub.getRef());
+            try { Thread.sleep(800); } catch (InterruptedException ie) { Thread.currentThread().interrupt(); }
+            entity = postProcessPayment(network, payload);
+        }
 
         String raw = entity.getBody();
         ProcessResponse resp = parse(raw);
@@ -107,6 +112,18 @@ public class TrustPayWayGateway implements PaymentGateway {
                     sub.getRef(), network, msisdn, entity.getStatusCode().value(), dataStatus, message, raw);
         }
         return new PaymentRequest(txId, operator, accepted, message);
+    }
+
+    /** POST process-payment, reading the body regardless of HTTP status (we never let RestClient throw). */
+    private ResponseEntity<String> postProcessPayment(String network, Map<String, String> payload) {
+        return http.post()
+                .uri("/api/{network}/process-payment", network)
+                .header("Authorization", "Bearer " + token())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(payload)
+                .retrieve()
+                .onStatus(HttpStatusCode::isError, (req, res) -> { })
+                .toEntity(String.class);
     }
 
     /** Parse the process-payment body into our response shape; null/empty/garbage → null. */

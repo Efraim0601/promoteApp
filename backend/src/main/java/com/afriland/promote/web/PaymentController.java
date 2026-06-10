@@ -1,6 +1,7 @@
 package com.afriland.promote.web;
 
 import com.afriland.promote.model.PayStatus;
+import com.afriland.promote.model.Subscription;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.TrustPayWayGateway;
 import com.afriland.promote.payment.TrustPayWayProperties;
@@ -56,9 +57,18 @@ public class PaymentController {
         // The decline reason (e.g. "Solde insuffisant") may ride in confirmationStatus or description;
         // log the full body so the exact field is always visible, and keep it for the client UI.
         String reason = firstNonBlank(body.confirmationStatus(), body.description());
-        log.info("TrustPayWay webhook orderId={} status={} -> {} reason={} amount={} txId={} description={} confirmationStatus={}",
-                body.orderId(), body.status(), status, reason, body.amount(), body.transactionId(),
-                body.description(), body.confirmationStatus());
+        // The aggregator often delivers the same webhook twice. Log the full body at INFO only on the
+        // FIRST terminal delivery (the transaction is still pending); duplicates go to DEBUG to cut noise.
+        Subscription before = service.findByOrderId(body.orderId());
+        boolean firstDelivery = before != null && before.getPayStatus() == PayStatus.pending;
+        String line = "TrustPayWay webhook orderId={} status={} -> {} reason={} amount={} txId={} description={} confirmationStatus={}";
+        if (firstDelivery) {
+            log.info(line, body.orderId(), body.status(), status, reason, body.amount(), body.transactionId(),
+                    body.description(), body.confirmationStatus());
+        } else {
+            log.debug(line, body.orderId(), body.status(), status, reason, body.amount(), body.transactionId(),
+                    body.description(), body.confirmationStatus());
+        }
         service.applyWebhook(body.orderId(), status, reason);
         return ResponseEntity.ok().build();
     }

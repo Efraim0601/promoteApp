@@ -53,8 +53,17 @@ public class Subscription {
     @Column(nullable = false)
     private PayStatus payStatus;
 
+    /** Globally-unique order id sent to the aggregator (≠ the human ref). Carries a random/epoch
+     *  suffix so it never collides across DB resets / re-deploys — TrustPayWay's orderId namespace
+     *  is permanent, and reusing a ref caused "Duplicate transaction detected" rejections. The
+     *  webhook echoes this value back; null for cash / SARA / simulated. */
+    private String gatewayRef;
+
     /** Aggregator-side transaction id (e.g. TrustPayWay "transaction_id"); null for cash/simulated. */
     private String paymentTxId;
+
+    /** When the payment was confirmed paid (used for the MoMo confirmation-latency KPI). */
+    private Instant paidAt;
 
     /** Last aggregator message — the reason shown to the client on failure (e.g. "Solde insuffisant"). */
     @Column(length = 500)

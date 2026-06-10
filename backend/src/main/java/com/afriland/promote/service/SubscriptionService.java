@@ -35,6 +35,9 @@ public class SubscriptionService {
 
     // PRM-#### sequence (prototype starts at 1008, demo data uses 1000..1008)
     private final AtomicInteger seq = new AtomicInteger(1008);
+    private final java.security.SecureRandom rnd = new java.security.SecureRandom();
+    /** A pending MoMo transaction older than this is no longer "resumable" (a fresh attempt is allowed). */
+    private static final long RESUME_WINDOW_SECONDS = 300; // 5 min
 
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
                                AppUserRepository users, PaymentGateway gateway,
@@ -66,6 +69,29 @@ public class SubscriptionService {
 
     private String newRef() {
         return "PRM-" + seq.incrementAndGet();
+    }
+
+    /** Globally-unique order id for the aggregator: the human ref plus an epoch+random suffix, so it
+     *  never collides with an order id already known to TrustPayWay after a DB reset / re-deploy. */
+    private String newGatewayRef(String ref) {
+        String suffix = Long.toString(Instant.now().toEpochMilli(), 36)
+                + Integer.toString(rnd.nextInt(0x1000), 36);
+        return (ref + "-" + suffix).toUpperCase();
+    }
+
+    /** Find a still-pending MoMo transaction for the same payment number, amount and method, created
+     *  within the resume window — so a rapid re-submission resumes it instead of duplicating it. */
+    private Subscription findResumablePending(String payPhone, int amount, String pay) {
+        String want = local9(payPhone);
+        if (want.isEmpty()) return null;
+        Instant cutoff = Instant.now().minusSeconds(RESUME_WINDOW_SECONDS);
+        return subs.findAll().stream()
+                .filter(s -> s.getPayStatus() == PayStatus.pending)
+                .filter(s -> pay.equals(s.getPay()) && s.getAmount() == amount)
+                .filter(s -> want.equals(local9(s.getPayPhone())))
+                .filter(s -> s.getCreatedAt() != null && s.getCreatedAt().isAfter(cutoff))
+                .max(java.util.Comparator.comparing(Subscription::getCreatedAt))
+                .orElse(null);
     }
 
     /** total = price + fees + (transport if delivery == home). Ports kyc.jsx:37. */
@@ -119,6 +145,18 @@ public class SubscriptionService {
         String payRaw = req.payPhone() != null && !req.payPhone().isBlank() ? req.payPhone() : req.phone();
         String payPhone = momo ? payRaw.trim() : null;
 
+        // Idempotence: if the SAME number is already mid-payment for the SAME amount/method (a pending
+        // transaction created in the last few minutes), resume it instead of creating a duplicate
+        // subscription + a second gateway push. This is what users' rapid "Payer" re-taps produced.
+        if (momo) {
+            Subscription resumable = findResumablePending(payPhone, amount, req.pay());
+            if (resumable != null) {
+                log.info("Reprise du paiement en attente {} (tel={} {} {} XAF) au lieu d'un doublon",
+                        resumable.getRef(), payPhone, req.pay(), amount);
+                return resumable;
+            }
+        }
+
         Subscription s = Subscription.builder()
                 .ref(newRef())
                 .prenom(req.prenom().trim())
@@ -158,6 +196,8 @@ public class SubscriptionService {
         // cash and SARA are settled off-platform (in person / external app) — no gateway push.
         if (!cash && !sara) {
             try {
+                // Globally-unique order id for the aggregator (survives DB resets — see Subscription.gatewayRef).
+                s.setGatewayRef(newGatewayRef(s.getRef()));
                 // Push the USSD prompt via the active gateway (simulated or real aggregator).
                 PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, req.pay());
                 s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
@@ -240,24 +280,33 @@ public class SubscriptionService {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         boolean ok = "validate".equalsIgnoreCase(outcome);
         s.setPayStatus(ok ? PayStatus.paid : PayStatus.failed);
+        if (ok) s.setPaidAt(Instant.now());
         // Keep the decline reason (e.g. "Solde insuffisant") so the client UI can explain why; clear it on success.
         s.setPaymentMessage(ok ? null : (reason == null || reason.isBlank() ? null : reason.trim()));
         return subs.save(s);
     }
 
+    /** Resolve the subscription a webhook refers to: by the unique gateway order id we sent, falling
+     *  back to the bare ref (older records / simulated). Public so the controller can pick the log level. */
+    public Subscription findByOrderId(String orderId) {
+        if (orderId == null) return null;
+        return subs.findByGatewayRef(orderId).or(() -> subs.findByRefIgnoreCase(orderId)).orElse(null);
+    }
+
     /**
-     * Apply an aggregator webhook (push). {@code orderId} is the reference we sent
-     * ({@code sub.ref}); {@code newStatus} is the resolved {@link PayStatus} (or null
-     * if the aggregator status was not terminal). Only moves a transaction that is
-     * still {@code pending}, so a late/duplicate webhook can't overturn a final state.
+     * Apply an aggregator webhook (push). {@code orderId} is the unique gateway order id we sent
+     * ({@code sub.gatewayRef}, fallback {@code sub.ref}); {@code newStatus} is the resolved
+     * {@link PayStatus} (or null if not terminal). Only moves a transaction that is still
+     * {@code pending}, so a late/duplicate webhook can't overturn a final state.
      */
     @Transactional
     public Subscription applyWebhook(String orderId, PayStatus newStatus, String reason) {
         if (orderId == null || newStatus == null) return null;
-        Subscription s = subs.findByRefIgnoreCase(orderId).orElse(null);
+        Subscription s = findByOrderId(orderId);
         if (s == null) return null;
         if (s.getPayStatus() == PayStatus.pending) {
             s.setPayStatus(newStatus);
+            if (newStatus == PayStatus.paid) s.setPaidAt(Instant.now());
             // On a decline, keep the aggregator's reason (e.g. "Solde insuffisant") for the client UI.
             if (newStatus == PayStatus.failed && reason != null && !reason.isBlank()) {
                 s.setPaymentMessage(reason.trim());
@@ -274,12 +323,22 @@ public class SubscriptionService {
      */
     @Transactional
     public Subscription refreshStatus(String ref) {
-        Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
-        if (s == null) return null;
-        if (s.getPayStatus() == PayStatus.pending) {
+        return pullLiveStatus(subs.findByRefIgnoreCase(ref).orElse(null));
+    }
+
+    /**
+     * If the payment is still {@code pending}, ask the active gateway for a live status
+     * (get-status) and persist it when terminal. This is the fallback for when the webhook
+     * never arrived (e.g. no public callback URL). No-op for the simulated gateway, which
+     * returns no status. Returns the (possibly updated) subscription.
+     */
+    @Transactional
+    public Subscription pullLiveStatus(Subscription s) {
+        if (s != null && s.getPayStatus() == PayStatus.pending) {
             PayStatus pulled = gateway.queryStatus(s).orElse(null);
             if (pulled != null && pulled != PayStatus.pending) {
                 s.setPayStatus(pulled);
+                if (pulled == PayStatus.paid) s.setPaidAt(Instant.now());
                 subs.save(s);
             }
         }
@@ -337,6 +396,7 @@ public class SubscriptionService {
         if (req.saraAmount() != null) s.setSaraAmount(req.saraAmount());
         if ("validate".equalsIgnoreCase(req.outcome())) {
             s.setPayStatus(PayStatus.paid);
+            s.setPaidAt(Instant.now());
             s.setPaymentMessage(null);
         } else {
             s.setPayStatus(PayStatus.failed);
@@ -358,6 +418,7 @@ public class SubscriptionService {
         if (s.getPayStatus() != PayStatus.cash) return s;
         if ("validate".equalsIgnoreCase(outcome)) {
             s.setPayStatus(PayStatus.paid);
+            s.setPaidAt(Instant.now());
             s.setPaymentMessage(null);
             // Trace the collection: cashier name (readable, for screens), id (stats), and timestamp.
             s.setCashCollectedBy(cashierName(cashierId));
@@ -398,6 +459,9 @@ public class SubscriptionService {
                 .findFirst().orElse(null);
 
         if (match == null) return new ClaimResult(false, "notfound", null);
+        // The QR payment may already be settled at the aggregator but not yet reflected locally
+        // (missed webhook). Pull a live status before refusing the sale as "unpaid".
+        pullLiveStatus(match);
         if (match.getPayStatus() != PayStatus.paid) return new ClaimResult(false, "unpaid", SubscriptionDto.of(match));
         if (match.getAgentId() != null) return new ClaimResult(false, "taken", SubscriptionDto.of(match));
 
