@@ -25,3 +25,5 @@ wallet_transaction_detail.docx
 
 # Claude Code runtime locks
 .claude/scheduled_tasks.lock
+.env.capture
+docs/capture/node_modules/
