@@ -4,27 +4,48 @@
 Generate the Promote card user guide as BOTH .docx (Word) and .pptx (PowerPoint),
 using only the Python standard library (each file is a ZIP of OOXML parts).
 
-Every "step" carries a description + a screenshot PLACEHOLDER box the user fills in.
+Steps that have a real screenshot (docs/captures/<file>.png) embed the image;
+the others keep a « 📷 Capture » placeholder to fill in.
 """
-import os, zipfile
+import os, struct, zipfile
 from xml.sax.saxutils import escape
 
 OUT = os.path.dirname(os.path.abspath(__file__))
+CAPDIR = os.path.join(OUT, "captures")
 TITLE = "Carte Promote — Guide utilisateur"
 SUB = "Afriland First Bank · Souscription & gestion de la carte prépayée"
 SITE = "https://rfprepaidcard.afrilandfirstbank.com"
+EMU = 914400
 
 def esc(s): return escape(str(s), {'"': "&quot;", "'": "&apos;"})
 
+def png_size(path):
+    with open(path, "rb") as f:
+        head = f.read(24)
+    w, h = struct.unpack(">II", head[16:24])
+    return w, h
+
+def fit_emu(w, h, maxw, maxh):
+    asp = w / h
+    if maxw / maxh > asp:
+        cy = maxh; cx = int(maxh * asp)
+    else:
+        cx = maxw; cy = int(maxw / asp)
+    return cx, cy
+
+def cap(name):
+    """Return a captures/<name>.png path if it exists, else None."""
+    p = os.path.join(CAPDIR, name + ".png")
+    return p if os.path.exists(p) else None
+
 # ---------------------------------------------------------------- CONTENT
-# kind: cover | section | step. step => bullets + capture placeholder caption.
 CONTENT = [
     {"kind": "cover", "title": TITLE, "sub": SUB,
      "bullets": [f"Application web : {SITE}", "Document de prise en main pour tous les profils",
-                 "Les cadres « 📷 Capture » sont à remplir avec vos propres copies d'écran."]},
+                 "Captures réelles ci-après ; les écrans caméra/validation MoMo restent en emplacement à remplir."]},
 
     {"kind": "section", "title": "1. Accès & rôles"},
-    {"kind": "step", "title": "Se connecter", "capture": "Écran de connexion",
+    {"kind": "step", "title": "Se connecter", "capture": "Écran de connexion", "img": cap("01-connexion"),
      "bullets": [f"Ouvrir {SITE} dans un navigateur (Chrome / Edge / Safari).",
                  "Saisir son e-mail et son mot de passe, puis « Se connecter ».",
                  "Le système ouvre l'espace correspondant au rôle du compte."]},
@@ -34,11 +55,11 @@ CONTENT = [
                  "Point d'impression (imprimeur) — recherche d'un dossier, validation, activation/impression de la carte."]},
 
     {"kind": "section", "title": "2. Parcours CLIENT — souscription en ligne (QR)"},
-    {"kind": "step", "title": "Écran d'accueil", "capture": "Accueil client (après scan du QR)",
+    {"kind": "step", "title": "Écran d'accueil", "capture": "Accueil client (après scan du QR)", "img": cap("02-client-accueil"),
      "bullets": ["Le client scanne le QR code présenté par le conseiller (ou ouvre le lien).",
                  "Titre : « Offre Promotionnelle pour votre carte prépayée AFB ».",
                  "Les 3 étapes sont rappelées, puis bouton « Commencer »."]},
-    {"kind": "step", "title": "Étape 1 — Identité", "capture": "Formulaire d'identité",
+    {"kind": "step", "title": "Étape 1 — Identité", "capture": "Formulaire d'identité", "img": cap("03-client-identite"),
      "bullets": ["Renseigner : prénom, nom, sexe, n° CNI, NIU (facultatif), date d'expiration de la CNI.",
                  "Date d'expiration : choisie via le calendrier (date picker).",
                  "Téléphone : sélecteur de pays (drapeau + indicatif, défaut Cameroun) puis le numéro.",
@@ -69,7 +90,7 @@ CONTENT = [
                  "Boutons « Réessayer » / « Accueil ». L'annulation côté USSD est détectée automatiquement."]},
 
     {"kind": "section", "title": "3. Parcours CONSEILLER (commercial)"},
-    {"kind": "step", "title": "Espace conseiller", "capture": "Tableau de bord conseiller",
+    {"kind": "step", "title": "Espace conseiller", "capture": "Tableau de bord conseiller", "img": cap("08-conseiller-accueil"),
      "bullets": ["Après connexion : ses statistiques et la liste de ses ventes.",
                  "Chaque ligne affiche la PHOTO du client + nom, téléphone, CNI, date, montant et statut.",
                  "Recherche avancée (référence, nom, NIU, téléphone)."]},
@@ -83,11 +104,11 @@ CONTENT = [
                  "Si la vente est payée et non attribuée, elle est ajoutée aux statistiques du conseiller."]},
 
     {"kind": "section", "title": "4. Parcours POINT D'IMPRESSION (imprimeur)"},
-    {"kind": "step", "title": "Rechercher un dossier", "capture": "Recherche imprimeur + résultats",
+    {"kind": "step", "title": "Rechercher un dossier", "capture": "Recherche imprimeur + résultats", "img": cap("09-imprimeur-recherche"),
      "bullets": ["Saisir une référence (PRM-…), un nom ou un numéro de téléphone.",
                  "Chaque résultat affiche la PHOTO du client + nom, référence, téléphone, CNI et statut.",
                  "But : identifier visuellement le client rapidement."]},
-    {"kind": "step", "title": "Consulter la fiche", "capture": "Fiche complète du dossier",
+    {"kind": "step", "title": "Consulter la fiche", "capture": "Fiche complète du dossier", "img": cap("10-imprimeur-fiche"),
      "bullets": ["Photo client + CNI recto/verso (cliquer une image pour l'agrandir en plein écran).",
                  "Toutes les informations + le badge de statut (Payée / Échouée / …).",
                  "Possibilité de reprendre une photo mal cadrée."]},
@@ -101,24 +122,19 @@ CONTENT = [
                  "Si le paiement a ÉCHOUÉ ou est en attente : l'activation est BLOQUÉE (message « Paiement non réglé »)."]},
 
     {"kind": "section", "title": "5. Parcours ADMINISTRATEUR"},
-    {"kind": "step", "title": "Vue d'ensemble", "capture": "Tableau de bord — KPI",
+    {"kind": "step", "title": "Vue d'ensemble", "capture": "Tableau de bord — KPI", "img": cap("04-admin-vue-ensemble"),
      "bullets": ["KPI : Souscriptions, Montant collecté, Réussies, En attente, ÉCHOUÉES.",
                  "Le KPI « Échouées » (rouge) est cliquable → ouvre la liste filtrée sur les échecs.",
                  "Répartition des ventes par conseiller."]},
-    {"kind": "step", "title": "Configuration de la carte", "capture": "Configuration carte",
+    {"kind": "step", "title": "Configuration de la carte", "capture": "Configuration carte", "img": cap("05-admin-config"),
      "bullets": ["Définir le prix de la carte (et frais / transport).",
                  "Ces montants s'appliquent à toutes les nouvelles souscriptions.",
                  "« Enregistrer »."]},
-    {"kind": "step", "title": "Utilisateurs — créer un compte", "capture": "Création d'un utilisateur",
-     "bullets": ["Renseigner nom, e-mail, rôle, mot de passe.",
-                 "Pour un conseiller : agence + téléphone (9 chiffres) obligatoires.",
-                 "La liste des comptes existants est affichée en dessous."]},
-    {"kind": "step", "title": "Utilisateurs — import en masse", "capture": "Import d'utilisateurs (aperçu)",
-     "bullets": ["Charger un fichier CSV (modèle téléchargeable) OU coller un tableau Excel.",
-                 "Aperçu : chaque ligne étiquetée Nouveau / Doublon / Invalide.",
-                 "Choisir « Ignorer les doublons » ou « Mettre à jour », puis « Importer ».",
-                 "Mots de passe temporaires générés + export CSV des identifiants à communiquer."]},
-    {"kind": "step", "title": "Historique des paiements", "capture": "Tableau des transactions",
+    {"kind": "step", "title": "Utilisateurs (création & import)", "capture": "Utilisateurs / import", "img": cap("06-admin-utilisateurs"),
+     "bullets": ["Créer un compte (nom, e-mail, rôle, mot de passe ; agence + téléphone pour un conseiller).",
+                 "Import en masse : CSV ou coller un tableau ; aperçu Nouveau / Doublon / Invalide.",
+                 "Doublons : ignorer ou mettre à jour ; mots de passe temporaires générés + export CSV."]},
+    {"kind": "step", "title": "Historique des paiements", "capture": "Tableau des transactions", "img": cap("07-admin-transactions"),
      "bullets": ["Tableau détaillé : Photo · Client · Téléphone · CNI · Date · Paiement · Montant · Statut.",
                  "Filtres (recherche, statut, conseiller, dates) + chip rapide « Échouées ».",
                  "Pagination ; clic sur une ligne = détail complet ; export CSV."]},
@@ -137,24 +153,32 @@ CONTENT = [
 # ================================================================ DOCX
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 
-def w_p(text, style=None, bullet=False, color=None, bold=False, sz=None):
+def w_p(text, style=None, bullet=False):
     ppr = "<w:pPr>"
     if style: ppr += f'<w:pStyle w:val="{style}"/>'
     if bullet: ppr += '<w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'
     ppr += "</w:pPr>"
-    rpr = ""
-    if color or bold or sz:
-        rpr = "<w:rPr>"
-        if bold: rpr += "<w:b/>"
-        if color: rpr += f'<w:color w:val="{color}"/>'
-        if sz: rpr += f'<w:sz w:val="{sz}"/>'
-        rpr += "</w:rPr>"
-    return f'<w:p>{ppr}<w:r>{rpr}<w:t xml:space="preserve">{esc(text)}</w:t></w:r></w:p>'
+    return f'<w:p>{ppr}<w:r><w:t xml:space="preserve">{esc(text)}</w:t></w:r></w:p>'
+
+def w_image(rid, cx, cy, did, caption):
+    drawing = (f'<w:p><w:pPr><w:spacing w:before="80" w:after="40"/></w:pPr><w:r><w:drawing>'
+               f'<wp:inline distT="0" distB="0" distL="0" distR="0" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing">'
+               f'<wp:extent cx="{cx}" cy="{cy}"/><wp:effectExtent l="0" t="0" r="0" b="0"/>'
+               f'<wp:docPr id="{did}" name="img{did}"/>'
+               f'<wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" noChangeAspect="1"/></wp:cNvGraphicFramePr>'
+               f'<a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+               f'<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture">'
+               f'<pic:nvPicPr><pic:cNvPr id="{did}" name="img{did}"/><pic:cNvPicPr/></pic:nvPicPr>'
+               f'<pic:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="{rid}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill>'
+               f'<pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+               f'<a:ln w="9525"><a:solidFill><a:srgbClr val="DDDDDD"/></a:solidFill></a:ln></pic:spPr>'
+               f'</pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>')
+    cap = (f'<w:p><w:pPr><w:spacing w:after="160"/></w:pPr><w:r><w:rPr><w:i/><w:color w:val="888888"/><w:sz w:val="18"/></w:rPr>'
+           f'<w:t xml:space="preserve">Capture : {esc(caption)}</w:t></w:r></w:p>')
+    return drawing + cap
 
 def w_capture_box(caption):
-    # A dashed, light-grey single-cell table acting as a screenshot placeholder.
-    inner = (f'<w:p><w:pPr><w:jc w:val="center"/></w:pPr>'
-             f'<w:r><w:rPr><w:b/><w:color w:val="888888"/></w:rPr>'
+    inner = (f'<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:color w:val="888888"/></w:rPr>'
              f'<w:t xml:space="preserve">📷 Capture : {esc(caption)}</w:t></w:r></w:p>')
     inner += ('<w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:color w:val="AAAAAA"/><w:sz w:val="18"/></w:rPr>'
               '<w:t>(insérer la copie d’écran ici)</w:t></w:r></w:p>')
@@ -169,7 +193,9 @@ def w_capture_box(caption):
             f'<w:vAlign w:val="center"/></w:tcPr>{inner}</w:tc></w:tr></w:tbl><w:p/>')
 
 def build_docx(path):
-    body = []
+    body, media, rels_extra = [], [], []
+    did = 100
+    rimg = 10
     for it in CONTENT:
         k = it["kind"]
         if k == "cover":
@@ -184,13 +210,24 @@ def build_docx(path):
             body.append(w_p(it["title"], style="Heading2"))
             for b in it["bullets"]:
                 body.append(w_p(b, bullet=True))
-            body.append(w_capture_box(it["capture"]))
+            img = it.get("img")
+            if img:
+                rimg += 1; did += 1
+                rid = f"rIdImg{rimg}"
+                name = f"media/img{rimg}.png"
+                media.append((name, img))
+                rels_extra.append(f'<Relationship Id="{rid}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="{name}"/>')
+                w, h = png_size(img)
+                cx, cy = fit_emu(w, h, 5600000, 4300000)
+                body.append(w_image(rid, cx, cy, did, it["capture"]))
+            else:
+                body.append(w_capture_box(it["capture"]))
+
     document = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                 f'<w:document xmlns:w="{W}"><w:body>' + "".join(body) +
                 '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/>'
                 '<w:pgMar w:top="1134" w:bottom="1134" w:left="1134" w:right="1134"/></w:sectPr>'
                 '</w:body></w:document>')
-
     styles = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="{W}">
  <w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault></w:docDefaults>
@@ -200,30 +237,28 @@ def build_docx(path):
  <w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:pPr><w:spacing w:before="280" w:after="140"/><w:pBdr><w:bottom w:val="single" w:sz="8" w:space="4" w:color="D81E2C"/></w:pBdr></w:pPr><w:rPr><w:b/><w:color w:val="9B0F1E"/><w:sz w:val="34"/></w:rPr></w:style>
  <w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:pPr><w:spacing w:before="200" w:after="80"/></w:pPr><w:rPr><w:b/><w:color w:val="1E1416"/><w:sz w:val="28"/></w:rPr></w:style>
 </w:styles>'''
-
     numbering = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:numbering xmlns:w="{W}">
  <w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="360" w:hanging="360"/></w:pPr></w:lvl></w:abstractNum>
  <w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
 </w:numbering>'''
-
-    ct = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
- <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
- <Default Extension="xml" ContentType="application/xml"/>
- <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
- <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
- <Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
-</Types>'''
-    rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
- <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>'''
-    drels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
- <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
- <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
-</Relationships>'''
+    ct = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+          '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+          '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
+          '<Default Extension="xml" ContentType="application/xml"/>'
+          '<Default Extension="png" ContentType="image/png"/>'
+          '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>'
+          '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>'
+          '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>'
+          '</Types>')
+    rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')
+    drels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+             '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+             '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>'
+             '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>'
+             + "".join(rels_extra) + "</Relationships>")
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
         z.writestr("[Content_Types].xml", ct)
         z.writestr("_rels/.rels", rels)
@@ -231,13 +266,14 @@ def build_docx(path):
         z.writestr("word/styles.xml", styles)
         z.writestr("word/numbering.xml", numbering)
         z.writestr("word/_rels/document.xml.rels", drels)
+        for arc, src in media:
+            z.write(src, "word/" + arc)
 
 # ================================================================ PPTX
 A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 PML = "http://schemas.openxmlformats.org/presentationml/2006/main"
 REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
-EMU = 914400
-SW, SH = 12192000, 6858000  # 16:9
+SW, SH = 12192000, 6858000
 
 def a_par(text, sz, color, bold=False, bullet=False, align="l"):
     bu = '<a:buChar char="•"/>' if bullet else '<a:buNone/>'
@@ -247,47 +283,54 @@ def a_par(text, sz, color, bold=False, bullet=False, align="l"):
             f'<a:r><a:rPr lang="fr-FR" sz="{sz}"{b}><a:solidFill><a:srgbClr val="{color}"/></a:solidFill></a:rPr>'
             f'<a:t>{esc(text)}</a:t></a:r></a:p>')
 
-def sp_text(sid, name, x, y, cx, cy, paragraphs, fill=None, line=None, anchor="t"):
+def sp_text(sid, name, x, y, cx, cy, paragraphs, fill=None, anchor="t"):
     sppr_fill = f'<a:solidFill><a:srgbClr val="{fill}"/></a:solidFill>' if fill else '<a:noFill/>'
-    sppr_line = line or ''
     return (f'<p:sp><p:nvSpPr><p:cNvPr id="{sid}" name="{esc(name)}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>'
             f'<p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm>'
-            f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>{sppr_fill}{sppr_line}</p:spPr>'
+            f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>{sppr_fill}</p:spPr>'
             f'<p:txBody><a:bodyPr wrap="square" lIns="91440" tIns="68580" rIns="91440" bIns="68580" anchor="{anchor}"><a:normAutofit/></a:bodyPr>'
             f'<a:lstStyle/>{"".join(paragraphs)}</p:txBody></p:sp>')
 
+def sp_pic(sid, rid, x, y, cx, cy):
+    return (f'<p:pic><p:nvPicPr><p:cNvPr id="{sid}" name="img{sid}"/><p:cNvPicPr><a:picLocks noChangeAspect="1"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>'
+            f'<p:blipFill><a:blip r:embed="{rid}"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>'
+            f'<p:spPr><a:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{cx}" cy="{cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'
+            f'<a:ln w="9525"><a:solidFill><a:srgbClr val="DDDDDD"/></a:solidFill></a:ln></p:spPr></p:pic>')
+
 def slide_xml(it):
-    k = it["kind"]
-    shapes = []
-    sid = 2
+    k = it["kind"]; shapes = []; sid = 2
     if k == "cover":
         shapes.append(sp_text(sid, "bg", 0, 0, SW, SH, [], fill="FFFFFF")); sid += 1
         shapes.append(sp_text(sid, "bar", 0, 0, SW, 36000, [], fill="D81E2C")); sid += 1
-        shapes.append(sp_text(sid, "title", 800000, 2200000, SW-1600000, 1600000,
+        shapes.append(sp_text(sid, "title", 800000, 2100000, SW-1600000, 1600000,
                               [a_par(it["title"], 4000, "D81E2C", bold=True)], anchor="ctr")); sid += 1
-        shapes.append(sp_text(sid, "sub", 800000, 3700000, SW-1600000, 1400000,
-                              [a_par(it["sub"], 1800, "766164")] +
-                              [a_par("• " + b, 1300, "555555") for b in it["bullets"]], anchor="t")); sid += 1
+        shapes.append(sp_text(sid, "sub", 800000, 3650000, SW-1600000, 1600000,
+                              [a_par(it["sub"], 1800, "766164")] + [a_par("• " + b, 1300, "555555") for b in it["bullets"]])); sid += 1
     elif k == "section":
         shapes.append(sp_text(sid, "bg", 0, 0, SW, SH, [], fill="9B0F1E")); sid += 1
         shapes.append(sp_text(sid, "title", 800000, 2700000, SW-1600000, 1400000,
                               [a_par(it["title"], 3600, "FFFFFF", bold=True)], anchor="ctr")); sid += 1
     else:
         shapes.append(sp_text(sid, "bg", 0, 0, SW, SH, [], fill="FFFFFF")); sid += 1
-        shapes.append(sp_text(sid, "title", 500000, 380000, SW-1000000, 760000,
+        shapes.append(sp_text(sid, "title", 500000, 360000, SW-1000000, 760000,
                               [a_par(it["title"], 2600, "9B0F1E", bold=True)])); sid += 1
-        bullets = [a_par(b, 1500, "1E1416", bullet=True) for b in it["bullets"]]
-        shapes.append(sp_text(sid, "body", 500000, 1300000, 5500000, SH-1700000, bullets, anchor="t")); sid += 1
-        # screenshot placeholder on the right
-        ph_line = '<a:ln w="19050"><a:solidFill><a:srgbClr val="BBBBBB"/></a:solidFill><a:prstDash val="dash"/></a:ln>'
-        cap = [a_par("📷 Capture", 1600, "888888", bold=True, align="ctr"),
-               a_par(it["capture"], 1300, "888888", align="ctr"),
-               a_par("(insérer la copie d’écran ici)", 1100, "AAAAAA", align="ctr")]
-        ph = (f'<p:sp><p:nvSpPr><p:cNvPr id="{sid}" name="placeholder"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>'
-              f'<p:spPr><a:xfrm><a:off x="6250000" y="1300000"/><a:ext cx="5400000" cy="4700000"/></a:xfrm>'
-              f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="F4F4F4"/></a:solidFill>{ph_line}</p:spPr>'
-              f'<p:txBody><a:bodyPr anchor="ctr"><a:normAutofit/></a:bodyPr><a:lstStyle/>{"".join(cap)}</p:txBody></p:sp>')
-        shapes.append(ph)
+        shapes.append(sp_text(sid, "body", 500000, 1300000, 5300000, SH-1700000,
+                              [a_par(b, 1500, "1E1416", bullet=True) for b in it["bullets"]])); sid += 1
+        bx, by, bw, bh = 6050000, 1250000, 5650000, 5050000
+        if it.get("img"):
+            w, h = png_size(it["img"]); cx, cy = fit_emu(w, h, bw, bh)
+            shapes.append(sp_pic(sid, "rIdImg", bx + (bw - cx) // 2, by + (bh - cy) // 2, cx, cy)); sid += 1
+        else:
+            ph = (f'<p:sp><p:nvSpPr><p:cNvPr id="{sid}" name="placeholder"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr>'
+                  f'<p:spPr><a:xfrm><a:off x="{bx}" y="{by}"/><a:ext cx="{bw}" cy="{bh}"/></a:xfrm>'
+                  f'<a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="F4F4F4"/></a:solidFill>'
+                  f'<a:ln w="19050"><a:solidFill><a:srgbClr val="BBBBBB"/></a:solidFill><a:prstDash val="dash"/></a:ln></p:spPr>'
+                  f'<p:txBody><a:bodyPr anchor="ctr"><a:normAutofit/></a:bodyPr><a:lstStyle/>'
+                  + a_par("📷 Capture", 1600, "888888", bold=True, align="ctr")
+                  + a_par(it["capture"], 1300, "888888", align="ctr")
+                  + a_par("(insérer la copie d’écran ici)", 1100, "AAAAAA", align="ctr")
+                  + '</p:txBody></p:sp>')
+            shapes.append(ph)
     return (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
             f'<p:sld xmlns:a="{A}" xmlns:r="{REL}" xmlns:p="{PML}"><p:cSld><p:spTree>'
             f'<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
@@ -311,7 +354,6 @@ def build_pptx(path):
 <a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst>
 <a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst>
 </a:fmtScheme></a:themeElements></a:theme>'''
-
     empty_tree = ('<p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>'
                   '<p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr></p:spTree>')
     master = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -329,35 +371,29 @@ def build_pptx(path):
     layout_rels = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                    f'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
                    f'<Relationship Id="rId1" Type="{REL}/slideMaster" Target="../slideMasters/slideMaster1.xml"/></Relationships>')
-    slide_rels = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-                  f'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                  f'<Relationship Id="rId1" Type="{REL}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/></Relationships>')
-
     sld_ids = "".join(f'<p:sldId id="{256+i}" r:id="rId{i+1}"/>' for i in range(n))
     presentation = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                     f'<p:presentation xmlns:a="{A}" xmlns:r="{REL}" xmlns:p="{PML}">'
                     f'<p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rIdM"/></p:sldMasterIdLst>'
                     f'<p:sldIdLst>{sld_ids}</p:sldIdLst>'
                     f'<p:sldSz cx="{SW}" cy="{SH}" type="screen16x9"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>')
-    pres_rels_items = [f'<Relationship Id="rId{i+1}" Type="{REL}/slide" Target="slides/slide{i+1}.xml"/>' for i in range(n)]
-    pres_rels_items.append(f'<Relationship Id="rIdM" Type="{REL}/slideMaster" Target="slideMasters/slideMaster1.xml"/>')
-    # NB: the theme is related from the slideMaster (not the presentation) — per the OOXML schema.
     pres_rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                  '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                 + "".join(pres_rels_items) + "</Relationships>")
-
-    ct_items = "".join(
-        f'<Override PartName="/ppt/slides/slide{i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>'
-        for i in range(n))
+                 + "".join(f'<Relationship Id="rId{i+1}" Type="{REL}/slide" Target="slides/slide{i+1}.xml"/>' for i in range(n))
+                 + f'<Relationship Id="rIdM" Type="{REL}/slideMaster" Target="slideMasters/slideMaster1.xml"/></Relationships>')
+    media = []  # (arcname, src)
+    ct_imgs = ""
     ct = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
           '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
           '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
           '<Default Extension="xml" ContentType="application/xml"/>'
+          '<Default Extension="png" ContentType="image/png"/>'
           '<Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/>'
           '<Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/>'
           '<Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/>'
           '<Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/>'
-          + ct_items + '</Types>')
+          + "".join(f'<Override PartName="/ppt/slides/slide{i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>' for i in range(n))
+          + '</Types>')
     root_rels = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
                  f'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
                  f'<Relationship Id="rId1" Type="{REL}/officeDocument" Target="ppt/presentation.xml"/></Relationships>')
@@ -374,13 +410,22 @@ def build_pptx(path):
         z.writestr("ppt/slideLayouts/_rels/slideLayout1.xml.rels", layout_rels)
         for i, it in enumerate(CONTENT):
             z.writestr(f"ppt/slides/slide{i+1}.xml", slide_xml(it))
-            z.writestr(f"ppt/slides/_rels/slide{i+1}.xml.rels", slide_rels)
+            rels = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+                    f'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    f'<Relationship Id="rId1" Type="{REL}/slideLayout" Target="../slideLayouts/slideLayout1.xml"/>')
+            if it.get("img"):
+                arc = f"media/image{i+1}.png"
+                z.write(it["img"], "ppt/" + arc)
+                rels += f'<Relationship Id="rIdImg" Type="{REL}/image" Target="../{arc}"/>'
+            rels += "</Relationships>"
+            z.writestr(f"ppt/slides/_rels/slide{i+1}.xml.rels", rels)
 
 if __name__ == "__main__":
     docx_path = os.path.join(OUT, "Guide-utilisateur-Carte-Promote.docx")
     pptx_path = os.path.join(OUT, "Guide-utilisateur-Carte-Promote.pptx")
     build_docx(docx_path)
     build_pptx(pptx_path)
+    imgs = sum(1 for it in CONTENT if it.get("img"))
     print("Écrit :", docx_path)
     print("Écrit :", pptx_path)
-    print("Slides/sections :", len(CONTENT))
+    print(f"Sections/diapos : {len(CONTENT)} · captures embarquées : {imgs}")
