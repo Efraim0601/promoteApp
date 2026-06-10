@@ -20,6 +20,10 @@ app:
     email: imprimeur@afrilandfirstbank.com
     password: promote
     name: Point d'impression
+  cashier:
+    email: caissier@afrilandfirstbank.com
+    password: promote
+    name: Caissier Promote
   jwt:
     secret: test-secret-key-that-is-at-least-32-bytes-long-for-hs256
     expiration-hours: 1

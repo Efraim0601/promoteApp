@@ -35,9 +35,11 @@ import { assessDocument, DocIssue } from './image-quality';
           <button class="btn btn-ghost" (click)="retakePhoto()" style="padding:10px 14px;font-size:13px;width:auto">
             <ic name="refresh" [size]="16"></ic> {{ i18n.t('selfie_retake') }}
           </button>
-          <button class="btn btn-outline" (click)="pickFromGallery()" style="padding:10px 14px;font-size:13px;width:auto">
-            <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
-          </button>
+          @if (allowGallery) {
+            <button class="btn btn-outline" (click)="pickFromGallery()" style="padding:10px 14px;font-size:13px;width:auto">
+              <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
+            </button>
+          }
         </div>
       </div>
     } @else {
@@ -74,16 +76,20 @@ import { assessDocument, DocIssue } from './image-quality';
             <button class="btn btn-primary" (click)="start()" [disabled]="starting()" style="width:auto;padding:11px 18px">
               <ic name="camera" [size]="18"></ic> {{ starting() ? i18n.t('selfie_shooting') : i18n.t('cam_open') }}
             </button>
-            <button class="btn btn-outline" (click)="pickFromGallery()" style="width:auto;padding:11px 14px;font-size:13px">
-              <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
-            </button>
+            @if (allowGallery) {
+              <button class="btn btn-outline" (click)="pickFromGallery()" style="width:auto;padding:11px 14px;font-size:13px">
+                <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
+              </button>
+            }
           } @else {
             <button class="btn btn-primary" (click)="shoot()" [disabled]="shooting()" style="width:auto;padding:11px 18px">
               <ic name="camera" [size]="18"></ic> {{ i18n.t('cam_take') }}
             </button>
-            <button class="btn btn-outline" (click)="pickFromGallery()" style="width:auto;padding:11px 14px;font-size:13px">
-              <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
-            </button>
+            @if (allowGallery) {
+              <button class="btn btn-outline" (click)="pickFromGallery()" style="width:auto;padding:11px 14px;font-size:13px">
+                <ic name="image" [size]="16"></ic> {{ i18n.t('cam_gallery') }}
+              </button>
+            }
             @if (allowFlip) {
               <button class="btn btn-outline" (click)="flip()" style="width:auto;padding:11px 14px;font-size:13px">
                 <ic name="refresh" [size]="16"></ic> {{ facing === 'user' ? i18n.t('cam_rear') : i18n.t('cam_front') }}
@@ -112,6 +118,8 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   @Input() boxH = 200;
   /** When true, captured frames are checked for document quality (sharp, exposed, fully framed). */
   @Input() qualityCheck = false;
+  /** Allow picking from the gallery. Set false to FORCE the live camera (selfie / KYC integrity). */
+  @Input() allowGallery = true;
   @Output() captured = new EventEmitter<string>();
   @Output() retake = new EventEmitter<void>();
 

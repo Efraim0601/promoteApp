@@ -23,7 +23,7 @@ const STEP_KEYS = ['step_identity', 'step_documents', 'step_photo', 'step_paymen
 const STEP_COUNT = STEP_KEYS.length;
 
 interface WizardForm {
-  prenom: string; nom: string; sexe: string; cni: string; niu: string; cniExp: string; phone: string;
+  prenom: string; nom: string; sexe: string; docType: string; cni: string; niu: string; cniExp: string; phone: string;
   email: string; quartier: string; ville: string;
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
@@ -92,7 +92,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly cniTips = ['cni_tip_flat', 'cni_tip_light', 'cni_tip_glare', 'cni_tip_frame'];
 
   form: WizardForm = {
-    prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '',
+    prenom: '', nom: '', sexe: '', docType: 'cni', cni: '', niu: '', cniExp: '', phone: '',
     email: '', quartier: '', ville: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
@@ -128,13 +128,20 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   // ---- draft persistence: survive reloads / navigating away, so nothing typed is lost ----
   private storageKey() { return `promote-wizard-${this.channel}`; }
 
-  /** Save text fields + upload keys + step. Heavy base64 previews are skipped (localStorage quota);
-   *  the uploads themselves already live on the server, referenced by their keys. */
+  /** Save the whole form (text fields, upload keys AND the image previews) + step, so a reload
+   *  restores the client's session exactly — photos included. If the payload exceeds the
+   *  localStorage quota (large SARA PDF, several photos), we fall back to saving everything
+   *  EXCEPT the heavy base64 previews (the uploads still live on the server, by their keys). */
   private persist() {
+    const key = this.storageKey();
     try {
-      const { selfieData, cniRectoData, cniVersoData, saraReceiptData, ...rest } = this.form;
-      localStorage.setItem(this.storageKey(), JSON.stringify({ form: rest, step: this.step() }));
-    } catch { /* storage unavailable or full — ignore */ }
+      localStorage.setItem(key, JSON.stringify({ form: this.form, step: this.step() }));
+    } catch {
+      try {
+        const { selfieData, cniRectoData, cniVersoData, saraReceiptData, ...rest } = this.form;
+        localStorage.setItem(key, JSON.stringify({ form: rest, step: this.step() }));
+      } catch { /* storage unavailable — ignore */ }
+    }
   }
 
   private restore() {
@@ -142,11 +149,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       const raw = localStorage.getItem(this.storageKey());
       if (!raw) return;
       const saved = JSON.parse(raw) as { form?: Partial<WizardForm>; step?: number };
-      if (saved.form) {
-        // Restore fields, but force previews null (only their keys were persisted).
-        this.form = { ...this.form, ...saved.form,
-          selfieData: null, cniRectoData: null, cniVersoData: null, saraReceiptData: null };
-      }
+      // Merge saved fields back in. Image previews are restored when present; if the quota
+      // fallback dropped them, the keys still submit and the preview simply stays empty.
+      if (saved.form) this.form = { ...this.form, ...saved.form };
       if (typeof saved.step === 'number') this.step.set(Math.min(this.lastStep, Math.max(0, saved.step)));
     } catch { /* corrupt draft — ignore */ }
   }
@@ -174,12 +179,15 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     const expDate = parseExp(f.cniExp);
     const phoneOk = isValidPhoneNumber(f.phone);
     const emailOk = /^\S+@\S+\.\S+$/.test(f.email);
-    const cniOk = /^[0-9A-F]{6,}$/.test(f.cni); // hexadecimal, at least 6 chars
+    // CNI = hexadécimal (0-9 A-F) ; passeport / récépissé = alphanumérique (lettres, chiffres, tiret).
+    const docOk = f.docType === 'cni'
+      ? /^[0-9A-F]{6,}$/.test(f.cni)
+      : /^[0-9A-Z-]{5,}$/.test(f.cni.trim().toUpperCase());
     return {
       prenom: !f.prenom.trim() ? this.i18n.t('required') : null,
       nom: !f.nom.trim() ? this.i18n.t('required') : null,
       sexe: !f.sexe ? this.i18n.t('required') : null,
-      cni: !f.cni ? this.i18n.t('required') : !cniOk ? this.i18n.t('cni_invalid') : null,
+      cni: !f.cni ? this.i18n.t('required') : !docOk ? this.i18n.t(f.docType === 'cni' ? 'cni_invalid' : 'doc_num_invalid') : null,
       cniExp: !f.cniExp ? this.i18n.t('required') : !expDate ? this.i18n.t('exp_invalid')
         : expDate < new Date() ? this.i18n.t('exp_expired') : null,
       phone: !f.phone ? this.i18n.t('required') : !phoneOk ? this.i18n.t('invalid_phone') : null,
@@ -199,9 +207,15 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   // Document / photo steps are satisfied by a local capture OR a restored upload key (so a
   // page reload mid-wizard doesn't force the client to retake what was already uploaded).
   get docsOk() {
-    return (!!this.form.cniRectoData || !!this.form.cniRectoKey)
-        && (!!this.form.cniVersoData || !!this.form.cniVersoKey);
+    const recto = !!this.form.cniRectoData || !!this.form.cniRectoKey;
+    const verso = !!this.form.cniVersoData || !!this.form.cniVersoKey;
+    // Le passeport n'a qu'une page d'identité → le verso est facultatif.
+    return recto && (this.form.docType === 'passport' ? true : verso);
   }
+  /** Libellés dépendant du type de pièce (CNI / passeport / récépissé). */
+  get docLabel() { return this.i18n.t('doc_' + this.form.docType); }
+  get docNumLabel() { return this.i18n.t('doc_num_' + this.form.docType); }
+  get needsVerso() { return this.form.docType !== 'passport'; }
   get selfieOk() { return !!this.form.selfieData || !!this.form.selfieKey; }
   /** Mobile Money methods that need a payment number + USSD push. */
   get isMomo() { return this.form.pay === 'om' || this.form.pay === 'mtn'; }
@@ -349,6 +363,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   private payload() {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
+      docType: this.form.docType,
       cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
       email: this.form.email.trim(), quartier: this.form.quartier.trim(), ville: this.form.ville.trim(),
       pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
@@ -440,7 +455,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     this.stopPolling();
     this.clearPersist();
     this.form = {
-      prenom: '', nom: '', sexe: '', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', ville: '',
+      prenom: '', nom: '', sexe: '', docType: 'cni', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', ville: '',
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null, saraRef: '',

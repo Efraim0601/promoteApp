@@ -27,7 +27,8 @@ public class Subscription {
     private String sexe;            // M | F
     private String email;
 
-    private String cni;             // ID card number
+    private String docType;         // type de pièce : cni | passport | recepisse (défaut cni)
+    private String cni;             // ID document number (CNI / passport / récépissé)
     private String niu;             // Numéro d'Identification Unique (taxpayer id) — optional
     private String cniExp;          // expiry, displayed dd/MM/yyyy
     private String phone;           // "+237 6XXXXXXXX"
@@ -77,6 +78,11 @@ public class Subscription {
     private String saraRef;          // transaction reference, e.g. W2026051112422763
     private String saraPayerPhone;   // sender ("Émetteur") account, "+237 XXXXXXXXX"
     private Integer saraAmount;      // total amount on the receipt, in XAF
+
+    /** Cash collection trace: who (cashier name) confirmed the in-person cash payment, and when.
+     *  Set when a CASHIER validates a {@code cash} subscription (cash → paid). */
+    private String cashCollectedBy;
+    private Instant cashCollectedAt;
 
     /** Resolve a stored image key by kind. */
     @Transient

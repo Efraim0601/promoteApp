@@ -40,6 +40,11 @@ public class DataSeeder implements CommandLineRunner {
     private final String printPassword;
     private final String printName;
 
+    // Cashier account (CASHIER) — set CASHIER_EMAIL / CASHIER_PASSWORD / CASHIER_NAME in production.
+    private final String cashierEmail;
+    private final String cashierPassword;
+    private final String cashierName;
+
     public DataSeeder(AppUserRepository users, CardConfigRepository configs, SubscriptionRepository subs,
                       SubscriptionService service, PasswordEncoder encoder,
                       @Value("${app.admin.email}") String adminEmail,
@@ -48,7 +53,10 @@ public class DataSeeder implements CommandLineRunner {
                       @Value("${app.seed.test-agent:true}") boolean seedTestAgent,
                       @Value("${app.print.email}") String printEmail,
                       @Value("${app.print.password}") String printPassword,
-                      @Value("${app.print.name:Point d'impression}") String printName) {
+                      @Value("${app.print.name:Point d'impression}") String printName,
+                      @Value("${app.cashier.email}") String cashierEmail,
+                      @Value("${app.cashier.password}") String cashierPassword,
+                      @Value("${app.cashier.name:Caissier Promote}") String cashierName) {
         this.users = users;
         this.configs = configs;
         this.subs = subs;
@@ -61,6 +69,9 @@ public class DataSeeder implements CommandLineRunner {
         this.printEmail = printEmail;
         this.printPassword = printPassword;
         this.printName = printName;
+        this.cashierEmail = cashierEmail;
+        this.cashierPassword = cashierPassword;
+        this.cashierName = cashierName;
     }
 
     @Override
@@ -68,6 +79,7 @@ public class DataSeeder implements CommandLineRunner {
         seedConfig();
         seedUsers();
         seedPrintAgent(); // independent of the first-boot guard, so it appears on existing deployments
+        seedCashier();    // idem — completes the four roles on existing deployments too
         // No demo client-journey data is seeded: subscriptions start empty.
         service.initSequence();
     }
@@ -97,6 +109,14 @@ public class DataSeeder implements CommandLineRunner {
         if (users.findByEmailIgnoreCase(printEmail).isPresent()) return;
         users.save(AppUser.builder().id("print").name(printName).email(printEmail)
                 .passwordHash(encoder.encode(printPassword)).role(Role.PRINT_AGENT).build());
+    }
+
+    /** Ensure a cashier account exists (CASHIER). Idempotent by email, so it is created on existing
+     *  deployments too — completing the four roles: ADMIN, AGENT, PRINT_AGENT, CASHIER. */
+    private void seedCashier() {
+        if (users.findByEmailIgnoreCase(cashierEmail).isPresent()) return;
+        users.save(AppUser.builder().id("cashier").name(cashierName).email(cashierEmail)
+                .passwordHash(encoder.encode(cashierPassword)).role(Role.CASHIER).build());
     }
 
     /** Builds a demo subscription, mirroring app.jsx:seedTx's mk() helper. */

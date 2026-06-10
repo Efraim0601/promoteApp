@@ -124,6 +124,7 @@ public class SubscriptionService {
                 .fullName((req.prenom().trim() + " " + req.nom().trim()).trim())
                 .sexe(req.sexe())
                 .email(req.email() == null ? null : req.email().trim())
+                .docType(req.docType() == null || req.docType().isBlank() ? "cni" : req.docType().trim())
                 .cni(req.cni())
                 .niu(normNiu(req.niu()))
                 .cniExp(req.cniExp())
@@ -328,6 +329,35 @@ public class SubscriptionService {
             s.setPaymentMessage(reason == null || reason.isBlank() ? "Reçu SARA non conforme" : reason.trim());
         }
         return subs.save(s);
+    }
+
+    /**
+     * Cashier decision on an in-person cash payment. Idempotent: only acts while the record is
+     * still {@code cash}, so a payment can't be validated twice or overturned once final.
+     * {@code validate} → {@code paid} (printable), recording who collected the cash and when;
+     * {@code reject} → {@code failed} (+ reason, e.g. the client never showed up to pay).
+     */
+    @Transactional
+    public Subscription validateCash(String ref, String outcome, String reason, String cashierId) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
+        if (s.getPayStatus() != PayStatus.cash) return s;
+        if ("validate".equalsIgnoreCase(outcome)) {
+            s.setPayStatus(PayStatus.paid);
+            s.setPaymentMessage(null);
+            // Trace the collection: store the cashier's name (readable) and the timestamp.
+            s.setCashCollectedBy(cashierName(cashierId));
+            s.setCashCollectedAt(Instant.now());
+        } else {
+            s.setPayStatus(PayStatus.failed);
+            s.setPaymentMessage(reason == null || reason.isBlank() ? "Paiement espèces non perçu" : reason.trim());
+        }
+        return subs.save(s);
+    }
+
+    /** Resolve a staff member's display name from their id; falls back to the raw id. */
+    private String cashierName(String id) {
+        if (id == null) return null;
+        return users.findById(id).map(AppUser::getName).orElse(id);
     }
 
     private static String blankToNull(String v) {

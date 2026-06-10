@@ -30,7 +30,7 @@ class PaymentFlowTest {
     /** Create a MoMo (om) subscription — the simulated gateway accepts the push, so it starts 'pending'. */
     private String createPendingMomo(String cni, String phone) {
         CreateSubscriptionRequest req = new CreateSubscriptionRequest(
-                "Pay", "Test", "M", cni, null, "01/01/2031", phone,
+                "Pay", "Test", "M", "cni", cni, null, "01/01/2031", phone,
                 "pay.test@afb.cm", "Bonamoussadi", "Littoral", "Douala",
                 "om", phone, "promote", false, null, null, null, null, null, null);
         Subscription s = service.create(req, "self", null);

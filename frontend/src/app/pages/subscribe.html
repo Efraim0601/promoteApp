@@ -173,7 +173,20 @@
             </select>
           </div>
         </field>
-        <cni-field [label]="i18n.t('cni')" [hint]="i18n.t('cni_hint')" [value]="form.cni" (valueChange)="set('cni', $event)" [err]="e('cni')"></cni-field>
+        <field [label]="i18n.t('doc_type_label')">
+          <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
+            <select [value]="form.docType" (change)="set('docType', $any($event.target).value)">
+              <option value="cni">{{ i18n.t('doc_cni') }}</option>
+              <option value="passport">{{ i18n.t('doc_passport') }}</option>
+              <option value="recepisse">{{ i18n.t('doc_recepisse') }}</option>
+            </select>
+          </div>
+        </field>
+        @if (form.docType === 'cni') {
+          <cni-field [label]="docNumLabel" [hint]="i18n.t('cni_hint')" [value]="form.cni" (valueChange)="set('cni', $event)" [err]="e('cni')"></cni-field>
+        } @else {
+          <field [label]="docNumLabel" [err]="e('cni')"><div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span><input autocapitalize="characters" style="text-transform:uppercase" [placeholder]="i18n.t('doc_num_ph')" [value]="form.cni" (input)="set('cni', $any($event.target).value.toUpperCase())" /></div></field>
+        }
         <field [label]="i18n.t('niu_label')" [hint]="i18n.t('niu_hint')"><div class="input-prefix"><span class="pfx"><ic name="hash" [size]="17"></ic></span><input [placeholder]="i18n.t('niu_ph')" [value]="form.niu" (input)="set('niu', $any($event.target).value)" /></div></field>
         <expiry-field [label]="i18n.t('cni_exp')" [value]="form.cniExp" (valueChange)="set('cniExp', $event)" [err]="e('cniExp')"></expiry-field>
         <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
@@ -201,18 +214,21 @@
 
       <!-- Step 1: ID document (CNI recto + verso, rear camera) -->
       @else if (step() === 1) {
-        <div style="font-size:13px;font-weight:700;margin-top:2px">{{ i18n.t('cni_recto') }}</div>
+        <div style="font-size:13px;font-weight:700;margin-top:2px">{{ docLabel }} — {{ i18n.t('side_recto') }}</div>
         <photo-capture [imageData]="form.cniRectoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
           [guide]="i18n.t('cni_recto_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniRecto($event)" (retake)="onRetakeRecto()"></photo-capture>
-        <div style="font-size:13px;font-weight:700;margin-top:6px">{{ i18n.t('cni_verso') }}</div>
-        <photo-capture [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
-          [guide]="i18n.t('cni_verso_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniVerso($event)" (retake)="onRetakeVerso()"></photo-capture>
+        @if (needsVerso) {
+          <div style="font-size:13px;font-weight:700;margin-top:6px">{{ docLabel }} — {{ i18n.t('side_verso') }}</div>
+          <photo-capture [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
+            [guide]="i18n.t('cni_verso_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniVerso($event)" (retake)="onRetakeVerso()"></photo-capture>
+        }
         @if (touched() && !docsOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }
 
       <!-- Step 2: client photo (front selfie or rear camera) -->
       @else if (step() === 2) {
         <photo-capture [imageData]="form.selfieData" facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
+          [allowGallery]="false"
           [guide]="i18n.t('photo_guide')" (captured)="onSelfie($event)" (retake)="onRetakeSelfie()"></photo-capture>
         @if (touched() && !selfieOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }
@@ -294,7 +310,7 @@
         <div class="card" style="padding:4px 16px">
           <div class="srow"><span class="lbl">{{ i18n.t('client') }}</span><span class="val">{{ fullName }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('sexe') }}</span><span class="val">{{ form.sexe === 'M' ? i18n.t('sexe_m') : i18n.t('sexe_f') }}</span></div>
-          <div class="srow"><span class="lbl">{{ i18n.t('cni_short') }}</span><span class="val">{{ form.cni }}</span></div>
+          <div class="srow"><span class="lbl">{{ docLabel }}</span><span class="val">{{ form.cni }}</span></div>
           @if (form.niu.trim()) { <div class="srow"><span class="lbl">{{ i18n.t('niu_short') }}</span><span class="val">{{ form.niu }}</span></div> }
           <div class="srow"><span class="lbl">{{ i18n.t('validity') }}</span><span class="val">{{ expDisplay }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('phone') }}</span><span class="val">{{ fmtPhone(form.phone) }}</span></div>

@@ -25,7 +25,7 @@ class PrintGuardTest {
 
     private String createMomo(String cni, String phone) {
         CreateSubscriptionRequest req = new CreateSubscriptionRequest(
-                "Print", "Guard", "M", cni, null, "01/01/2031", phone,
+                "Print", "Guard", "M", "cni", cni, null, "01/01/2031", phone,
                 "pg@afb.cm", "Bonamoussadi", "Littoral", "Douala",
                 "om", phone, "promote", false, null, null, null, null, null, null);
         return service.create(req, "self", null).getRef();

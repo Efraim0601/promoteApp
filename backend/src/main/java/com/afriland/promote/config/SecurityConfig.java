@@ -66,12 +66,15 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/niu").hasAnyRole("AGENT", "ADMIN")
                 .requestMatchers("/api/stats/agent").hasRole("AGENT")
 
-                // ---- print point (also reachable by admin/agent) ----
-                .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/image/*").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
-                .requestMatchers(HttpMethod.GET, "/api/subscriptions/*").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
+                // ---- print point + cashier (also reachable by admin/agent) ----
+                // The cashier looks a record up (search/fetch + selfie) to verify identity before taking cash.
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/image/*").hasAnyRole("PRINT_AGENT", "CASHIER", "ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions/*").hasAnyRole("PRINT_AGENT", "CASHIER", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/print").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/photo").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/sara-validate").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
+                // ---- cashier — validate an in-person cash payment (cash → paid) ----
+                .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/cash-validate").hasAnyRole("CASHIER", "ADMIN")
 
                 .anyRequest().authenticated())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

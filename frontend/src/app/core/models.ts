@@ -1,6 +1,6 @@
 /** Shared API types mirroring the backend DTOs. */
 
-export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT';
+export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER';
 
 export interface User {
   id: string;
@@ -59,6 +59,8 @@ export interface Subscription {
   saraAmount?: number | null;      // total amount extracted from the receipt (XAF)
   cardNumber?: string | null;      // physical card number, entered at the print point
   pan?: string | null;             // PAN (Primary Account Number), captured at card activation
+  cashCollectedBy?: string | null; // cashier who validated the in-person cash payment
+  cashCollectedAt?: string | null; // when the cash was collected (ISO instant)
   status: string;     // printed | failed | cash | sara_pending | awaiting
   createdAt: string;
   paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")

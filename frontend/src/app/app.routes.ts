@@ -20,5 +20,8 @@ export const routes: Routes = [
   // print point (staff)
   { path: 'print', canActivate: [authGuard], loadComponent: () => import('./pages/print-point').then((m) => m.PrintPointComponent) },
 
+  // cashier — validate in-person cash payments
+  { path: 'cashier', canActivate: [roleGuard('CASHIER', 'ADMIN')], loadComponent: () => import('./pages/cashier').then((m) => m.CashierComponent) },
+
   { path: '**', redirectTo: 'login' },
 ];

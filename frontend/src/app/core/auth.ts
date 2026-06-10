@@ -51,6 +51,7 @@ export class Auth {
     if (r === 'ADMIN') return '/admin';
     if (r === 'AGENT') return '/agent';
     if (r === 'PRINT_AGENT') return '/print';
+    if (r === 'CASHIER') return '/cashier';
     return '/login';
   }
 }

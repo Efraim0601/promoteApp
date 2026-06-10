@@ -38,7 +38,7 @@ public final class Dtos {
 
     public record LoginResponse(String token, UserDto user) {}
 
-    /** Admin creates a staff account. role = ADMIN | AGENT | PRINT_AGENT. */
+    /** Admin creates a staff account. role = ADMIN | AGENT | PRINT_AGENT | CASHIER. */
     public record CreateUserRequest(
             @NotBlank String name,
             @NotBlank String email,
@@ -56,6 +56,7 @@ public final class Dtos {
             @NotBlank String prenom,
             @NotBlank String nom,
             @NotBlank String sexe,       // M | F
+            String docType,              // type de pièce : cni | passport | recepisse (défaut cni)
             @NotBlank String cni,
             String niu,                  // NIU (taxpayer id) — optional, may be added later by the agent
             @NotBlank String cniExp,
@@ -77,23 +78,25 @@ public final class Dtos {
 
     public record SubscriptionDto(
             String ref, String prenom, String nom, String fullName, String sexe, String email,
-            String cni, String niu, String cniExp, String phone, String quartier, String region, String ville,
+            String docType, String cni, String niu, String cniExp, String phone, String quartier, String region, String ville,
             String pay, String payPhone, String delivery, int amount, int transport,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
             String saraRef, String saraPayerPhone, Integer saraAmount, String cardNumber, String pan,
+            String cashCollectedBy, String cashCollectedAt,
             String status, String createdAt, String paymentMessage) {
         public static SubscriptionDto of(Subscription s) {
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
-                    s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
+                    s.getDocType(), s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
                     s.getPay(), s.getPayPhone(), s.getDelivery(), s.getAmount(), s.getTransport(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
                     s.getSaraReceiptKey() != null,
                     s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(), s.getCardNumber(), s.getPan(),
+                    s.getCashCollectedBy(), s.getCashCollectedAt() == null ? null : s.getCashCollectedAt().toString(),
                     s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage());
         }
     }
@@ -112,6 +115,10 @@ public final class Dtos {
      *  The sara* fields carry the agent's confirmed/corrected receipt values (prefilled from extraction). */
     public record SaraValidateRequest(String outcome, String reason,
                                       String saraRef, String saraPayerPhone, Integer saraAmount) {}
+
+    /** Cashier decision on an in-person cash payment. {@code outcome} = "validate" (→ paid) |
+     *  "reject" (→ failed, with an optional reason, e.g. the client never paid). */
+    public record CashValidateRequest(String outcome, String reason) {}
 
     /** Lightweight, public payment status for the client polling the result. */
     public record PaymentStatusDto(String ref, String payStatus, String message) {}

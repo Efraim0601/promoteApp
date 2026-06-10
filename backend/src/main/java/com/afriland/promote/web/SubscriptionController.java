@@ -116,6 +116,14 @@ public class SubscriptionController {
         return SubscriptionDto.of(service.validateSara(ref, req));
     }
 
+    /** Cashier — validate or reject an in-person cash payment.
+     *  outcome = validate (→ paid, traced to the cashier) | reject (→ failed, with an optional reason). */
+    @PatchMapping("/{ref}/cash-validate")
+    public SubscriptionDto cashValidate(@PathVariable String ref, @RequestBody CashValidateRequest req,
+                                        Authentication auth) {
+        return SubscriptionDto.of(service.validateCash(ref, req.outcome(), req.reason(), (String) auth.getPrincipal()));
+    }
+
     /** Agent claims a paid, unattributed QR sale (optionally capturing the client's NIU). */
     @PostMapping("/claim")
     public ClaimResult claim(@Valid @RequestBody ClaimRequest req, Authentication auth) {

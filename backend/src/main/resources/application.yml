@@ -23,6 +23,10 @@ app:
     email: ${PRINT_EMAIL:imprimeur.promote@afrilandfirstbank.com}
     password: ${PRINT_PASSWORD:promote}
     name: ${PRINT_NAME:Point d'impression}
+  cashier:
+    email: ${CASHIER_EMAIL:caissier.promote@afrilandfirstbank.com}
+    password: ${CASHIER_PASSWORD:promote}
+    name: ${CASHIER_NAME:Caissier Promote}
   seed:
     test-agent: ${SEED_TEST_AGENT:true}   # set false in production to skip the demo agent
   jwt:

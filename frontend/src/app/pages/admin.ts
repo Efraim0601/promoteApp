@@ -153,6 +153,7 @@ import { payById, recordStatus } from '../shared/constants';
             <select class="input" [value]="nu().role" (change)="onNu('role', $event)">
               <option value="AGENT">{{ i18n.t('role_agent') }}</option>
               <option value="PRINT_AGENT">{{ i18n.t('role_print') }}</option>
+              <option value="CASHIER">{{ i18n.t('role_cashier') }}</option>
               <option value="ADMIN">{{ i18n.t('role_admin') }}</option>
             </select>
           </field>
@@ -521,7 +522,7 @@ export class AdminComponent implements OnInit {
     });
   }
   roleLabel(role: Role) {
-    return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print' : 'role_agent');
+    return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print' : role === 'CASHIER' ? 'role_cashier' : 'role_agent');
   }
 
   // --- bulk user import ---
@@ -546,7 +547,7 @@ export class AdminComponent implements OnInit {
       let status: 'new' | 'duplicate' | 'invalid' = 'new';
       let reason = '';
       if (!name || !/\S+@\S+\.\S+/.test(email)) { status = 'invalid'; reason = 'name_email'; }
-      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT') { status = 'invalid'; reason = 'role'; }
+      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT' && role !== 'CASHIER') { status = 'invalid'; reason = 'role'; }
       else if (role === 'AGENT' && !/^6\d{8}$/.test(phone9)) { status = 'invalid'; reason = 'phone'; }
       else {
         const key = email.toLowerCase();
@@ -602,6 +603,7 @@ export class AdminComponent implements OnInit {
     const s = (r || '').trim().toLowerCase();
     if (/admin/.test(s)) return 'ADMIN';
     if (/print|impr/.test(s)) return 'PRINT_AGENT';
+    if (/caiss|cashier|esp[èe]ce/.test(s)) return 'CASHIER';
     if (/agent|commerc|client/.test(s)) return 'AGENT';
     return (r || '').trim().toUpperCase();
   }

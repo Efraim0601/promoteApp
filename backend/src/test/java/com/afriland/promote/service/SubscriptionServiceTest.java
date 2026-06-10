@@ -27,7 +27,7 @@ class SubscriptionServiceTest {
     /** Build a valid create request; tweak the bits a test cares about via the explicit args. */
     private CreateSubscriptionRequest req(String pay, String saraReceiptKey, String saraRef, String referrerPhone) {
         return new CreateSubscriptionRequest(
-                "Jean", "Kamga", "M", "1234ABCD", null, "12/04/2030", "677001122",
+                "Jean", "Kamga", "M", "cni", "1234ABCD", null, "12/04/2030", "677001122",
                 "jean@example.com", "Bonamoussadi", "Littoral", "Douala",
                 pay, null, "promote", false, null, null, null, saraReceiptKey, saraRef, referrerPhone);
     }
@@ -106,5 +106,35 @@ class SubscriptionServiceTest {
     void unknownReferrerPhoneResolvesToNull() {
         assertNull(service.resolveAgentByPhone("600000000"));
         assertNull(service.resolveAgentByPhone(null));
+    }
+
+    @Test
+    void cashierValidatingCashMarksPaidAndTracesTheCollector() {
+        Subscription s = service.create(req("cash", null, null, null), "agent", "a1");
+        assertEquals(PayStatus.cash, s.getPayStatus());
+        // "a1" is the seeded agent Awa Fall — the cashier's name is resolved for the trace.
+        Subscription paid = service.validateCash(s.getRef(), "validate", null, "a1");
+        assertEquals(PayStatus.paid, paid.getPayStatus());
+        assertEquals("Awa Fall", paid.getCashCollectedBy());
+        assertNotNull(paid.getCashCollectedAt());
+    }
+
+    @Test
+    void cashierRejectingCashMarksFailedWithReason() {
+        Subscription s = service.create(req("cash", null, null, null), "agent", "a1");
+        Subscription failed = service.validateCash(s.getRef(), "reject", "Client jamais venu payer", "a1");
+        assertEquals(PayStatus.failed, failed.getPayStatus());
+        assertEquals("Client jamais venu payer", failed.getPaymentMessage());
+        assertNull(failed.getCashCollectedBy(), "a rejected cash payment is not traced as collected");
+    }
+
+    @Test
+    void validateCashIsIdempotentOnAlreadySettledRecords() {
+        // A MoMo subscription is never 'cash', so the cashier endpoint must leave it untouched.
+        Subscription s = service.create(req("om", null, null, null), "self", null);
+        PayStatus before = s.getPayStatus();
+        Subscription after = service.validateCash(s.getRef(), "validate", null, "a1");
+        assertEquals(before, after.getPayStatus(), "non-cash records are not changed by the cashier");
+        assertNull(after.getCashCollectedBy());
     }
 }
