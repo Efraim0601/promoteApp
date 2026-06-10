@@ -58,6 +58,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/agents").hasRole("ADMIN")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/stats/admin").hasRole("ADMIN")
+                .requestMatchers("/api/stats/payments").hasRole("ADMIN")
 
                 // ---- relationship officer ----
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions").hasRole("AGENT")

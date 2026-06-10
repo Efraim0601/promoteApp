@@ -72,6 +72,10 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   started = signal(false);
   proc = signal<null | 'paying' | 'reference' | 'failed'>(null);
   phase = signal<'send' | 'wait'>('send');
+  /** Auto-polling exhausted its window but the payment isn't terminal → prolonged-wait screen. */
+  waitLong = signal(false);
+  /** A manual "J'ai payé / Rafraîchir" status check is in flight. */
+  refreshing = signal(false);
   touched = signal(false);
   refAgent = signal<Agent | null>(null);
   refUnknown = signal(false);
@@ -409,10 +413,17 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     setTimeout(() => this.phase.set('wait'), 1300);
   }
 
-  /** Poll the live payment status every 3 s until terminal, or give up after ~2 min. */
+  /** ~7-minute polling window with back-off. Mobile Money confirmations can legitimately take
+   *  over 2 minutes, so a short window produced false "failed" on real payments. */
+  private readonly pollMax = 56;
+  private pollDelay(n: number) { return n < 10 ? 3000 : n < 24 ? 5000 : 10000; }
+
+  /** Poll the live payment status (back-off) until terminal; on window exhaustion show a
+   *  prolonged-wait screen (never a false failure) the client can refresh manually. */
   private startStatusPolling(ref: string) {
     this.stopPolling();
     this.polling = true;
+    this.waitLong.set(false);
     let attempts = 0;
     const tick = () => {
       if (!this.polling) return;
@@ -428,29 +439,56 @@ export class SubscribeComponent implements OnInit, OnDestroy {
             // Keep the decline reason (e.g. "Solde insuffisant") so the failure screen can explain it.
             this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: s.message ?? this.result()?.message });
             this.proc.set('failed');
-          } else if (++attempts >= 40) {
+          } else if (++attempts >= this.pollMax) {
+            // Don't declare failure — the confirmation may still arrive (late webhook). Switch to a
+            // prolonged-wait state the client can refresh, instead of a misleading "échec".
             this.polling = false;
-            this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: this.i18n.t('failed_timeout') });
-            this.proc.set('failed'); // timed out waiting for the PIN
+            this.waitLong.set(true);
           } else {
-            this.pollTimer = setTimeout(tick, 3000);
+            this.pollTimer = setTimeout(tick, this.pollDelay(attempts));
           }
         },
         error: () => {
           if (!this.polling) return;
-          if (++attempts >= 40) { this.polling = false; this.proc.set('failed'); }
-          else this.pollTimer = setTimeout(tick, 3000);
+          if (++attempts >= this.pollMax) { this.polling = false; this.waitLong.set(true); }
+          else this.pollTimer = setTimeout(tick, this.pollDelay(attempts));
         },
       });
     };
-    this.pollTimer = setTimeout(tick, 3000);
+    this.pollTimer = setTimeout(tick, this.pollDelay(0));
+  }
+
+  /** Manual "J'ai payé / Rafraîchir" during a prolonged wait — a single status check. */
+  manualRefresh() {
+    const ref = this.result()?.ref;
+    if (!ref || this.refreshing()) return;
+    this.refreshing.set(true);
+    this.api.paymentStatus(ref).subscribe({
+      next: (s) => {
+        this.refreshing.set(false);
+        if (s.payStatus === 'paid') {
+          this.result.set({ ...(this.result() ?? { ref }), payStatus: 'paid' });
+          this.proc.set('reference');
+        } else if (s.payStatus === 'failed') {
+          this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: s.message ?? this.result()?.message });
+          this.proc.set('failed');
+        }
+        // else: still pending → stay on the prolonged-wait screen
+      },
+      error: () => this.refreshing.set(false),
+    });
+  }
+  /** Resume auto-polling from the prolonged-wait screen. */
+  resumePolling() {
+    const ref = this.result()?.ref;
+    if (ref) this.startStatusPolling(ref);
   }
 
   private stopPolling() {
     this.polling = false;
     if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
   }
-  retry() { this.stopPolling(); this.proc.set(null); }
+  retry() { this.stopPolling(); this.waitLong.set(false); this.proc.set(null); }
 
   reset() {
     this.stopPolling();
@@ -463,6 +501,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       pay: 'om', payPhone: '', delivery: 'promote', refPhone: '',
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
+    this.waitLong.set(false); this.refreshing.set(false);
     this.refAgent.set(null); this.refUnknown.set(false);
     this.started.set(!this.isSelf); // client returns to the welcome screen
   }
@@ -504,6 +543,11 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get insufficientBalance() {
     const m = (this.result()?.message || '').toLowerCase();
     return /insuffisan|insufficient|\bsolde\b|provision|\bfonds?\b|\bfunds?\b|not enough/.test(m);
+  }
+  /** True when the transaction expired (the client never entered their PIN in time). */
+  get expired() {
+    const m = (this.result()?.message || '').toLowerCase();
+    return !this.insufficientBalance && /expir|timeout|time out|délai|delai/.test(m);
   }
   /** Amount the client tried to pay (for the failure message). */
   get failAmount() { return this.result()?.amount ?? this.total; }

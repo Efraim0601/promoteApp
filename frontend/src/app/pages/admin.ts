@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, CardConfig, CreateUserRequest, ImportUserRow, ImportUsersResult, Role, Subscription, User } from '../core/models';
+import { AdminStats, CardConfig, CreateUserRequest, ImportUserRow, ImportUsersResult, PaymentStats, Role, Subscription, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -69,6 +69,40 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
           <div class="kv" style="color:var(--accent)">{{ failedCount() }}</div><div class="kl">{{ i18n.t('kpi_failed') }}</div>
         </div>
       </div>
+
+      <!-- ===== Mobile Money payment funnel ===== -->
+      @if (payStats(); as p) {
+        <div class="card" style="padding:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
+            <h3 style="font-size:15px">{{ i18n.t('pay_funnel_title') }}</h3>
+            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div class="kpi"><div class="kv">{{ p.momoTotal }}</div><div class="kl">{{ i18n.t('pay_funnel_total') }}</div></div>
+            <div class="kpi"><div class="kv" style="color:var(--success)">{{ rate(p.momoPaid, p.momoTotal) }}%</div><div class="kl">{{ i18n.t('pay_funnel_success_rate') }}</div></div>
+            <div class="kpi"><div class="kv" style="font-size:17px">{{ p.medianConfirmSeconds }}s</div><div class="kl">{{ i18n.t('pay_funnel_median') }}</div></div>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:12px;font-weight:700">
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--success-soft);color:var(--success)">{{ p.momoPaid }} {{ i18n.t('st_paid') }}</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--surface-2);color:var(--muted)">{{ p.momoPending }} {{ i18n.t('st_pending') }}</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)">{{ p.momoFailed }} {{ i18n.t('st_failed') }}</span>
+          </div>
+          <div style="margin-top:14px">
+            <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_by_network') }}</div>
+            <div class="srow" style="padding:6px 0"><span class="lbl">Orange Money</span><span class="val">{{ p.orangePaid }}/{{ p.orangeTotal }} · {{ rate(p.orangePaid, p.orangeTotal) }}%</span></div>
+            <div class="srow" style="padding:6px 0"><span class="lbl">MTN MoMo</span><span class="val">{{ p.mtnPaid }}/{{ p.mtnTotal }} · {{ rate(p.mtnPaid, p.mtnTotal) }}%</span></div>
+          </div>
+          @if (p.momoFailed) {
+            <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
+              <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_failures') }}</div>
+              <div class="srow" style="padding:5px 0"><span class="lbl">{{ i18n.t('fail_insufficient') }}</span><span class="val">{{ p.insufficientFunds }}</span></div>
+              <div class="srow" style="padding:5px 0"><span class="lbl">{{ i18n.t('fail_expired') }}</span><span class="val">{{ p.expired }}</span></div>
+              <div class="srow" style="padding:5px 0"><span class="lbl">{{ i18n.t('fail_other') }}</span><span class="val">{{ p.otherFailures }}</span></div>
+            </div>
+          }
+        </div>
+      }
 
       <div class="card" style="padding:16px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
@@ -407,6 +441,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   section = signal<'overview' | 'config' | 'users' | 'transactions'>('overview');
 
   stats = signal<AdminStats | null>(null);
+  payStats = signal<PaymentStats | null>(null);
   txs = signal<Subscription[]>([]);
   // Per-section loading flags so each panel can show a spinner while its request is in flight.
   statsLoading = signal(true);
@@ -488,8 +523,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   rowStatus = (t: Subscription) => recordStatus(t);
   txDate = (iso: string) => this.fmtDateTime(iso);
 
+  /** Success rate (%) guarded against division by zero. */
+  rate(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
+
   ngOnInit() {
     this.api.adminStats().subscribe({ next: (s) => { this.stats.set(s); this.statsLoading.set(false); }, error: () => this.statsLoading.set(false) });
+    this.api.paymentStats().subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
     this.api.allSubscriptions().subscribe({ next: (t) => { this.txs.set(t); this.txLoading.set(false); }, error: () => this.txLoading.set(false) });
     this.api.getConfig().subscribe({ next: (c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); this.cfgLoading.set(false); }, error: () => this.cfgLoading.set(false) });
     this.loadUsers();
@@ -499,6 +538,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
   private refreshLive() {
     this.api.adminStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
+    this.api.paymentStats().subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
     this.api.allSubscriptions().subscribe({ next: (t) => this.txs.set(t), error: () => {} });
   }
 

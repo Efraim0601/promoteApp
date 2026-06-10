@@ -80,6 +80,45 @@ public class StatsService {
         return new PrintStats(myPrinted, myToday, queue, totalPrinted);
     }
 
+    /** Mobile Money payment funnel for the admin dashboard: volumes & success per network, failure
+     *  causes (from the stored decline reason), and the confirmation latency (createdAt → paidAt). */
+    public PaymentStats paymentStats() {
+        List<Subscription> momo = subscriptions.all().stream()
+                .filter(s -> "om".equals(s.getPay()) || "mtn".equals(s.getPay()))
+                .toList();
+        long paid = momo.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
+        long failed = momo.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
+        long pending = momo.stream().filter(s -> s.getPayStatus() == PayStatus.pending).count();
+
+        List<Subscription> orange = momo.stream().filter(s -> "om".equals(s.getPay())).toList();
+        List<Subscription> mtn = momo.stream().filter(s -> "mtn".equals(s.getPay())).toList();
+        long orangePaid = orange.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
+        long mtnPaid = mtn.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
+
+        // Failure causes, classified from the aggregator's stored decline reason.
+        long insufficient = 0, expired = 0, other = 0;
+        for (Subscription s : momo) {
+            if (s.getPayStatus() != PayStatus.failed) continue;
+            String m = s.getPaymentMessage() == null ? "" : s.getPaymentMessage().toLowerCase();
+            if (m.matches(".*(insuffisan|insufficient|solde|provision|fonds|funds).*")) insufficient++;
+            else if (m.matches(".*(expir|timeout|time out|délai|delai).*")) expired++;
+            else other++;
+        }
+
+        // Confirmation latency (PENDING → paid), in seconds, for MoMo payments we have a paidAt for.
+        List<Long> secs = momo.stream()
+                .filter(s -> s.getPayStatus() == PayStatus.paid && s.getPaidAt() != null && s.getCreatedAt() != null)
+                .map(s -> java.time.Duration.between(s.getCreatedAt(), s.getPaidAt()).getSeconds())
+                .filter(v -> v >= 0)
+                .sorted()
+                .toList();
+        long avg = secs.isEmpty() ? 0 : Math.round(secs.stream().mapToLong(Long::longValue).average().orElse(0));
+        long median = secs.isEmpty() ? 0 : secs.get(secs.size() / 2);
+
+        return new PaymentStats(momo.size(), paid, failed, pending, orange.size(), orangePaid,
+                mtn.size(), mtnPaid, insufficient, expired, other, avg, median);
+    }
+
     /** Cashier statistics for a given staff member. */
     public CashierStats cashierStats(String cashierId) {
         List<Subscription> all = subscriptions.all();

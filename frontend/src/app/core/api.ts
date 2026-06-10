@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AdminStats, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
   CreateSubscriptionRequest, CreateUserRequest, ImportUserRow, ImportUsersResult,
-  LoginResponse, PayStatus, PrintStats, Subscription, User,
+  LoginResponse, PaymentStats, PayStatus, PrintStats, Subscription, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -125,5 +125,9 @@ export class Api {
   /** Cashier KPIs for the logged-in cashier (cash validated + queue). */
   cashierStats(): Observable<CashierStats> {
     return this.http.get<CashierStats>(`${this.base}/stats/cashier`);
+  }
+  /** Admin — Mobile Money payment funnel (acceptance, latency, failure causes, by network). */
+  paymentStats(): Observable<PaymentStats> {
+    return this.http.get<PaymentStats>(`${this.base}/stats/payments`);
   }
 }

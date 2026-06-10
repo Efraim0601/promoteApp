@@ -167,6 +167,22 @@ export interface CashierStats {
   pendingAmount: number;   // total amount still to collect (XAF)
 }
 
+export interface PaymentStats {
+  momoTotal: number;       // total Mobile Money transactions
+  momoPaid: number;
+  momoFailed: number;
+  momoPending: number;
+  orangeTotal: number;
+  orangePaid: number;
+  mtnTotal: number;
+  mtnPaid: number;
+  insufficientFunds: number; // failures: insufficient balance
+  expired: number;           // failures: PIN never entered / timeout
+  otherFailures: number;
+  avgConfirmSeconds: number;    // mean PENDING → paid latency
+  medianConfirmSeconds: number; // median PENDING → paid latency
+}
+
 export interface ClaimResult {
   ok: boolean;
   reason: string | null;

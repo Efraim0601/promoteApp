@@ -177,4 +177,12 @@ public final class Dtos {
      *  cash subscriptions still awaiting collection (count + amount). */
     public record CashierStats(long myCount, long myCollected, long myCountToday,
                                long pendingCount, long pendingAmount) {}
+
+    /** Mobile Money payment funnel (admin): volumes & success per network, failure causes, and the
+     *  confirmation latency (PENDING → paid). Lets the bank monitor the aggregator's health. */
+    public record PaymentStats(
+            long momoTotal, long momoPaid, long momoFailed, long momoPending,
+            long orangeTotal, long orangePaid, long mtnTotal, long mtnPaid,
+            long insufficientFunds, long expired, long otherFailures,
+            long avgConfirmSeconds, long medianConfirmSeconds) {}
 }

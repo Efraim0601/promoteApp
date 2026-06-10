@@ -4,6 +4,7 @@ import com.afriland.promote.service.StatsService;
 import com.afriland.promote.web.dto.Dtos.AdminStats;
 import com.afriland.promote.web.dto.Dtos.AgentStats;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
+import com.afriland.promote.web.dto.Dtos.PaymentStats;
 import com.afriland.promote.web.dto.Dtos.PrintStats;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -38,5 +39,11 @@ public class StatsController {
     @GetMapping("/cashier")
     public CashierStats cashier(Authentication auth) {
         return stats.cashierStats((String) auth.getPrincipal());
+    }
+
+    /** Admin — Mobile Money payment funnel (acceptance, confirmation latency, failure causes, by network). */
+    @GetMapping("/payments")
+    public PaymentStats payments() {
+        return stats.paymentStats();
     }
 }
