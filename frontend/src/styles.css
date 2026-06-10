@@ -333,6 +333,7 @@ html, body { margin: 0; height: 100%; }
 .badge.pending{ background:color-mix(in srgb, var(--af-gold) 20%, transparent); color:#8a6400; }
 .badge.success{ background:var(--success-soft); color:var(--success-700); }
 .badge.failed{ background:var(--accent-soft); color:var(--accent); }
+.badge.info{ background:color-mix(in srgb, var(--primary) 14%, transparent); color:var(--primary); }
 .promote-app[data-theme="fintech"] .badge.pending{ color:var(--af-gold); }
 .promote-app[data-theme="fintech"] .badge.success{ color:var(--success); }
 

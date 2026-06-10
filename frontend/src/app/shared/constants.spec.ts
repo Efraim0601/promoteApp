@@ -35,6 +35,7 @@ describe('recordStatus', () => {
     expect(recordStatus({ ...base, payStatus: 'failed' } as Subscription)).toBe('failed');
     expect(recordStatus({ ...base, payStatus: 'cash' } as Subscription)).toBe('cash');
     expect(recordStatus({ ...base, payStatus: 'sara_pending' } as Subscription)).toBe('sara_pending');
-    expect(recordStatus(base)).toBe('awaiting');
+    expect(recordStatus(base)).toBe('pending');                                          // pending = en attente de paiement
+    expect(recordStatus({ ...base, payStatus: 'paid' } as Subscription)).toBe('paid');   // payée, pas encore imprimée
   });
 });

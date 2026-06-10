@@ -1,7 +1,7 @@
 import { Component, Input, inject } from '@angular/core';
 import { I18n } from '../core/i18n';
 
-/** Status pill — status: paid | awaiting | cash | sara_pending | failed | printed. */
+/** Status pill — status: paid (à imprimer) | pending | cash | sara_pending | failed | printed. */
 @Component({
   selector: 'status-badge',
   standalone: true,
@@ -9,16 +9,18 @@ import { I18n } from '../core/i18n';
 })
 export class StatusBadgeComponent {
   i18n = inject(I18n);
-  @Input() status = 'awaiting';
+  @Input() status = 'pending';
 
+  // 4 couleurs distinctes : ambre = action paiement, bleu = prêt à imprimer, vert = terminé, rouge = échec.
   private map: Record<string, { cls: string; key: string }> = {
-    paid: { cls: 'success', key: 'st_paid' },
-    awaiting: { cls: 'pending', key: 'st_awaiting' },
-    cash: { cls: 'pending', key: 'st_cash' },
+    pending: { cls: 'pending', key: 'st_pending' },     // en attente de paiement (PIN client)
+    cash: { cls: 'pending', key: 'st_cash' },            // espèces à encaisser
     sara_pending: { cls: 'pending', key: 'st_sara_pending' },
+    paid: { cls: 'info', key: 'st_to_print' },           // payée, pas encore imprimée
+    printed: { cls: 'success', key: 'st_printed' },      // imprimée (terminé)
     failed: { cls: 'failed', key: 'st_failed' },
-    printed: { cls: 'success', key: 'st_printed' },
+    awaiting: { cls: 'pending', key: 'st_pending' },     // rétro-compatibilité
   };
-  get cls(): string { return (this.map[this.status] ?? this.map['awaiting']).cls; }
-  get key(): string { return (this.map[this.status] ?? this.map['awaiting']).key; }
+  get cls(): string { return (this.map[this.status] ?? this.map['pending']).cls; }
+  get key(): string { return (this.map[this.status] ?? this.map['pending']).key; }
 }

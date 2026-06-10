@@ -96,10 +96,11 @@ public class Subscription {
     /** Overall display status — ports components.jsx:recordStatus(). */
     @Transient
     public String getStatus() {
+        if (payStatus == PayStatus.failed) return "failed";   // un échec ne doit jamais être masqué par une impression
         if (printed) return "printed";
-        if (payStatus == PayStatus.failed) return "failed";
         if (payStatus == PayStatus.cash) return "cash";
         if (payStatus == PayStatus.sara_pending) return "sara_pending";
-        return "awaiting"; // paid (awaiting print) or pending
+        if (payStatus == PayStatus.pending) return "pending"; // en attente de paiement (PIN client non saisi)
+        return "paid"; // payé, pas encore imprimé -> « à imprimer »
     }
 }

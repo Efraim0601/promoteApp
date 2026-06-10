@@ -44,7 +44,8 @@ export function recordStatus(r: Subscription): string {
   if (r.printed) return 'printed';
   if (r.payStatus === 'cash') return 'cash';
   if (r.payStatus === 'sara_pending') return 'sara_pending';
-  return 'awaiting';
+  if (r.payStatus === 'pending') return 'pending';   // en attente de paiement (PIN client)
+  return 'paid';                                      // payée, pas encore imprimée -> « à imprimer »
 }
 
 /** Deterministic PRNG (mulberry32) used by the generative QR + card starfield. */

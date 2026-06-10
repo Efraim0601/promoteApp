@@ -465,9 +465,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   /** Human-readable payment status for the receipt. */
   private statusLabel(payStatus?: string) {
     const k: Record<string, string> = {
-      paid: 'st_paid', cash: 'st_cash', sara_pending: 'st_sara_pending', pending: 'st_awaiting', failed: 'st_failed',
+      paid: 'st_paid', cash: 'st_cash', sara_pending: 'st_sara_pending', pending: 'st_pending', failed: 'st_failed',
     };
-    return this.i18n.t(k[payStatus ?? ''] ?? 'st_awaiting');
+    return this.i18n.t(k[payStatus ?? ''] ?? 'st_pending');
   }
   private payDisplay(pay?: string) {
     return pay === 'cash' ? this.i18n.t('pay_cash_name') : pay ? payById(pay).name : '—';

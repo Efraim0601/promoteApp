@@ -60,7 +60,7 @@ import { FieldComponent, PhoneFieldComponent, CniFieldComponent } from '../share
             <select class="input" [value]="txStatus()" (change)="txStatus.set($any($event.target).value)" style="flex:1">
               <option value="all">{{ i18n.t('tx_all_status') }}</option>
               <option value="paid">{{ i18n.t('st_paid') }}</option>
-              <option value="pending">{{ i18n.t('st_awaiting') }}</option>
+              <option value="pending">{{ i18n.t('st_pending') }}</option>
               <option value="cash">{{ i18n.t('st_cash') }}</option>
               <option value="sara_pending">{{ i18n.t('st_sara_pending') }}</option>
               <option value="failed">{{ i18n.t('st_failed') }}</option>
