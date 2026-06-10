@@ -345,12 +345,12 @@ import { payById, recordStatus } from '../shared/constants';
                   <tr class="tx-tr" (click)="toggleExpand(t.ref)">
                     <td><client-photo [refId]="t.ref" [name]="t.fullName" [hasSelfie]="t.hasSelfie" [size]="38"></client-photo></td>
                     <td><div class="cell-name">{{ t.fullName }}</div><div class="cell-sub">{{ t.ref }}@if (t.channel === 'self') { · {{ i18n.t('tx_self') }} }</div></td>
-                    <td class="nowrap">{{ t.phone || '—' }}</td>
-                    <td class="brk">{{ t.cni || '—' }}</td>
-                    <td class="nowrap">{{ txDate(t.createdAt) }}</td>
-                    <td><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="op-logo" [style.background]="pm(t).bg" [style.color]="pm(t).fg" style="width:20px;height:20px;font-size:8px;border-radius:5px;overflow:hidden;flex-shrink:0">@if (pm(t).logo) { <img [src]="pm(t).logo" [alt]="pm(t).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(t).short }} }</span><span style="overflow-wrap:anywhere;line-height:1.25">{{ t.pay === 'cash' ? i18n.t('pay_cash_short') : pm(t).name }}</span></span></td>
-                    <td class="num">{{ i18n.money(t.amount) }}</td>
-                    <td><status-badge [status]="rowStatus(t)"></status-badge></td>
+                    <td class="nowrap" [attr.data-label]="i18n.t('phone')">{{ t.phone || '—' }}</td>
+                    <td class="brk" [attr.data-label]="i18n.t('cni_short')">{{ t.cni || '—' }}</td>
+                    <td class="nowrap" [attr.data-label]="i18n.t('tx_date')">{{ txDate(t.createdAt) }}</td>
+                    <td [attr.data-label]="i18n.t('pay_method_label')"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="op-logo" [style.background]="pm(t).bg" [style.color]="pm(t).fg" style="width:20px;height:20px;font-size:8px;border-radius:5px;overflow:hidden;flex-shrink:0">@if (pm(t).logo) { <img [src]="pm(t).logo" [alt]="pm(t).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(t).short }} }</span><span style="overflow-wrap:anywhere;line-height:1.25">{{ t.pay === 'cash' ? i18n.t('pay_cash_short') : pm(t).name }}</span></span></td>
+                    <td class="num" [attr.data-label]="i18n.t('tx_amount')">{{ i18n.money(t.amount) }}</td>
+                    <td [attr.data-label]="i18n.t('tx_status')"><status-badge [status]="rowStatus(t)"></status-badge></td>
                   </tr>
                   @if (expandedRef() === t.ref) {
                     <tr class="tx-expand"><td colspan="8" style="padding:0 6px 10px;background:var(--surface-2)">

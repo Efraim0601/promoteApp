@@ -256,6 +256,30 @@ html, body { margin: 0; height: 100%; }
 .tx-table .cell-name{ font-weight:700; overflow-wrap:anywhere; line-height:1.25; }
 .tx-table .cell-sub{ color:var(--muted); font-size:10.5px; margin-top:1px; overflow-wrap:anywhere; }
 .tx-pager{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 6px 4px; flex-wrap:wrap; }
+/* Narrow screens: the table reflows into stacked cards so every field stays readable at any
+   size — one labelled line per value (data-label), no horizontal scrolling, no cramped columns. */
+@media (max-width:760px){
+  .tx-table{ table-layout:auto; }
+  .tx-table thead{ display:none; }
+  .tx-table tbody, .tx-table tr.tx-tr, .tx-table tr.tx-tr td{ display:block; }
+  .tx-table tr.tx-tr{
+    display:grid; grid-template-columns:38px 1fr; column-gap:10px; row-gap:6px; align-items:center;
+    padding:11px 12px; margin:0 0 10px; border:1px solid var(--border); border-radius:14px; background:var(--surface);
+  }
+  .tx-table tr.tx-tr td{ border:0; padding:0; }
+  .tx-table tr.tx-tr td:nth-child(2){ font-weight:700; min-width:0; }            /* client name + ref */
+  .tx-table tr.tx-tr td:nth-child(n+3){
+    grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:12px;
+    border-top:1px dashed var(--border); padding-top:6px; white-space:normal; overflow:visible; text-overflow:clip;
+  }
+  .tx-table tr.tx-tr td:nth-child(n+3)::before{
+    content:attr(data-label); flex-shrink:0;
+    font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
+  }
+  .tx-table tr.tx-tr td.num{ text-align:right; }
+  .tx-table tr.tx-expand, .tx-table tr.tx-expand td{ display:block; }
+  .tx-table tr.tx-expand td{ padding:0 0 10px; }
+}
 
 .kicker{ font-size:11.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--primary); }
 .muted{ color:var(--muted); }
