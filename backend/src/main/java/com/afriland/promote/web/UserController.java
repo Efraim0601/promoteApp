@@ -7,6 +7,7 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -38,6 +39,36 @@ public class UserController {
     @GetMapping
     public List<UserDto> list() {
         return users.findAll().stream().map(UserDto::of).toList();
+    }
+
+    /**
+     * Enable or disable a staff account (ADMIN only — enforced in SecurityConfig). A disabled
+     * account can no longer log in nor use an existing token. An admin cannot disable their own
+     * account (would lock themselves out), and the last active admin cannot be disabled.
+     */
+    @PatchMapping("/{id}/enabled")
+    public ResponseEntity<?> setEnabled(@PathVariable String id,
+                                        @RequestBody SetEnabledRequest req,
+                                        Authentication auth) {
+        AppUser u = users.findById(id).orElse(null);
+        if (u == null) return ResponseEntity.notFound().build();
+        if (!req.enabled()) {
+            if (id.equals(auth.getName())) {
+                return ResponseEntity.badRequest().body(new ErrorResponse("cannot_disable_self"));
+            }
+            if (u.getRole() == Role.ADMIN && lastActiveAdmin(u.getId())) {
+                return ResponseEntity.badRequest().body(new ErrorResponse("last_admin"));
+            }
+        }
+        u.setEnabled(req.enabled());
+        return ResponseEntity.ok(UserDto.of(users.save(u)));
+    }
+
+    /** True if {@code candidateId} is the only enabled ADMIN left. */
+    private boolean lastActiveAdmin(String candidateId) {
+        return users.findAll().stream()
+                .filter(a -> a.getRole() == Role.ADMIN && a.isEnabled() && !a.getId().equals(candidateId))
+                .findAny().isEmpty();
     }
 
     /** Create a staff account. Rejects a duplicate email or an unknown role. */

@@ -30,7 +30,7 @@ import { SpinnerComponent } from '../shared/spinner';
                  [value]="email()" (input)="setEmail($event)" (keydown.enter)="submit()" />
         </div>
       </field>
-      <field [label]="i18n.t('login_pw')" [err]="err() ? i18n.t('login_err') : null">
+      <field [label]="i18n.t('login_pw')" [err]="err() ? i18n.t(err()) : null">
         <div class="input-prefix">
           <span class="pfx"><ic name="lock" [size]="16"></ic></span>
           <input [type]="showPw() ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••"
@@ -58,19 +58,19 @@ export class LoginComponent {
 
   email = signal('');
   pw = signal('');
-  err = signal(false);
+  err = signal('');   // i18n key of the error to show, or '' when none
   showPw = signal(false);
   busy = signal(false);
 
-  setEmail(e: Event) { this.email.set((e.target as HTMLInputElement).value); this.err.set(false); }
-  setPw(e: Event) { this.pw.set((e.target as HTMLInputElement).value); this.err.set(false); }
+  setEmail(e: Event) { this.email.set((e.target as HTMLInputElement).value); this.err.set(''); }
+  setPw(e: Event) { this.pw.set((e.target as HTMLInputElement).value); this.err.set(''); }
 
   submit() {
     if (this.busy()) return;
     this.busy.set(true);
     this.auth.login(this.email().trim(), this.pw()).subscribe({
       next: () => this.router.navigateByUrl(this.auth.mustChangePassword ? '/change-password' : this.auth.landingPath()),
-      error: () => { this.err.set(true); this.busy.set(false); },
+      error: (e) => { this.err.set(e?.status === 403 ? 'login_disabled' : 'login_err'); this.busy.set(false); },
     });
   }
 

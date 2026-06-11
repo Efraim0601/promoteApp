@@ -108,6 +108,10 @@ export class Api {
   createUser(req: CreateUserRequest): Observable<CreateUserResult> {
     return this.http.post<CreateUserResult>(`${this.base}/users`, req);
   }
+  /** Admin — enable or disable a staff account (a disabled account can no longer log in). */
+  setUserEnabled(id: string, enabled: boolean): Observable<User> {
+    return this.http.patch<User>(`${this.base}/users/${id}/enabled`, { enabled });
+  }
   /** Admin — bulk-import staff accounts; duplicates skipped or updated per updateExisting. */
   importUsers(rows: ImportUserRow[], updateExisting: boolean): Observable<ImportUsersResult> {
     return this.http.post<ImportUsersResult>(`${this.base}/users/import`, { rows, updateExisting });

@@ -223,16 +223,26 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
         } @else {
         <div style="display:flex;flex-direction:column">
           @for (u of pagedUsers(); track u.id) {
-            <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border)" [style.opacity]="u.enabled === false ? '.5' : '1'">
               <avatar [name]="u.name" [size]="30"></avatar>
               <div style="min-width:0;flex:1">
                 <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.name }}</div>
                 <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.email }}</div>
               </div>
+              @if (u.enabled === false) {
+                <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px;flex-shrink:0">{{ i18n.t('user_disabled') }}</span>
+              }
               <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px;flex-shrink:0">{{ roleLabel(u.role) }}</span>
+              @if (u.id !== auth.user()?.id) {
+                <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
+                        style="padding:5px 9px;font-size:11px;flex-shrink:0;white-space:nowrap">
+                  {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
+                </button>
+              }
             </div>
           }
         </div>
+        @if (userToggleErr()) { <p class="err" style="font-size:12px;text-align:center;margin-top:6px">{{ i18n.t(userToggleErr()) }}</p> }
         @if (userPageCount() > 1) {
           <div class="tx-pager">
             <span class="muted" style="font-size:11.5px">{{ i18n.t('step') }} {{ userPage() + 1 }} {{ i18n.t('of') }} {{ userPageCount() }}</span>
@@ -488,10 +498,33 @@ export class AdminComponent implements OnInit, OnDestroy {
     const p = Math.min(this.userPage(), this.userPageCount() - 1);
     return this.usersList().slice(p * this.userPageSize, p * this.userPageSize + this.userPageSize);
   });
-  // Fresh data (reload / create / import) → back to the first page.
-  private readonly _userPageReset = effect(() => { this.usersList(); this.userPage.set(0); });
+  // Back to the first page only when the number of accounts changes (reload / create / import),
+  // not on an in-place edit like enabling/disabling a user. A computed emits only on value change.
+  private readonly userCount = computed(() => this.usersList().length);
+  private readonly _userPageReset = effect(() => { this.userCount(); this.userPage.set(0); });
   userPrev() { this.userPage.update((p) => Math.max(0, p - 1)); }
   userNext() { this.userPage.update((p) => Math.min(this.userPageCount() - 1, p + 1)); }
+  // Enable/disable a staff account (admin only). userToggling holds the id being updated.
+  userToggling = signal('');
+  userToggleErr = signal('');
+  toggleUser(u: User) {
+    const next = u.enabled === false;   // currently disabled → re-enable; else disable
+    if (!next && !confirm(this.i18n.t('user_disable_confirm'))) return;
+    this.userToggleErr.set('');
+    this.userToggling.set(u.id);
+    this.api.setUserEnabled(u.id, next).subscribe({
+      next: (updated) => {
+        this.userToggling.set('');
+        this.usersList.update((list) => list.map((x) => (x.id === u.id ? { ...x, enabled: updated.enabled } : x)));
+      },
+      error: (err) => {
+        this.userToggling.set('');
+        const code = err?.error?.error;
+        this.userToggleErr.set(code === 'last_admin' ? 'user_err_last_admin'
+          : code === 'cannot_disable_self' ? 'user_err_self' : 'user_err_toggle');
+      },
+    });
+  }
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
   userMsg = signal<'' | 'created' | 'exists' | 'invalid'>('');
   userBusy = signal(false);

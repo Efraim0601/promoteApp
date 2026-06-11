@@ -1,5 +1,6 @@
 package com.afriland.promote.security;
 
+import com.afriland.promote.repo.AppUserRepository;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,9 +22,11 @@ import java.util.List;
 public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
+    private final AppUserRepository users;
 
-    public JwtAuthFilter(JwtService jwtService) {
+    public JwtAuthFilter(JwtService jwtService, AppUserRepository users) {
         this.jwtService = jwtService;
+        this.users = users;
     }
 
     @Override
@@ -36,11 +39,16 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 Claims claims = jwtService.parse(header.substring(7));
                 String role = claims.get("role", String.class);
-                var auth = new UsernamePasswordAuthenticationToken(
-                        claims.getSubject(), null,
-                        List.of(new SimpleGrantedAuthority("ROLE_" + role)));
-                auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                SecurityContextHolder.getContext().setAuthentication(auth);
+                // Reject a token whose account has since been disabled (or deleted): the
+                // authentication is simply not set, so protected endpoints answer 401/403.
+                boolean active = users.findById(claims.getSubject()).map(u -> u.isEnabled()).orElse(false);
+                if (active) {
+                    var auth = new UsernamePasswordAuthenticationToken(
+                            claims.getSubject(), null,
+                            List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                    auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(auth);
+                }
             } catch (Exception ignored) {
                 // invalid/expired token → stays anonymous, protected endpoints will 401/403
             }

@@ -27,10 +27,12 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
-        return users.findByEmailIgnoreCase(req.email())
-                .filter(u -> encoder.matches(req.password(), u.getPasswordHash()))
-                .<ResponseEntity<?>>map(u -> ResponseEntity.ok(new LoginResponse(jwt.generate(u), UserDto.of(u))))
-                .orElseGet(() -> ResponseEntity.status(401).body("invalid_credentials"));
+        AppUser u = users.findByEmailIgnoreCase(req.email())
+                .filter(x -> encoder.matches(req.password(), x.getPasswordHash()))
+                .orElse(null);
+        if (u == null) return ResponseEntity.status(401).body("invalid_credentials");
+        if (!u.isEnabled()) return ResponseEntity.status(403).body("account_disabled");
+        return ResponseEntity.ok(new LoginResponse(jwt.generate(u), UserDto.of(u)));
     }
 
     @GetMapping("/me")

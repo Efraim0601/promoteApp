@@ -39,4 +39,11 @@ public class AppUser {
     @Column(nullable = false)
     @ColumnDefault("false")
     private boolean mustChangePassword = false;
+
+    /** Whether the account may log in. An admin can disable an account without deleting it;
+     *  a disabled user can neither sign in nor use an existing token. */
+    @Builder.Default
+    @Column(nullable = false)
+    @ColumnDefault("true")
+    private boolean enabled = true;
 }

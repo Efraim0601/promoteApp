@@ -10,6 +10,7 @@ export interface User {
   agency: string | null;
   phone: string | null;
   mustChangePassword?: boolean;   // true until the user sets their own password (first login)
+  enabled?: boolean;              // false → account disabled by an admin (cannot log in)
 }
 
 export interface ChangePasswordRequest {

@@ -31,12 +31,15 @@ public final class Dtos {
                                     List<ImportRowResult> rows) {}
 
     public record UserDto(String id, String name, String email, String role, String agency, String phone,
-                          boolean mustChangePassword) {
+                          boolean mustChangePassword, boolean enabled) {
         public static UserDto of(AppUser u) {
             return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), u.getAgency(), u.getPhone(),
-                    u.isMustChangePassword());
+                    u.isMustChangePassword(), u.isEnabled());
         }
     }
+
+    /** Admin enables/disables a staff account. */
+    public record SetEnabledRequest(boolean enabled) {}
 
     public record LoginResponse(String token, UserDto user) {}
 
