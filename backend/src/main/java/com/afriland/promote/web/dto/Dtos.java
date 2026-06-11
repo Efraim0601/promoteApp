@@ -14,6 +14,27 @@ public final class Dtos {
     // ---- auth ----
     public record LoginRequest(@NotBlank String email, @NotBlank String password) {}
 
+    // ---- pickup agencies (lieux de retrait) ----
+    /** A pickup point shown to the client when delivery == agence. */
+    public record AgencyDto(String id, String name, String city) {
+        public static AgencyDto of(com.afriland.promote.model.Agency a) {
+            return new AgencyDto(a.getId(), a.getName(), a.getCity());
+        }
+    }
+
+    /** One agency row to import (name required; city optional). */
+    public record ImportAgencyRow(String name, String city) {}
+
+    /** Import payload + duplicate policy. updateExisting=false → existing (name+city) are skipped. */
+    public record ImportAgenciesRequest(List<ImportAgencyRow> rows, boolean updateExisting) {}
+
+    /** Per-row outcome: created | updated | skipped | invalid. */
+    public record ImportAgencyRowResult(String name, String city, String status, String reason) {}
+
+    /** Import summary: counts + per-row detail (same order as input). */
+    public record ImportAgenciesResult(int created, int updated, int skipped, int invalid,
+                                       List<ImportAgencyRowResult> rows) {}
+
     // ---- bulk user import ----
     /** One row to import. Password is generated server-side for new accounts. */
     public record ImportUserRow(String name, String email, String role, String phone, String agency) {}
@@ -88,12 +109,27 @@ public final class Dtos {
             String cniVersoKey,
             String saraReceiptKey,       // SARA money: key of the uploaded receipt (required when pay == sara)
             String saraRef,              // SARA money: receipt reference confirmed/corrected by the client
-            String referrerPhone) {}     // self path only
+            String referrerPhone,        // self path only
+            Double latitude,             // browser GPS captured at subscription time (optional — may be null)
+            Double longitude,
+            Double geoAccuracy,          // accuracy radius in metres (optional)
+            String pickupAgencyId) {     // chosen pickup branch id when delivery == agence (optional)
+
+        /** Backward-compatible constructor (no geolocation) — keeps existing callers/tests valid. */
+        public CreateSubscriptionRequest(String prenom, String nom, String sexe, String docType, String cni,
+                String niu, String cniExp, String phone, String email, String quartier, String region,
+                String ville, String pay, String payPhone, String delivery, boolean selfie, String selfieKey,
+                String cniRectoKey, String cniVersoKey, String saraReceiptKey, String saraRef, String referrerPhone) {
+            this(prenom, nom, sexe, docType, cni, niu, cniExp, phone, email, quartier, region, ville, pay,
+                    payPhone, delivery, selfie, selfieKey, cniRectoKey, cniVersoKey, saraReceiptKey, saraRef,
+                    referrerPhone, null, null, null, null);
+        }
+    }
 
     public record SubscriptionDto(
             String ref, String prenom, String nom, String fullName, String sexe, String email,
             String docType, String cni, String niu, String cniExp, String phone, String quartier, String region, String ville,
-            String pay, String payPhone, String delivery, int amount, int transport,
+            String pay, String payPhone, String delivery, String pickupAgencyName, int amount, int transport,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
@@ -104,7 +140,7 @@ public final class Dtos {
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
                     s.getDocType(), s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
-                    s.getPay(), s.getPayPhone(), s.getDelivery(), s.getAmount(), s.getTransport(),
+                    s.getPay(), s.getPayPhone(), s.getDelivery(), s.getPickupAgencyName(), s.getAmount(), s.getTransport(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
@@ -199,4 +235,20 @@ public final class Dtos {
             long orangeTotal, long orangePaid, long mtnTotal, long mtnPaid,
             long insufficientFunds, long expired, long otherFailures,
             long avgConfirmSeconds, long medianConfirmSeconds) {}
+
+    // ---- geolocation ----
+    /** Browser-reported position; posted by a logged-in user right after login. */
+    public record LocationUpdate(double latitude, double longitude, Double accuracy) {}
+
+    /** One point on the admin map. {@code type} = client | staff. For a client, {@code label} is the
+     *  full name, {@code status} the subscription status and {@code ref} its reference. For staff,
+     *  {@code label} is the name, {@code role} the role, {@code ref} the user id. {@code date} is the
+     *  ISO instant of, respectively, the subscription or the last location report.
+     *  {@code accuracy} is the fix's precision radius in metres (null when unknown).
+     *  <p>{@code lat}/{@code lng} are null when the record has no GPS fix; in that case
+     *  {@code place} carries a coarse locality (client city, staff agency) the frontend
+     *  forward-geocodes to an approximate position so every client/agent still shows up. */
+    public record MapPointDto(String type, String label, Double lat, Double lng,
+                              String role, String status, String ref, String date,
+                              Double accuracy, String place) {}
 }

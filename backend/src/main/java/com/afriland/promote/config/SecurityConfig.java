@@ -41,6 +41,7 @@ public class SecurityConfig {
                 // ---- public: client (QR / self) path, no account ----
                 .requestMatchers("/api/auth/login").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/config").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/agencies").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/agents/resolve").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions/self").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/pay").permitAll()
@@ -56,9 +57,11 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PUT, "/api/config").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/agents").hasRole("ADMIN")
+                .requestMatchers("/api/agencies/**").hasRole("ADMIN")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/stats/admin").hasRole("ADMIN")
                 .requestMatchers("/api/stats/payments").hasRole("ADMIN")
+                .requestMatchers("/api/map/**").hasRole("ADMIN")
 
                 // ---- relationship officer ----
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions").hasRole("AGENT")

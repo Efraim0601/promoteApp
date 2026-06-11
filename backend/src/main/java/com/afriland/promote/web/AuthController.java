@@ -42,6 +42,22 @@ public class AuthController {
         return u == null ? ResponseEntity.status(401).build() : ResponseEntity.ok(UserDto.of(u));
     }
 
+    /** Report the logged-in user's current position (browser GPS), stored as their last known
+     *  location for the admin map. Best-effort: the frontend calls this right after login when the
+     *  geolocation permission is granted; failure here never affects the session. */
+    @PostMapping("/location")
+    public ResponseEntity<Void> location(@RequestBody LocationUpdate req, Authentication auth) {
+        if (auth == null) return ResponseEntity.status(401).build();
+        AppUser u = users.findById(auth.getName()).orElse(null);
+        if (u == null) return ResponseEntity.status(401).build();
+        u.setLastLat(req.latitude());
+        u.setLastLng(req.longitude());
+        u.setLastAccuracy(req.accuracy());
+        u.setLastLocatedAt(java.time.Instant.now());
+        users.save(u);
+        return ResponseEntity.noContent().build();
+    }
+
     /** Any logged-in user changes their own password. Clears the forced-change flag on success. */
     @PostMapping("/change-password")
     public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest req, Authentication auth) {

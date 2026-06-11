@@ -46,4 +46,11 @@ public class AppUser {
     @Column(nullable = false)
     @ColumnDefault("true")
     private boolean enabled = true;
+
+    /** Last known geolocation (browser GPS), reported by the frontend right after login. Null until
+     *  the user logs in from a browser that grants the geolocation permission. */
+    private Double lastLat;
+    private Double lastLng;
+    private Double lastAccuracy;   // precision radius in metres of the last fix
+    private java.time.Instant lastLocatedAt;
 }

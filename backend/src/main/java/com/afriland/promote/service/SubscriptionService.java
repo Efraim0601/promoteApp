@@ -5,6 +5,7 @@ import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.receipt.SaraReceipt;
 import com.afriland.promote.receipt.SaraReceiptExtractor;
 import com.afriland.promote.storage.ImageStorage;
+import com.afriland.promote.repo.AgencyRepository;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
@@ -29,6 +30,7 @@ public class SubscriptionService {
     private final SubscriptionRepository subs;
     private final CardConfigRepository configs;
     private final AppUserRepository users;
+    private final AgencyRepository agencies;
     private final PaymentGateway gateway;
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
@@ -40,11 +42,12 @@ public class SubscriptionService {
     private static final long RESUME_WINDOW_SECONDS = 300; // 5 min
 
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
-                               AppUserRepository users, PaymentGateway gateway,
+                               AppUserRepository users, AgencyRepository agencies, PaymentGateway gateway,
                                ImageStorage storage, SaraReceiptExtractor receiptExtractor) {
         this.subs = subs;
         this.configs = configs;
         this.users = users;
+        this.agencies = agencies;
         this.gateway = gateway;
         this.storage = storage;
         this.receiptExtractor = receiptExtractor;
@@ -129,6 +132,14 @@ public class SubscriptionService {
         int amount = total(cfg, delivery);
         boolean isSelf = "self".equals(channel);
 
+        // Pickup branch: only meaningful when delivery == agence. Snapshot the name so it survives
+        // the agency being renamed/removed; ignore a stale/unknown id rather than failing the sale.
+        String pickupAgencyId = null, pickupAgencyName = null;
+        if ("agence".equals(delivery) && req.pickupAgencyId() != null && !req.pickupAgencyId().isBlank()) {
+            Agency a = agencies.findById(req.pickupAgencyId().trim()).orElse(null);
+            if (a != null) { pickupAgencyId = a.getId(); pickupAgencyName = a.getName(); }
+        }
+
         // Resolve the referrer (parrain) by phone for BOTH channels. In the self path the
         // referrer also becomes the owning agent (QR sale attribution); in the assisted path
         // the seller stays the logged-in agent and the referrer is recorded for tracking only.
@@ -172,9 +183,14 @@ public class SubscriptionService {
                 .quartier(req.quartier() == null ? null : req.quartier().trim())
                 .region(req.region())
                 .ville(req.ville() == null ? null : req.ville().trim())
+                .latitude(req.latitude())
+                .longitude(req.longitude())
+                .geoAccuracy(req.geoAccuracy())
                 .pay(req.pay())
                 .payPhone(payPhone)
                 .delivery(delivery)
+                .pickupAgencyId(pickupAgencyId)
+                .pickupAgencyName(pickupAgencyName)
                 .amount(amount)
                 .transport(transport)
                 .channel(channel)

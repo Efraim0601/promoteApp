@@ -2,9 +2,10 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AdminStats, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
-  CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportUserRow, ImportUsersResult,
-  LoginResponse, PaymentStats, PayStatus, PrintStats, Subscription, User,
+  AdminStats, Agency, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
+  CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
+  ImportUserRow, ImportUsersResult,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Subscription, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -23,12 +24,29 @@ export class Api {
   changePassword(currentPassword: string, newPassword: string): Observable<User> {
     return this.http.post<User>(`${this.base}/auth/change-password`, { currentPassword, newPassword });
   }
+  /** Report the logged-in user's current GPS position (best-effort, stored as last-known location). */
+  reportLocation(latitude: number, longitude: number, accuracy?: number): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/location`, { latitude, longitude, accuracy });
+  }
+  /** Admin — every geolocated point to plot on the map (clients + staff). */
+  mapPoints(): Observable<MapPoint[]> {
+    return this.http.get<MapPoint[]>(`${this.base}/map/points`);
+  }
 
   getConfig(): Observable<CardConfig> {
     return this.http.get<CardConfig>(`${this.base}/config`);
   }
   updateConfig(c: CardConfig): Observable<CardConfig> {
     return this.http.put<CardConfig>(`${this.base}/config`, c);
+  }
+
+  /** Public — active pickup branches the client can choose (delivery == agence). */
+  getAgencies(): Observable<Agency[]> {
+    return this.http.get<Agency[]>(`${this.base}/agencies`);
+  }
+  /** Admin — bulk import pickup branches. */
+  importAgencies(rows: ImportAgencyRow[], updateExisting: boolean): Observable<ImportAgenciesResult> {
+    return this.http.post<ImportAgenciesResult>(`${this.base}/agencies/import`, { rows, updateExisting });
   }
 
   createAssisted(req: CreateSubscriptionRequest): Observable<Subscription> {

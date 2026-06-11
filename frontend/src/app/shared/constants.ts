@@ -41,7 +41,10 @@ export const formatPhone = (v: string): string => {
   return p ? p.formatInternational() : v;
 };
 
-export const DELIVERY_MODES = ['promote', 'agence', 'home'];
+/** Retrait/livraison proposé au client. 'promote' (stand Promote) par défaut, ou 'agence'
+ *  (retrait dans une agence Afriland à choisir). 'home' n'est plus proposé mais reste toléré
+ *  pour l'affichage des données existantes. */
+export const DELIVERY_MODES = ['promote', 'agence'];
 
 /** Overall record status for badges — ports components.jsx recordStatus(). */
 export function recordStatus(r: Subscription): string {

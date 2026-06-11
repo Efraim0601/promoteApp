@@ -2,7 +2,8 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
-import { Agent, CardConfig, Subscription } from '../core/models';
+import { Geo, GeoFix } from '../core/geo';
+import { Agency, Agent, CardConfig, Subscription } from '../core/models';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { PAY_METHODS, payById, matchesOperator, formatPhone } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
@@ -29,7 +30,7 @@ interface WizardForm {
   cniRectoData: string | null; cniRectoKey: string | null;
   cniVersoData: string | null; cniVersoKey: string | null;
   saraReceiptData: string | null; saraReceiptKey: string | null; saraRef: string;
-  pay: string; payPhone: string; delivery: string; refPhone: string;
+  pay: string; payPhone: string; delivery: string; pickupAgencyId: string; refPhone: string;
 }
 
 function parseExp(d: string): Date | null {
@@ -56,9 +57,13 @@ const fmtExp = (d: string) => (d.length === 8 ? `${d.slice(0, 2)}/${d.slice(2, 4
 export class SubscribeComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   private api = inject(Api);
+  private geo = inject(Geo);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private receipt = inject(ReceiptService);
+
+  /** Browser GPS fix captured when the wizard opens (best-effort) — stored with the subscription. */
+  private geoFix: GeoFix | null = null;
 
   channel: 'agent' | 'self' = 'agent';
   get isSelf() { return this.channel === 'self'; }
@@ -66,6 +71,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly payById = payById;
 
   config: CardConfig = { price: 5000, fees: 500, transport: 1000 };
+
+  /** Pickup branches (lieux de retrait) loaded from the server — shown when delivery == agence. */
+  agencies = signal<Agency[]>([]);
 
   step = signal(0);
   /** Self (QR) flow opens on a welcome screen; the agent flow starts straight on the form. */
@@ -102,7 +110,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
     saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-    pay: 'om', payPhone: '', delivery: 'promote', refPhone: '',
+    pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '',
   };
 
   ngOnInit() {
@@ -112,7 +120,11 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     // draft is being resumed mid-way, in which case skip straight back to where they were.
     this.started.set(!this.isSelf || this.step() > 0);
     this.api.getConfig().subscribe((c) => (this.config = c));
+    // Pickup branches for the "En agence" option (best-effort — empty list just hides the choice).
+    this.api.getAgencies().subscribe({ next: (a) => this.agencies.set(a ?? []), error: () => {} });
     if (this.isSelf && this.form.refPhone) this.onRefPhone(this.form.refPhone);
+    // Best-effort GPS — prompts for the permission once; stored with the subscription if granted.
+    this.geo.current().then((fix) => (this.geoFix = fix));
   }
 
   /** Leave the welcome screen and begin the wizard (client/QR flow). */
@@ -246,9 +258,11 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get payPhoneErrorShown(): string | null {
     return this.touched() || this.form.payPhone.length >= 9 ? this.payPhoneError : null;
   }
-  /** Payment step: a method is chosen; MoMo needs a valid payment number, SARA needs a receipt. */
+  /** Payment step: a method is chosen + a pickup branch when "En agence"; MoMo needs a valid
+   *  payment number, SARA needs a receipt. */
   get payStepOk() {
     if (!this.form.pay) return false;
+    if (!this.deliveryOk) return false;
     if (this.isMomo) return this.payPhoneOk;
     // SARA: receipt uploaded AND its reference confirmed (the primary field — may need correction).
     if (this.form.pay === 'sara') return !!this.form.saraReceiptKey && !!this.form.saraRef.trim();
@@ -306,6 +320,34 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       desc: desc[p.id] ?? '',
     }));
   }
+
+  /** Retrait / livraison tiles: "Promote" (par défaut) + "En agence" (si des agences existent). */
+  get deliveryTiles(): TileOption[] {
+    const tiles: TileOption[] = [
+      { id: 'promote', icon: '★', bg: 'var(--primary)', color: '#fff',
+        title: this.i18n.t('del_promote_title'), desc: this.i18n.t('del_promote_desc') },
+    ];
+    if (this.agencies().length) {
+      tiles.push({ id: 'agence', icon: '▣', bg: 'var(--af-gold)', color: '#1a1a1a',
+        title: this.i18n.t('del_agence_title'), desc: this.i18n.t('del_agence_desc') });
+    }
+    return tiles;
+  }
+
+  /** Picking a delivery mode; switching away from "agence" clears the chosen branch. */
+  setDelivery(mode: string) {
+    this.form.delivery = mode;
+    if (mode !== 'agence') this.form.pickupAgencyId = '';
+    this.persist();
+  }
+  onPickupAgency(e: Event) { this.set('pickupAgencyId', (e.target as HTMLSelectElement).value); }
+
+  /** Resolved name of the chosen pickup branch (for the recap). */
+  get pickupAgencyName(): string {
+    return this.agencies().find((a) => a.id === this.form.pickupAgencyId)?.name ?? '';
+  }
+  /** Delivery step is valid: a branch must be chosen when "En agence" is selected. */
+  get deliveryOk() { return this.form.delivery !== 'agence' || !!this.pickupAgencyName; }
 
   // ---- navigation ----
   next() {
@@ -372,11 +414,13 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
       email: this.form.email.trim(), quartier: this.form.quartier.trim(), ville: this.form.ville.trim(),
       pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
+      pickupAgencyId: this.form.delivery === 'agence' ? (this.form.pickupAgencyId || undefined) : undefined,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
       saraReceiptKey: this.form.saraReceiptKey,
       saraRef: this.form.pay === 'sara' ? (this.form.saraRef.trim() || undefined) : undefined,
       referrerPhone: this.form.refPhone || undefined,
+      latitude: this.geoFix?.lat, longitude: this.geoFix?.lng, geoAccuracy: this.geoFix?.accuracy,
     };
   }
 
@@ -498,7 +542,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-      pay: 'om', payPhone: '', delivery: 'promote', refPhone: '',
+      pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '',
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
     this.waitLong.set(false); this.refreshing.set(false);

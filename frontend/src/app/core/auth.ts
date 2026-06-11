@@ -2,6 +2,7 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { Api } from './api';
+import { Geo } from './geo';
 import { Role, User } from './models';
 
 const TOKEN_KEY = 'promote.token';
@@ -11,6 +12,7 @@ const USER_KEY = 'promote.user';
 @Injectable({ providedIn: 'root' })
 export class Auth {
   private api = inject(Api);
+  private geo = inject(Geo);
   private router = inject(Router);
 
   readonly user = signal<User | null>(this.restoreUser());
@@ -30,7 +32,17 @@ export class Auth {
       localStorage.setItem(TOKEN_KEY, res.token);
       localStorage.setItem(USER_KEY, JSON.stringify(res.user));
       this.user.set(res.user);
+      this.reportLocation();
     }));
+  }
+
+  /** Best-effort: capture the browser's GPS fix and store it as the user's last-known location
+   *  (powers the admin map). Silently does nothing if the permission is denied or unavailable. */
+  private reportLocation(): void {
+    this.geo.current().then((fix) => {
+      if (!fix) return;
+      this.api.reportLocation(fix.lat, fix.lng, fix.accuracy).subscribe({ error: () => {} });
+    });
   }
 
   logout(): void {

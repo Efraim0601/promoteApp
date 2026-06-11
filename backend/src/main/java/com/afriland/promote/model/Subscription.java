@@ -43,9 +43,20 @@ public class Subscription {
     private String region;          // administrative region
     private String ville;           // city / town
 
+    /** Geolocation captured (browser GPS) at subscription time. Null when the client declined the
+     *  permission or the browser couldn't get a fix. {@code geoAccuracy} is the radius in metres. */
+    private Double latitude;
+    private Double longitude;
+    private Double geoAccuracy;
+
     private String pay;             // om | mtn | cash | sara
     private String payPhone;        // "+237 6XXXXXXXX" — MoMo number used for payment (may differ from phone)
     private String delivery;        // promote | agence | home
+
+    /** Chosen pickup branch when delivery == agence. The name is snapshotted so it survives the
+     *  agency being renamed or removed later; the id links back to the {@code Agency} row. */
+    private String pickupAgencyId;
+    private String pickupAgencyName;
 
     private int amount;             // total paid/due
     private int transport;          // transport fee portion (0 unless home)

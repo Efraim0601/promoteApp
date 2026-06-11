@@ -48,6 +48,7 @@ export interface Subscription {
   pay: string;        // om | mtn | cash | sara
   payPhone?: string | null;  // MoMo number used for payment (may differ from contact phone)
   delivery: string;   // promote | agence | home
+  pickupAgencyName?: string | null;  // chosen pickup branch name (delivery == agence)
   amount: number;
   transport: number;
   channel: string;    // agent | self
@@ -87,12 +88,30 @@ export interface CreateSubscriptionRequest {
   pay: string;
   payPhone?: string | null;
   delivery: string;
+  pickupAgencyId?: string | null;  // chosen pickup branch id when delivery == agence
   selfie: boolean;
   selfieKey?: string | null;
   cniRectoKey?: string | null;
   cniVersoKey?: string | null;
   saraReceiptKey?: string | null;
   referrerPhone?: string;
+  latitude?: number | null;     // browser GPS captured at subscription time (optional)
+  longitude?: number | null;
+  geoAccuracy?: number | null;  // accuracy radius in metres (optional)
+}
+
+/** One point on the admin map (client subscription or staff member). */
+export interface MapPoint {
+  type: 'client' | 'staff';
+  label: string;
+  lat: number | null;      // exact GPS fix, or null when none was captured
+  lng: number | null;
+  role: string | null;     // staff only — role name
+  status: string | null;   // client only — subscription status
+  ref: string;             // subscription ref (client) or user id (staff)
+  date: string | null;     // ISO instant: subscription createdAt, or last location report
+  accuracy: number | null; // fix precision radius in metres
+  place: string | null;    // coarse locality (city / agency) to geocode when lat/lng are null
 }
 
 export interface CreateUserRequest {
@@ -114,6 +133,30 @@ export interface Agent {
   name: string;
   agency: string | null;
   phone: string | null;
+}
+
+// ---- pickup agencies (lieux de retrait) ----
+export interface Agency {
+  id: string;
+  name: string;
+  city?: string | null;
+}
+export interface ImportAgencyRow {
+  name: string;
+  city?: string | null;
+}
+export interface ImportAgencyRowResult {
+  name: string;
+  city?: string | null;
+  status: 'created' | 'updated' | 'skipped' | 'invalid';
+  reason?: string | null;
+}
+export interface ImportAgenciesResult {
+  created: number;
+  updated: number;
+  skipped: number;
+  invalid: number;
+  rows: ImportAgencyRowResult[];
 }
 
 // ---- bulk user import ----

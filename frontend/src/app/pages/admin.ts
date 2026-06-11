@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, CardConfig, CreateUserRequest, ImportUserRow, ImportUsersResult, PaymentStats, Role, Subscription, User } from '../core/models';
+import { AdminStats, Agency, CardConfig, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, PaymentStats, Role, Subscription, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -12,12 +12,13 @@ import { TxDetailComponent } from '../shared/tx-detail';
 import { SpinnerComponent } from '../shared/spinner';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { ClientPhotoComponent } from '../shared/client-photo';
+import { AdminMapComponent } from './admin-map';
 import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
 
 @Component({
   selector: 'page-admin',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent],
   template: `
   <div class="scr">
     <app-bar class="appbar-wide">
@@ -38,7 +39,9 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
           <button [class.active]="section() === 'overview'" (click)="section.set('overview')"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_overview') }}</button>
           <button [class.active]="section() === 'config'" (click)="section.set('config')"><ic name="gear" [size]="18"></ic> {{ i18n.t('nav_config') }}</button>
           <button [class.active]="section() === 'users'" (click)="section.set('users')"><ic name="user" [size]="18"></ic> {{ i18n.t('nav_users') }}</button>
+          <button [class.active]="section() === 'agencies'" (click)="section.set('agencies')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_agencies') }}</button>
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
+          <button [class.active]="section() === 'map'" (click)="section.set('map')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_map') }}</button>
         </nav>
         <div class="admin-spacer"></div>
         <nav class="admin-nav admin-logout">
@@ -343,6 +346,104 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
 
       }
 
+      <!-- ========== PICKUP AGENCIES (lieux de retrait) ========== -->
+      @if (section() === 'agencies') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_agencies') }}</h1>
+
+      <!-- Import pickup agencies -->
+      <div class="card" style="padding:16px;margin-top:12px">
+        <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
+          <ic name="download" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
+          <div style="min-width:0">
+            <h3 style="font-size:15px;line-height:1.2">{{ i18n.t('ag_import_title') }}</h3>
+            <p class="muted" style="font-size:11.5px;line-height:1.4;margin-top:3px">{{ i18n.t('ag_import_sub') }}</p>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+          <button class="btn btn-outline" (click)="agFile.click()" style="flex:1;min-width:140px;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('import_pick') }}</button>
+          <button class="btn btn-ghost" (click)="downloadAgTemplate()" style="flex:1;min-width:120px;padding:9px;font-size:13px"><ic name="download" [size]="15"></ic> {{ i18n.t('import_template') }}</button>
+        </div>
+        <input #agFile type="file" accept=".csv,text/csv,text/plain" (change)="onAgFile($event)" style="display:none" />
+
+        <field [label]="i18n.t('import_paste_label')">
+          <textarea class="input" rows="4" [placeholder]="i18n.t('ag_paste_ph')" [value]="agText()" (input)="onAgText($event)" style="resize:vertical;font-family:var(--font);line-height:1.5"></textarea>
+        </field>
+
+        @if (agPreview().length) {
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;font-size:12px;font-weight:700">
+            <span style="color:var(--success)">{{ agCounts().created }} {{ i18n.t('import_new') }}</span>
+            <span style="color:var(--af-gold)">{{ agCounts().dup }} {{ i18n.t('import_dup') }}</span>
+            @if (agCounts().invalid) { <span style="color:var(--accent)">{{ agCounts().invalid }} {{ i18n.t('import_invalid') }}</span> }
+          </div>
+
+          <div style="margin-top:10px">
+            <div class="muted" style="font-size:11px;font-weight:700;margin-bottom:5px">{{ i18n.t('import_dup_policy') }}</div>
+            <div style="display:flex;gap:6px">
+              <button class="btn" [class.btn-primary]="!agUpdate()" [class.btn-outline]="agUpdate()" (click)="agUpdate.set(false)" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('import_skip') }}</button>
+              <button class="btn" [class.btn-primary]="agUpdate()" [class.btn-outline]="!agUpdate()" (click)="agUpdate.set(true)" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('import_update') }}</button>
+            </div>
+          </div>
+
+          <div style="max-height:220px;overflow-y:auto;margin-top:10px;border:1px solid var(--border);border-radius:var(--radius)">
+            @for (r of agPreview(); track $index) {
+              <div style="display:flex;align-items:center;gap:8px;padding:7px 9px;border-bottom:1px solid var(--border)">
+                @switch (r.status) {
+                  @case ('new') { <span class="badge" style="background:color-mix(in srgb, var(--success) 18%, transparent);color:var(--success);font-size:10px;flex-shrink:0">{{ i18n.t('import_new') }}</span> }
+                  @case ('duplicate') { <span class="badge" style="background:color-mix(in srgb, var(--af-gold) 22%, transparent);color:#8a6400;font-size:10px;flex-shrink:0">{{ i18n.t('import_dup') }}</span> }
+                  @case ('invalid') { <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px;flex-shrink:0">{{ i18n.t('import_invalid') }}</span> }
+                }
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.name || '—' }}</div>
+                  <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.city || '—' }}@if (r.status === 'invalid') { · <span style="color:var(--accent)">{{ i18n.t('ag_r_name') }}</span> }</div>
+                </div>
+              </div>
+            }
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button class="btn btn-primary" [disabled]="agBusy() || !agActionable()" (click)="runAgImport()" style="flex:1;padding:11px">
+              @if (agBusy()) { <spinner></spinner> } @else { <ic name="check" [size]="17"></ic> {{ i18n.t('import_run') }} {{ agActionable() }} {{ i18n.t('import_lines') }} }
+            </button>
+            <button class="btn btn-ghost" (click)="clearAg()" [disabled]="agBusy()" style="padding:11px">{{ i18n.t('tx_clear') }}</button>
+          </div>
+          @if (agErr()) { <p class="err" style="font-size:12px;text-align:center;margin-top:6px">{{ i18n.t('import_error') }}</p> }
+        }
+
+        @if (agResult(); as res) {
+          <div class="card" style="background:var(--surface-2);padding:12px 14px;margin-top:12px">
+            <div style="font-size:13px;font-weight:800;margin-bottom:6px"><ic name="check" [size]="15" style="color:var(--success);vertical-align:-2px"></ic> {{ i18n.t('import_done') }}</div>
+            <div style="font-size:12.5px;line-height:1.7">
+              <b style="color:var(--success)">{{ res.created }}</b> {{ i18n.t('import_created') }} ·
+              <b>{{ res.updated }}</b> {{ i18n.t('import_updated') }} ·
+              <b>{{ res.skipped }}</b> {{ i18n.t('import_skipped') }}@if (res.invalid) { · <b style="color:var(--accent)">{{ res.invalid }}</b> {{ i18n.t('import_invalid_n') }} }
+            </div>
+          </div>
+        }
+      </div>
+
+      <!-- Current pickup agencies -->
+      <div class="kicker" style="margin-top:16px;margin-bottom:6px">{{ i18n.t('ag_list') }} · {{ agencies().length }}</div>
+      @if (agLoading()) {
+        <div class="load-center"><spinner tone="primary"></spinner></div>
+      } @else if (!agencies().length) {
+        <p class="muted" style="font-size:12.5px">{{ i18n.t('ag_empty') }}</p>
+      } @else {
+        <div class="card" style="padding:4px 0;overflow:hidden">
+          @for (a of agencies(); track a.id) {
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
+              <ic name="pin" [size]="16" style="color:var(--primary);flex-shrink:0"></ic>
+              <div style="min-width:0;flex:1">
+                <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ a.name }}</div>
+                @if (a.city) { <div class="muted" style="font-size:11px">{{ a.city }}</div> }
+              </div>
+            </div>
+          }
+        </div>
+      }
+
+      }
+
       <!-- ========== TRANSACTIONS (wider than the 760px content cap, for the detailed table) ========== -->
       @if (section() === 'transactions') {
       <h1 style="font-size:21px">{{ i18n.t('nav_transactions') }}</h1>
@@ -455,6 +556,15 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
       </div>
       }
 
+      <!-- ========== MAP ========== -->
+      @if (section() === 'map') {
+        <div class="card" style="padding:16px">
+          <h2 style="font-size:16px;margin-bottom:4px">{{ i18n.t('nav_map') }}</h2>
+          <p class="muted" style="font-size:12.5px;margin-bottom:14px">{{ i18n.t('map_sub') }}</p>
+          <admin-map></admin-map>
+        </div>
+      }
+
       </main>
     </div>
   </div>`,
@@ -467,7 +577,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private poll?: ReturnType<typeof setInterval>;
 
   /** Active sidebar section. */
-  section = signal<'overview' | 'config' | 'users' | 'transactions'>('overview');
+  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'map'>('overview');
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
@@ -599,6 +709,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.api.allSubscriptions().subscribe({ next: (t) => { this.txs.set(t); this.txLoading.set(false); }, error: () => this.txLoading.set(false) });
     this.api.getConfig().subscribe({ next: (c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); this.cfgLoading.set(false); }, error: () => this.cfgLoading.set(false) });
     this.loadUsers();
+    this.loadAgencies();
     // Silent background refresh of the KPIs + transactions table (no spinner, keeps filters intact).
     this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
   }
@@ -775,6 +886,101 @@ export class AdminComponent implements OnInit, OnDestroy {
     const a = document.createElement('a');
     a.href = url; a.download = name; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // --- pickup agencies (lieux de retrait) ---
+  agencies = signal<Agency[]>([]);
+  agLoading = signal(true);
+  agText = signal('');
+  agUpdate = signal(false);
+  agBusy = signal(false);
+  agErr = signal(false);
+  agResult = signal<ImportAgenciesResult | null>(null);
+
+  private loadAgencies() {
+    this.agLoading.set(true);
+    this.api.getAgencies().subscribe({ next: (a) => { this.agencies.set(a); this.agLoading.set(false); }, error: () => this.agLoading.set(false) });
+  }
+
+  agParsedRows = computed<ImportAgencyRow[]>(() => this.parseAgencies(this.agText()));
+
+  /** Client-side preview (the backend is authoritative): name required, dup by name+city. */
+  agPreview = computed(() => {
+    const existing = new Set(this.agencies().map((a) => this.agKey(a.name, a.city ?? '')));
+    const seen = new Set<string>();
+    return this.agParsedRows().map((r) => {
+      const name = (r.name || '').trim();
+      const city = (r.city || '').trim();
+      let status: 'new' | 'duplicate' | 'invalid' = 'new';
+      if (!name) { status = 'invalid'; }
+      else {
+        const key = this.agKey(name, city);
+        if (existing.has(key) || seen.has(key)) status = 'duplicate';
+        seen.add(key);
+      }
+      return { name, city, status };
+    });
+  });
+  agCounts = computed(() => {
+    const p = this.agPreview();
+    return {
+      created: p.filter((r) => r.status === 'new').length,
+      dup: p.filter((r) => r.status === 'duplicate').length,
+      invalid: p.filter((r) => r.status === 'invalid').length,
+    };
+  });
+  agActionable = computed(() => this.agCounts().created + (this.agUpdate() ? this.agCounts().dup : 0));
+
+  private agKey(name: string, city: string) { return `${(name || '').trim().toLowerCase()}|${(city || '').trim().toLowerCase()}`; }
+
+  /** Parse pasted/CSV text. Header line mapped by column name, or positional: name, city.
+   *  Delimiter detected: tab, ';' or ','. */
+  private parseAgencies(text: string): ImportAgencyRow[] {
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l.length);
+    if (!lines.length) return [];
+    const delim = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+    const cells = (l: string) => l.split(delim).map((c) => c.trim().replace(/^"(.*)"$/, '$1'));
+    let rows = lines.map(cells);
+    let idx = { name: 0, city: 1 };
+    const head = rows[0].map((c) => c.toLowerCase());
+    const isHeader = head.some((c) => /^(nom|name|agence|agency)$/.test(c)) || head.some((c) => /^(ville|city)$/.test(c));
+    if (isHeader) {
+      const at = (...re: RegExp[]) => head.findIndex((c) => re.some((r) => r.test(c)));
+      idx = { name: at(/^(nom|name|agence|agency)$/), city: at(/^(ville|city|localit[eé])$/) };
+      rows = rows.slice(1);
+    }
+    const g = (row: string[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
+    return rows.map((row) => ({ name: g(row, idx.name), city: g(row, idx.city) || null }));
+  }
+
+  onAgText(e: Event) {
+    this.agText.set((e.target as HTMLTextAreaElement).value);
+    this.agResult.set(null); this.agErr.set(false);
+  }
+  onAgFile(e: Event) {
+    const input = e.target as HTMLInputElement;
+    const f = input.files?.[0];
+    input.value = '';
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = () => { this.agText.set(String(reader.result ?? '')); this.agResult.set(null); this.agErr.set(false); };
+    reader.readAsText(f);
+  }
+  clearAg() { this.agText.set(''); this.agResult.set(null); this.agErr.set(false); }
+  runAgImport() {
+    const rows = this.agParsedRows();
+    if (!rows.length || this.agBusy()) return;
+    this.agBusy.set(true); this.agErr.set(false);
+    this.api.importAgencies(rows, this.agUpdate()).subscribe({
+      next: (res) => { this.agBusy.set(false); this.agResult.set(res); this.loadAgencies(); },
+      error: () => { this.agBusy.set(false); this.agErr.set(true); },
+    });
+  }
+  downloadAgTemplate() {
+    this.downloadCsv('modele-agences.csv',
+      '﻿nom,ville\r\n'
+      + 'Agence Yaoundé Centre,Yaoundé\r\n'
+      + 'Agence Douala Akwa,Douala\r\n');
   }
 
   clearFilters() {
