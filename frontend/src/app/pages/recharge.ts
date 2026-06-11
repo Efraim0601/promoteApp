@@ -6,7 +6,7 @@ import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { Geo, GeoFix } from '../core/geo';
 import { Recharge } from '../core/models';
-import { PAY_METHODS, payById, matchesOperator, formatPhone, formatPan } from '../shared/constants';
+import { PAY_METHODS, payById, matchesOperator, formatPhone, formatPan, PAN_DIGITS } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
@@ -94,7 +94,7 @@ interface RechargeForm {
           </p>
           <div class="card" style="padding:11px 14px;display:flex;gap:9px;align-items:flex-start;max-width:300px;text-align:left;background:var(--surface-2)">
             <ic name="phone" [size]="18" style="color:var(--primary);flex-shrink:0;margin-top:1px"></ic>
-            <span style="font-size:11.5px;color:var(--text);line-height:1.45;font-weight:600">{{ i18n.t('waiting_pin_instr') }}</span>
+            <span style="font-size:11.5px;color:var(--text);line-height:1.45;font-weight:600">{{ i18n.t('waiting_pin_instr', { op: pm.name }) }}</span>
           </div>
         }
       </div>
@@ -217,9 +217,16 @@ interface RechargeForm {
           }
 
           @if (form.pay === 'sara') {
-            <div class="card" style="padding:12px 14px;margin-top:10px;display:flex;gap:9px;align-items:flex-start;background:var(--surface-2)">
-              <ic name="alert" [size]="18" style="color:var(--af-gold);flex-shrink:0;margin-top:1px"></ic>
-              <span style="font-size:12px;line-height:1.5">{{ i18n.t('sara_flow_notice') }}</span>
+            <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:11px;background:var(--surface-2)">
+              <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--primary)"><ic name="phone" [size]="16"></ic> {{ i18n.t('sara_steps_title') }}</div>
+              <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px">
+                @for (s of saraSteps; track $index) {
+                  <li style="display:flex;gap:10px;align-items:flex-start">
+                    <span style="flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ $index + 1 }}</span>
+                    <span style="font-size:12px;line-height:1.45">{{ i18n.t(s) }}</span>
+                  </li>
+                }
+              </ol>
             </div>
             <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--primary)">
               <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--primary)">{{ i18n.t('sara_account_title') }}</div>
@@ -290,6 +297,8 @@ export class RechargeComponent implements OnInit, OnDestroy {
   private polling = false;
 
   readonly payById = payById;
+  /** SARA money: numbered steps to follow in the SARA app before uploading the receipt. */
+  readonly saraSteps = ['sara_step1', 'sara_step2', 'sara_step3', 'sara_step4'];
 
   form: RechargeForm = {
     prenom: '', nom: '', pan: '', amount: '',
@@ -346,7 +355,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
 
   // ---- validation ----
   get nameOk() { return !!this.form.prenom.trim() && !!this.form.nom.trim(); }
-  get panOk() { const n = this.panDigits.length; return n >= 12 && n <= 19; }
+  get panOk() { return this.panDigits.length === PAN_DIGITS; }
   get amountOk() { const a = this.amountValue; return a >= this.min() && a <= this.max(); }
   get payPhoneOk() {
     const v = this.form.payPhone;

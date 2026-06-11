@@ -35,6 +35,8 @@ public class RechargeService {
     /** Free-entry amount bounds (XAF). */
     public static final int MIN_AMOUNT = 500;
     public static final int MAX_AMOUNT = 1_000_000;
+    /** Card PAN: fixed length (digits). */
+    public static final int PAN_DIGITS = 16;
 
     private final RechargeRepository recharges;
     private final AppUserRepository users;
@@ -99,6 +101,11 @@ public class RechargeService {
         if (sara && (req.saraReceiptKey() == null || req.saraReceiptKey().isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sara_receipt_required");
         }
+        // PAN: fixed at 16 digits (defence-in-depth — the form already enforces it).
+        String pan = req.pan() == null ? "" : req.pan().replaceAll("\\D", "");
+        if (pan.length() != PAN_DIGITS) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_pan");
+        }
         String payPhone = null;
         if (momo) {
             if (req.payPhone() == null || req.payPhone().isBlank()) {
@@ -112,7 +119,7 @@ public class RechargeService {
                 .prenom(req.prenom().trim())
                 .nom(req.nom().trim())
                 .fullName((req.prenom().trim() + " " + req.nom().trim()).trim())
-                .pan(req.pan().trim())
+                .pan(pan)
                 .amount(amount)
                 .latitude(req.latitude())
                 .longitude(req.longitude())

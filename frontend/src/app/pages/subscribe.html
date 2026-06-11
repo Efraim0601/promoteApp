@@ -81,7 +81,7 @@
         <!-- Explicit guidance: most "failures" were users who never validated the USSD prompt with their PIN. -->
         <div class="card" style="padding:11px 14px;display:flex;gap:9px;align-items:flex-start;max-width:300px;text-align:left;background:var(--surface-2)">
           <ic name="phone" [size]="18" style="color:var(--primary);flex-shrink:0;margin-top:1px"></ic>
-          <span style="font-size:11.5px;color:var(--text);line-height:1.45;font-weight:600">{{ i18n.t('waiting_pin_instr') }}</span>
+          <span style="font-size:11.5px;color:var(--text);line-height:1.45;font-weight:600">{{ i18n.t('waiting_pin_instr', { op: pm.name }) }}</span>
         </div>
         <div class="card" style="padding:11px 14px;display:flex;gap:9px;align-items:center;max-width:300px;text-align:left">
           <ic name="clock" [size]="18" style="color:var(--muted);flex-shrink:0"></ic>
