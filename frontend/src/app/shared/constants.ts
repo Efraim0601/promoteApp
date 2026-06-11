@@ -12,9 +12,10 @@ export const PAY_METHODS: PayMethod[] = [
 export const payById = (id: string): PayMethod => PAY_METHODS.find((p) => p.id === id) ?? PAY_METHODS[0];
 
 /** Interval (ms) for the silent background refresh of payment data on the staff dashboards.
- *  Kept short so every status transition (initiée → en attente → payée → payée à imprimer)
- *  surfaces in the tables in near real-time across all roles. */
-export const LIVE_REFRESH_MS = 3000;
+ *  15 s is a deliberate balance: status transitions still surface quickly, but the request rate
+ *  per connected user is ~5× lower than at 3 s — which is the single biggest capacity lever
+ *  (a load test showed 100 agents polling every 3 s saturated the server). */
+export const LIVE_REFRESH_MS = 15000;
 
 /**
  * Cameroon mobile prefixes per operator (9 digits, starting with 6). Used to ensure the

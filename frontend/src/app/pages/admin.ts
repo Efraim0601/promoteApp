@@ -537,9 +537,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
   ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
   private refreshLive() {
+    // Only the lightweight, SQL-aggregated KPIs are polled live. The payments funnel and the full
+    // transactions list (heavier) are loaded on open, not on every cycle — this keeps the
+    // dashboard's hot path cheap (they refresh on page (re)load).
     this.api.adminStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
-    this.api.paymentStats().subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
-    this.api.allSubscriptions().subscribe({ next: (t) => this.txs.set(t), error: () => {} });
   }
 
   private loadUsers() {

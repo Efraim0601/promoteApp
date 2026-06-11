@@ -6,6 +6,10 @@ spring:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/promote}
     username: ${SPRING_DATASOURCE_USERNAME:promote}
     password: ${SPRING_DATASOURCE_PASSWORD:promote}
+    hikari:
+      # More concurrent DB connections so dashboard polling doesn't queue on a tiny pool.
+      maximum-pool-size: ${DB_POOL_MAX:25}
+      minimum-idle: ${DB_POOL_MIN:5}
   jpa:
     hibernate:
       ddl-auto: update

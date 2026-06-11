@@ -10,7 +10,14 @@ import java.time.Instant;
  * Mirrors the prototype's transaction record (app.jsx / kyc.jsx recordPayload).
  */
 @Entity
-@Table(name = "subscription")
+@Table(name = "subscription", indexes = {
+        // Speed up the aggregated KPIs and the common filters (created with ddl-auto: update).
+        @Index(name = "idx_sub_pay_status", columnList = "pay_status"),
+        @Index(name = "idx_sub_agent_id", columnList = "agent_id"),
+        @Index(name = "idx_sub_printed_by_id", columnList = "printed_by_id"),
+        @Index(name = "idx_sub_cash_collected_by_id", columnList = "cash_collected_by_id"),
+        @Index(name = "idx_sub_created_at", columnList = "created_at"),
+})
 @Getter
 @Setter
 @NoArgsConstructor

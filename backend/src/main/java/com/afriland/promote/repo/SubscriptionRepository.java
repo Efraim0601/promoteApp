@@ -1,8 +1,12 @@
 package com.afriland.promote.repo;
 
+import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -11,4 +15,30 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findByAgentIdOrderByCreatedAtAsc(String agentId);
     Optional<Subscription> findByRefIgnoreCase(String ref);
     Optional<Subscription> findByGatewayRef(String gatewayRef);
+
+    // ---- aggregated KPIs (computed in SQL instead of loading the whole table into memory) ----
+    long countByPayStatus(PayStatus payStatus);
+    long countByPayStatusAndPrintedFalse(PayStatus payStatus);    // admin "pending" == cash, not yet printed
+    long countByPrintedTrue();
+    long countByPrintedFalseAndPayStatus(PayStatus payStatus);    // print queue == paid, not yet printed
+    long countByPrintedById(String printedById);
+    long countByPrintedByIdAndPrintedAtGreaterThanEqual(String printedById, Instant since);
+    long countByCashCollectedById(String cashCollectedById);
+    long countByCashCollectedByIdAndCashCollectedAtGreaterThanEqual(String cashCollectedById, Instant since);
+    long countByAgentId(String agentId);
+    long countByAgentIdIsNull();
+
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s where s.payStatus = :st")
+    long sumAmountByPayStatus(@Param("st") PayStatus st);
+
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s where s.cashCollectedById = :id")
+    long sumAmountByCashCollectedById(@Param("id") String id);
+
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s "
+            + "where s.agentId = :aid and s.payStatus = com.afriland.promote.model.PayStatus.paid")
+    long collectedPaidByAgentId(@Param("aid") String agentId);
+
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s "
+            + "where s.agentId is null and s.payStatus = com.afriland.promote.model.PayStatus.paid")
+    long collectedPaidOnline();
 }

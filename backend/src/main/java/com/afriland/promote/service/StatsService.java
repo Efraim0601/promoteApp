@@ -5,6 +5,7 @@ import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Role;
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.repo.AppUserRepository;
+import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.springframework.stereotype.Service;
 
@@ -20,10 +21,12 @@ import java.util.List;
 public class StatsService {
 
     private final SubscriptionService subscriptions;
+    private final SubscriptionRepository subs;
     private final AppUserRepository users;
 
-    public StatsService(SubscriptionService subscriptions, AppUserRepository users) {
+    public StatsService(SubscriptionService subscriptions, SubscriptionRepository subs, AppUserRepository users) {
         this.subscriptions = subscriptions;
+        this.subs = subs;
         this.users = users;
     }
 
@@ -38,20 +41,23 @@ public class StatsService {
     }
 
     public AdminStats adminStats() {
-        List<Subscription> all = subscriptions.all();
-        long paid = all.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
-        long pending = all.stream().filter(this::isPending).count();
+        // Aggregated in SQL — no longer loads the whole table into memory.
+        long total = subs.count();
+        long paid = subs.countByPayStatus(PayStatus.paid);
+        // "pending" preserves the previous semantics: a cash subscription not yet printed (status == "cash").
+        long pending = subs.countByPayStatusAndPrintedFalse(PayStatus.cash);
+        long collected = subs.sumAmountByPayStatus(PayStatus.paid);
 
         List<AgentBreakdown> rows = new ArrayList<>();
         for (AppUser a : users.findByRole(Role.AGENT)) {
-            List<Subscription> txs = all.stream().filter(s -> a.getId().equals(s.getAgentId())).toList();
-            rows.add(new AgentBreakdown(a.getId(), a.getName(), a.getAgency(), "agent", txs.size(), collected(txs)));
+            rows.add(new AgentBreakdown(a.getId(), a.getName(), a.getAgency(), "agent",
+                    subs.countByAgentId(a.getId()), subs.collectedPaidByAgentId(a.getId())));
         }
-        List<Subscription> online = all.stream().filter(s -> s.getAgentId() == null).toList();
-        rows.add(new AgentBreakdown("online", "online", null, "online", online.size(), collected(online)));
+        rows.add(new AgentBreakdown("online", "online", null, "online",
+                subs.countByAgentIdIsNull(), subs.collectedPaidOnline()));
         rows.sort(Comparator.comparingLong(AgentBreakdown::count).reversed());
 
-        return new AdminStats(all.size(), paid, pending, collected(all), rows);
+        return new AdminStats(total, paid, pending, collected, rows);
     }
 
     public AgentStats agentStats(String agentId) {
@@ -66,17 +72,14 @@ public class StatsService {
         return LocalDate.now(ZoneId.systemDefault()).atStartOfDay(ZoneId.systemDefault()).toInstant();
     }
 
-    /** Print-point statistics for a given staff member. */
+    /** Print-point statistics for a given staff member (aggregated in SQL). */
     public PrintStats printStats(String printerId) {
-        List<Subscription> all = subscriptions.all();
         Instant today = startOfToday();
-        long myPrinted = all.stream().filter(s -> printerId.equals(s.getPrintedById())).count();
-        long myToday = all.stream()
-                .filter(s -> printerId.equals(s.getPrintedById()) && s.getPrintedAt() != null && !s.getPrintedAt().isBefore(today))
-                .count();
+        long myPrinted = subs.countByPrintedById(printerId);
+        long myToday = subs.countByPrintedByIdAndPrintedAtGreaterThanEqual(printerId, today);
         // Queue = settled payments still waiting for a card (paid, not yet printed).
-        long queue = all.stream().filter(s -> !s.isPrinted() && s.getPayStatus() == PayStatus.paid).count();
-        long totalPrinted = all.stream().filter(Subscription::isPrinted).count();
+        long queue = subs.countByPrintedFalseAndPayStatus(PayStatus.paid);
+        long totalPrinted = subs.countByPrintedTrue();
         return new PrintStats(myPrinted, myToday, queue, totalPrinted);
     }
 
@@ -119,19 +122,15 @@ public class StatsService {
                 mtn.size(), mtnPaid, insufficient, expired, other, avg, median);
     }
 
-    /** Cashier statistics for a given staff member. */
+    /** Cashier statistics for a given staff member (aggregated in SQL). */
     public CashierStats cashierStats(String cashierId) {
-        List<Subscription> all = subscriptions.all();
         Instant today = startOfToday();
-        List<Subscription> mine = all.stream().filter(s -> cashierId.equals(s.getCashCollectedById())).toList();
-        long myCount = mine.size();
-        long myCollected = mine.stream().mapToLong(Subscription::getAmount).sum();
-        long myToday = mine.stream()
-                .filter(s -> s.getCashCollectedAt() != null && !s.getCashCollectedAt().isBefore(today))
-                .count();
+        long myCount = subs.countByCashCollectedById(cashierId);
+        long myCollected = subs.sumAmountByCashCollectedById(cashierId);
+        long myToday = subs.countByCashCollectedByIdAndCashCollectedAtGreaterThanEqual(cashierId, today);
         // Queue = cash subscriptions still awaiting collection.
-        List<Subscription> pending = all.stream().filter(s -> s.getPayStatus() == PayStatus.cash).toList();
-        long pendingAmount = pending.stream().mapToLong(Subscription::getAmount).sum();
-        return new CashierStats(myCount, myCollected, myToday, pending.size(), pendingAmount);
+        long pendingCount = subs.countByPayStatus(PayStatus.cash);
+        long pendingAmount = subs.sumAmountByPayStatus(PayStatus.cash);
+        return new CashierStats(myCount, myCollected, myToday, pendingCount, pendingAmount);
     }
 }
