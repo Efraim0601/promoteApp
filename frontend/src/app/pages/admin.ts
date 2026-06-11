@@ -222,7 +222,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
         <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
         } @else {
         <div style="display:flex;flex-direction:column">
-          @for (u of usersList(); track u.id) {
+          @for (u of pagedUsers(); track u.id) {
             <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border)">
               <avatar [name]="u.name" [size]="30"></avatar>
               <div style="min-width:0;flex:1">
@@ -233,6 +233,15 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
             </div>
           }
         </div>
+        @if (userPageCount() > 1) {
+          <div class="tx-pager">
+            <span class="muted" style="font-size:11.5px">{{ i18n.t('step') }} {{ userPage() + 1 }} {{ i18n.t('of') }} {{ userPageCount() }}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" (click)="userPrev()" [disabled]="userPage() === 0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
+              <button class="btn btn-outline" (click)="userNext()" [disabled]="userPage() >= userPageCount() - 1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
+            </div>
+          </div>
+        }
         }
       </div>
 
@@ -471,6 +480,18 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   // --- user management ---
   usersList = signal<User[]>([]);
+  // Client-side pagination of the staff accounts list.
+  userPage = signal(0);
+  readonly userPageSize = 8;
+  userPageCount = computed(() => Math.max(1, Math.ceil(this.usersList().length / this.userPageSize)));
+  pagedUsers = computed(() => {
+    const p = Math.min(this.userPage(), this.userPageCount() - 1);
+    return this.usersList().slice(p * this.userPageSize, p * this.userPageSize + this.userPageSize);
+  });
+  // Fresh data (reload / create / import) → back to the first page.
+  private readonly _userPageReset = effect(() => { this.usersList(); this.userPage.set(0); });
+  userPrev() { this.userPage.update((p) => Math.max(0, p - 1)); }
+  userNext() { this.userPage.update((p) => Math.min(this.userPageCount() - 1, p + 1)); }
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
   userMsg = signal<'' | 'created' | 'exists' | 'invalid'>('');
   userBusy = signal(false);
