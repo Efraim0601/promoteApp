@@ -19,7 +19,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /** Core subscription / KYC business logic, ported from the prototype (app.jsx, kyc.jsx). */
 @Service
@@ -34,16 +33,16 @@ public class SubscriptionService {
     private final PaymentGateway gateway;
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
+    private final ReferenceSequence refs;     // shared PRM-#### sequence (subscriptions + recharges)
 
-    // PRM-#### sequence (prototype starts at 1008, demo data uses 1000..1008)
-    private final AtomicInteger seq = new AtomicInteger(1008);
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
     /** A pending MoMo transaction older than this is no longer "resumable" (a fresh attempt is allowed). */
     private static final long RESUME_WINDOW_SECONDS = 300; // 5 min
 
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
                                AppUserRepository users, AgencyRepository agencies, PaymentGateway gateway,
-                               ImageStorage storage, SaraReceiptExtractor receiptExtractor) {
+                               ImageStorage storage, SaraReceiptExtractor receiptExtractor,
+                               ReferenceSequence refs) {
         this.subs = subs;
         this.configs = configs;
         this.users = users;
@@ -51,18 +50,12 @@ public class SubscriptionService {
         this.gateway = gateway;
         this.storage = storage;
         this.receiptExtractor = receiptExtractor;
+        this.refs = refs;
     }
 
-    /** Initialise the sequence above the highest existing reference (after seeding). */
+    /** Initialise the shared sequence above the highest existing reference (after seeding). */
     public void initSequence() {
-        int max = subs.findAll().stream()
-                .map(Subscription::getRef)
-                .filter(r -> r != null && r.startsWith("PRM-"))
-                .map(r -> {
-                    try { return Integer.parseInt(r.substring(4)); } catch (Exception e) { return 0; }
-                })
-                .max(Integer::compareTo).orElse(1008);
-        seq.set(Math.max(max, 1008));
+        refs.init();
     }
 
     public CardConfig config() {
@@ -71,7 +64,7 @@ public class SubscriptionService {
     }
 
     private String newRef() {
-        return "PRM-" + seq.incrementAndGet();
+        return refs.next();
     }
 
     /** Globally-unique order id for the aggregator: the human ref plus an epoch+random suffix, so it

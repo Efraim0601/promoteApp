@@ -21,7 +21,6 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Card top-up (recharge) business logic. Deliberately mirrors the payment lifecycle of
@@ -43,20 +42,20 @@ public class RechargeService {
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
     private final CardConfigRepository configs;
+    private final ReferenceSequence refs;     // shared PRM-#### sequence (same as subscriptions)
 
-    /** RC###### sequence (hyphen-free, 8-char ref). */
-    private final AtomicInteger seq = new AtomicInteger(0);
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
 
     public RechargeService(RechargeRepository recharges, AppUserRepository users, PaymentGateway gateway,
                            ImageStorage storage, SaraReceiptExtractor receiptExtractor,
-                           CardConfigRepository configs) {
+                           CardConfigRepository configs, ReferenceSequence refs) {
         this.recharges = recharges;
         this.users = users;
         this.gateway = gateway;
         this.storage = storage;
         this.receiptExtractor = receiptExtractor;
         this.configs = configs;
+        this.refs = refs;
     }
 
     /** Effective recharge bounds (admin-configured value, or the built-in default when unset). */
@@ -67,24 +66,18 @@ public class RechargeService {
         return configs.findById(1L).map(CardConfig::getRechargeMax).filter(java.util.Objects::nonNull).orElse(MAX_AMOUNT);
     }
 
-    /** Initialise the sequence above the highest existing recharge reference (after seeding). */
+    /** Initialise the shared sequence (subscriptions + recharges). */
     public void initSequence() {
-        int max = recharges.findAll().stream()
-                .map(Recharge::getRef)
-                .filter(r -> r != null && r.startsWith("RC"))
-                .map(r -> { try { return Integer.parseInt(r.substring(2)); } catch (Exception e) { return 0; } })
-                .max(Integer::compareTo).orElse(0);
-        seq.set(max);
+        refs.init();
     }
 
-    /** Distinct, hyphen-free 8-char reference, e.g. "RC000123". */
+    /** Same nomenclature as subscriptions: a PRM-#### reference from the shared sequence (unique
+     *  across both subscriptions and recharges). */
     private String newRef() {
-        return String.format("RC%06d", seq.incrementAndGet());
+        return refs.next();
     }
 
-    /** Globally-unique aggregator order id — same shape as the card flow ({@code ref-suffix}), so the
-     *  payload sent to TrustPayWay is structurally identical. The hyphen is only in this internal
-     *  order id; the user-facing reference ({@link #newRef()}) stays hyphen-free (RC######). */
+    /** Globally-unique aggregator order id — same shape as the card flow ({@code ref-suffix}). */
     private String newGatewayRef(String ref) {
         String suffix = Long.toString(Instant.now().toEpochMilli(), 36)
                 + Integer.toString(rnd.nextInt(0x1000), 36);
