@@ -125,7 +125,7 @@ public class DataSeeder implements CommandLineRunner {
 
     private void seedConfig() {
         if (configs.findById(1L).isEmpty()) {
-            configs.save(CardConfig.builder().id(1L).price(5000).fees(500).transport(1000).build());
+            configs.save(CardConfig.builder().id(1L).price(10000).fees(500).transport(1000).build());
         }
     }
 

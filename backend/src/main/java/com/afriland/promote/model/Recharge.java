@@ -3,6 +3,7 @@ package com.afriland.promote.model;
 import com.afriland.promote.payment.Payable;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -69,6 +70,16 @@ public class Recharge implements Payable {
     private String cashCollectedById;
     private Instant cashCollectedAt;
 
+    /** Fulfillment trace: once a recharge is paid, the cashier actually credits the prepaid card,
+     *  then validates here. {@code fulfilled} flips a paid recharge from "à créditer" to "rechargée".
+     *  Nullable-safe default so the column adds cleanly to existing rows (ddl-auto: update). */
+    @Column(nullable = false)
+    @ColumnDefault("false")
+    private boolean fulfilled;
+    private String fulfilledBy;     // cashier display name
+    private String fulfilledById;   // cashier id (stats attribution)
+    private Instant fulfilledAt;
+
     @Column(nullable = false)
     private Instant createdAt;
 
@@ -78,13 +89,14 @@ public class Recharge implements Payable {
         return "sara-receipt".equals(kind) ? saraReceiptKey : null;
     }
 
-    /** Overall display status — mirrors {@link Subscription#getStatus()} minus the print states. */
+    /** Overall display status. After payment, a recharge must still be credited to the card by a
+     *  cashier: {@code to_fulfill} (payée, à créditer) → {@code fulfilled} (rechargée). */
     @Transient
     public String getStatus() {
         if (payStatus == PayStatus.failed) return "failed";
         if (payStatus == PayStatus.cash) return "cash";
         if (payStatus == PayStatus.sara_pending) return "sara_pending";
         if (payStatus == PayStatus.pending) return "pending";
-        return "paid_done";   // payée & terminée — une recharge ne s'imprime pas
+        return fulfilled ? "fulfilled" : "to_fulfill";
     }
 }

@@ -31,10 +31,16 @@ public class RechargeController {
         return RechargeDto.of(service.create(req));
     }
 
-    /** Admin — all recharges. */
+    /** All recharges (admin + cashier — the cashier validates the effective recharge). */
     @GetMapping
     public List<RechargeDto> all() {
         return service.all().stream().map(RechargeDto::of).toList();
+    }
+
+    /** Cashier queue — recharges paid but not yet credited to the card (oldest first). */
+    @GetMapping("/pending-fulfillment")
+    public List<RechargeDto> pendingFulfillment() {
+        return service.pendingFulfillment().stream().map(RechargeDto::of).toList();
     }
 
     /** Staff — search a recharge by reference, holder name, or PAN. */
@@ -93,5 +99,11 @@ public class RechargeController {
     public RechargeDto cashValidate(@PathVariable String ref, @RequestBody CashValidateRequest req,
                                     Authentication auth) {
         return RechargeDto.of(service.validateCash(ref, req.outcome(), req.reason(), (String) auth.getPrincipal()));
+    }
+
+    /** Cashier — confirm the effective recharge (the card has been credited). */
+    @PatchMapping("/{ref}/fulfill")
+    public RechargeDto fulfill(@PathVariable String ref, Authentication auth) {
+        return RechargeDto.of(service.fulfill(ref, (String) auth.getPrincipal()));
     }
 }

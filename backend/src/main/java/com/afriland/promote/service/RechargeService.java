@@ -283,6 +283,28 @@ public class RechargeService {
         return recharges.save(r);
     }
 
+    /** Recharges awaiting fulfillment: paid by the client but not yet credited to the card by a
+     *  cashier (oldest first — FIFO queue). */
+    public List<Recharge> pendingFulfillment() {
+        return recharges.findAll().stream()
+                .filter(r -> r.getPayStatus() == PayStatus.paid && !r.isFulfilled())
+                .sorted(java.util.Comparator.comparing(Recharge::getCreatedAt))
+                .toList();
+    }
+
+    /** Cashier confirms the effective recharge (card credited). Idempotent: only acts on a paid,
+     *  not-yet-fulfilled recharge. */
+    @Transactional
+    public Recharge fulfill(String ref, String cashierId) {
+        Recharge r = recharges.findByRefIgnoreCase(ref).orElseThrow();
+        if (r.getPayStatus() != PayStatus.paid || r.isFulfilled()) return r;
+        r.setFulfilled(true);
+        r.setFulfilledBy(cashierName(cashierId));
+        r.setFulfilledById(cashierId);
+        r.setFulfilledAt(Instant.now());
+        return recharges.save(r);
+    }
+
     private String cashierName(String id) {
         if (id == null) return null;
         return users.findById(id).map(AppUser::getName).orElse(id);

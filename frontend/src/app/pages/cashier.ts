@@ -32,6 +32,21 @@ import { SpinnerComponent } from '../shared/spinner';
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('cash_sub') }}</p>
       </div>
 
+      <!-- Strong alert: a new recharge is waiting to be credited/validated. -->
+      @if (newAlert()) {
+        <button (click)="goRecharges()" style="width:100%;border:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:var(--radius);background:var(--af-gold);color:#5a4200;font-weight:800;font-size:13.5px;animation:pop .4s">
+          <ic name="alert" [size]="18"></ic> {{ i18n.t('cash_rch_new_alert') }}
+          <span style="margin-left:auto">{{ pendingRch().length }}</span>
+        </button>
+      }
+
+      <!-- Tabs: cash desk vs recharge validation. -->
+      <div style="display:flex;gap:8px">
+        <button class="btn" [class.btn-primary]="mode()==='caisse'" [class.btn-outline]="mode()!=='caisse'" (click)="setMode('caisse')" style="flex:1;padding:9px;font-size:13px"><ic name="store" [size]="16"></ic> {{ i18n.t('cash_tab_cash') }}</button>
+        <button class="btn" [class.btn-primary]="mode()==='recharges'" [class.btn-outline]="mode()!=='recharges'" (click)="setMode('recharges')" style="flex:1;padding:9px;font-size:13px"><ic name="phone" [size]="16"></ic> {{ i18n.t('cash_tab_recharges') }}@if (pendingRch().length) { <span style="margin-left:5px;background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ pendingRch().length }}</span> }</button>
+      </div>
+
+      @if (mode() === 'caisse') {
       <!-- The cashier can also initiate a new subscription or a recharge (hidden while viewing a record). -->
       @if (!rec() && !rRec()) {
         <div style="display:flex;gap:10px">
@@ -214,6 +229,65 @@ import { SpinnerComponent } from '../shared/spinner';
           </div>
         }
       }
+      } @else {
+        <!-- ===== Recharges à valider (créditer la carte puis valider) ===== -->
+        <div>
+          <h2 style="font-size:17px;margin-bottom:2px">{{ i18n.t('cash_rch_title') }}</h2>
+          <p class="muted" style="font-size:12.5px;line-height:1.4">{{ i18n.t('cash_rch_sub') }}</p>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn" [class.btn-primary]="rchView()==='queue'" [class.btn-outline]="rchView()!=='queue'" (click)="rchView.set('queue')" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('cash_rch_queue') }} ({{ pendingRch().length }})</button>
+          <button class="btn" [class.btn-primary]="rchView()==='all'" [class.btn-outline]="rchView()!=='all'" (click)="loadAllRch()" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('cash_rch_all') }}</button>
+        </div>
+
+        @if (rchView() === 'queue') {
+          @if (!pendingRch().length) {
+            <div class="card" style="padding:20px;text-align:center"><span class="muted" style="font-size:13px">{{ i18n.t('cash_rch_empty') }}</span></div>
+          } @else {
+            @for (r of pendingRch(); track r.ref) {
+              <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+                <div style="display:flex;align-items:center;gap:8px">
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:15px;font-weight:800">{{ r.fullName }}</div>
+                    <div class="muted" style="font-size:12px;margin-top:2px">{{ r.ref }} · {{ i18n.t('recharge_pan_short') }} {{ fmtPan(r.pan) }}</div>
+                  </div>
+                  <status-badge [status]="r.status"></status-badge>
+                </div>
+                <div class="srow total" style="padding:0"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val" style="color:var(--primary)">{{ i18n.money(r.amount) }}</span></div>
+                <div style="display:flex;gap:9px;align-items:flex-start;padding:9px 11px;border-radius:var(--radius);background:color-mix(in srgb, var(--af-gold) 14%, transparent)">
+                  <ic name="alert" [size]="16" style="color:#8a6400;flex-shrink:0;margin-top:1px"></ic>
+                  <span style="font-size:11.5px;line-height:1.4;color:#6b4f00">{{ i18n.t('cash_rch_credit_hint', { amount: i18n.money(r.amount), pan: fmtPan(r.pan) }) }}</span>
+                </div>
+                <button class="btn btn-primary" (click)="doFulfill(r.ref)" [disabled]="fulfilling() === r.ref" style="padding:11px">
+                  @if (fulfilling() === r.ref) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('cash_rch_validate') }} }
+                </button>
+              </div>
+            }
+          }
+        } @else {
+          @if (allRchLoading()) {
+            <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
+          } @else if (!allRch().length) {
+            <div class="card" style="padding:20px;text-align:center"><span class="muted" style="font-size:13px">{{ i18n.t('rch_empty') }}</span></div>
+          } @else {
+            <div class="card" style="overflow:hidden">
+              @for (r of allRch(); track r.ref) {
+                <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)">
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.fullName }}</div>
+                    <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.ref }} · {{ i18n.money(r.amount) }}</div>
+                  </div>
+                  <status-badge [status]="r.status"></status-badge>
+                  @if (r.payStatus === 'paid' && !r.fulfilled) {
+                    <button class="btn btn-primary" (click)="doFulfill(r.ref)" [disabled]="fulfilling() === r.ref" style="width:auto;padding:6px 10px;font-size:12px">@if (fulfilling() === r.ref) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('cash_rch_validate') }} }</button>
+                  }
+                </div>
+              }
+            </div>
+          }
+        }
+      }
+
       <div style="flex:1"></div>
     </div>
 
@@ -279,6 +353,16 @@ export class CashierComponent implements OnInit, OnDestroy {
   justValidated = signal(false);
   private objectUrls: string[] = [];
 
+  // ---- recharge fulfillment (cashier credits the card after payment, then validates) ----
+  mode = signal<'caisse' | 'recharges'>('caisse');
+  rchView = signal<'queue' | 'all'>('queue');
+  pendingRch = signal<Recharge[]>([]);     // paid, not yet credited — the validation queue
+  allRch = signal<Recharge[]>([]);
+  allRchLoading = signal(false);
+  fulfilling = signal<string | null>(null); // ref being validated
+  newAlert = signal(false);                  // strong alert when a new recharge enters the queue
+  private prevPending = -1;
+
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
 
@@ -288,6 +372,7 @@ export class CashierComponent implements OnInit, OnDestroy {
 
   ngOnInit() {
     this.loadStats();
+    this.loadPending();
     // Keep the queue/counters, the search results AND the open record live without a manual reload.
     this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
     const prefill = this.route.snapshot.queryParamMap.get('ref');
@@ -296,11 +381,81 @@ export class CashierComponent implements OnInit, OnDestroy {
   ngOnDestroy() { if (this.poll) clearInterval(this.poll); this.clear(); }
   private loadStats() { this.api.cashierStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} }); }
 
+  /** Load the validation queue; a strong alert fires when its size grows (a new recharge to credit). */
+  private loadPending() {
+    this.api.pendingRecharges().subscribe({
+      next: (list) => {
+        const n = list.length;
+        if (this.prevPending >= 0 && n > this.prevPending) this.raiseAlert();
+        this.prevPending = n;
+        this.pendingRch.set(list);
+      },
+      error: () => {},
+    });
+  }
+
+  private raiseAlert() {
+    this.newAlert.set(true);
+    this.beep();
+    setTimeout(() => this.newAlert.set(false), 8000);
+  }
+
+  /** Short double beep via the Web Audio API (no asset). Silently no-ops if audio is blocked. */
+  private beep() {
+    try {
+      const Ctx = (window as any).AudioContext || (window as any).webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      const blip = (at: number) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine'; o.frequency.value = 880;
+        o.connect(g); g.connect(ctx.destination);
+        g.gain.setValueAtTime(0.0001, ctx.currentTime + at);
+        g.gain.exponentialRampToValueAtTime(0.35, ctx.currentTime + at + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + at + 0.18);
+        o.start(ctx.currentTime + at); o.stop(ctx.currentTime + at + 0.2);
+      };
+      blip(0); blip(0.25);
+      setTimeout(() => ctx.close(), 800);
+    } catch { /* audio unavailable — the visual banner still shows */ }
+  }
+
+  setMode(m: 'caisse' | 'recharges') {
+    this.mode.set(m);
+    if (m === 'recharges') { this.newAlert.set(false); this.loadPending(); if (this.rchView() === 'all') this.loadAllRch(); }
+  }
+  goRecharges() { this.rchView.set('queue'); this.setMode('recharges'); }
+
+  loadAllRch() {
+    this.rchView.set('all');
+    this.allRchLoading.set(true);
+    this.api.recharges().subscribe({
+      next: (list) => { this.allRch.set([...list].reverse()); this.allRchLoading.set(false); },
+      error: () => this.allRchLoading.set(false),
+    });
+  }
+
+  /** Cashier confirms the card has been credited → recharge validated, leaves the queue. */
+  doFulfill(ref: string) {
+    if (this.fulfilling()) return;
+    this.fulfilling.set(ref);
+    this.api.fulfillRecharge(ref).subscribe({
+      next: () => {
+        this.fulfilling.set(null);
+        this.pendingRch.update((l) => l.filter((r) => r.ref !== ref));
+        this.prevPending = this.pendingRch().length;
+        if (this.rchView() === 'all') this.loadAllRch();
+      },
+      error: () => this.fulfilling.set(null),
+    });
+  }
+
   /** Silent background refresh: KPIs always; plus the open record's status OR the search
    *  results, so a payment moving (cash → payée) shows in near real-time. Never disturbs an
    *  in-flight action, the success screen, or the already-loaded selfie image. */
   private refreshLive() {
     this.loadStats();
+    this.loadPending();   // keep the queue count + alert live regardless of the active mode
     if (this.busy() || this.loading() || this.justValidated() || this.rValidated()) return;
     const r = this.rec();
     const rr = this.rRec();

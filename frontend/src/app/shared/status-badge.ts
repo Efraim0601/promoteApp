@@ -18,6 +18,8 @@ export class StatusBadgeComponent {
     sara_pending: { cls: 'pending', key: 'st_sara_pending' },
     paid: { cls: 'info', key: 'st_to_print' },           // payée, pas encore imprimée (souscription)
     paid_done: { cls: 'success', key: 'st_paid' },       // payée & terminée (recharge — rien à imprimer)
+    to_fulfill: { cls: 'info', key: 'st_to_fulfill' },   // recharge payée, à créditer sur la carte (caissier)
+    fulfilled: { cls: 'success', key: 'st_fulfilled' },  // recharge créditée & validée (terminé)
     printed: { cls: 'success', key: 'st_printed' },      // imprimée (terminé)
     failed: { cls: 'failed', key: 'st_failed' },
     awaiting: { cls: 'pending', key: 'st_pending' },     // rétro-compatibilité

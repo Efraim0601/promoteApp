@@ -60,7 +60,7 @@ public class SubscriptionService {
 
     public CardConfig config() {
         return configs.findById(1L).orElseGet(() ->
-                configs.save(CardConfig.builder().id(1L).price(5000).fees(500).transport(1000).build()));
+                configs.save(CardConfig.builder().id(1L).price(10000).fees(500).transport(1000).build()));
     }
 
     private String newRef() {

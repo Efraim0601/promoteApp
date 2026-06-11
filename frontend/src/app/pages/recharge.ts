@@ -298,7 +298,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
 
   readonly payById = payById;
   /** SARA money: numbered steps to follow in the SARA app before uploading the receipt. */
-  readonly saraSteps = ['sara_step1', 'sara_step2', 'sara_step3', 'sara_step4'];
+  readonly saraSteps = ['sara_step1', 'sara_step2', 'sara_step3', 'sara_step4', 'sara_step5'];
 
   form: RechargeForm = {
     prenom: '', nom: '', pan: '', amount: '',

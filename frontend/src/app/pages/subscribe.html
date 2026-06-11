@@ -12,9 +12,9 @@
         </div>
 
         <!-- ===== Offre Promote : carte gratuite + 1% cashback + prix en 2 lignes ===== -->
-        <div class="card" style="padding:0;overflow:hidden;border:1.5px solid var(--primary)">
-          <div style="background:linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 60%, #000));color:#fff;padding:11px 16px;display:flex;align-items:center;gap:9px">
-            <ic name="award" [size]="20"></ic>
+        <div class="card offer-card" style="padding:0;overflow:hidden;border:1.5px solid var(--primary)">
+          <div class="offer-head" style="background:linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 60%, #000));color:#fff;padding:11px 16px;display:flex;align-items:center;gap:9px">
+            <span class="offer-badge"><ic name="award" [size]="20"></ic></span>
             <span style="font-size:14px;font-weight:800;letter-spacing:.04em">{{ i18n.t('offer_title') }}</span>
           </div>
           <div style="padding:14px 16px;display:flex;flex-direction:column;gap:13px">
@@ -22,7 +22,7 @@
               <span style="font-size:12.5px;font-weight:600;color:var(--muted)">{{ i18n.t('offer_card_label') }}</span>
               <div style="display:flex;align-items:baseline;gap:9px">
                 <span style="text-decoration:line-through;color:var(--muted);font-size:15px">{{ i18n.money(config.price) }}</span>
-                <span style="font-size:21px;font-weight:800;color:var(--success);letter-spacing:.02em">{{ i18n.t('offer_free') }}</span>
+                <span class="offer-free" style="font-size:21px;font-weight:800;color:var(--success);letter-spacing:.02em">{{ i18n.t('offer_free') }}</span>
               </div>
             </div>
             <div style="display:flex;gap:9px;align-items:flex-start;background:color-mix(in srgb, var(--af-gold) 14%, transparent);border-radius:var(--radius);padding:10px 12px">
