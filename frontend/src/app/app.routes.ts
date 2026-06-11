@@ -33,6 +33,9 @@ export const routes: Routes = [
   // cashier — validate in-person cash payments
   { path: 'cashier', canActivate: [roleGuard('CASHIER', 'ADMIN')], loadComponent: () => import('./pages/cashier').then((m) => m.CashierComponent) },
 
+  // collecteur — capture + manage own bank-product sales (collectes)
+  { path: 'collecte', canActivate: [roleGuard('COLLECTEUR', 'ADMIN')], loadComponent: () => import('./pages/collecte').then((m) => m.CollecteComponent) },
+
   // Unknown URLs fall back to the public start page (not the staff login).
   { path: '**', redirectTo: 'start' },
 ];

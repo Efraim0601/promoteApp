@@ -5,6 +5,7 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.service.SubscriptionService;
+import com.afriland.promote.service.CollecteService;
 import com.afriland.promote.service.RechargeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,7 @@ public class DataSeeder implements CommandLineRunner {
     private final SubscriptionRepository subs;
     private final SubscriptionService service;
     private final RechargeService rechargeService;
+    private final CollecteService collecteService;
     private final PasswordEncoder encoder;
     private final JdbcTemplate jdbc;
 
@@ -55,7 +57,8 @@ public class DataSeeder implements CommandLineRunner {
     private final String cashierName;
 
     public DataSeeder(AppUserRepository users, CardConfigRepository configs, SubscriptionRepository subs,
-                      SubscriptionService service, RechargeService rechargeService, PasswordEncoder encoder, JdbcTemplate jdbc,
+                      SubscriptionService service, RechargeService rechargeService, CollecteService collecteService,
+                      PasswordEncoder encoder, JdbcTemplate jdbc,
                       @Value("${app.admin.email}") String adminEmail,
                       @Value("${app.admin.password}") String adminPassword,
                       @Value("${app.admin.name:Administrateur Promote}") String adminName,
@@ -71,6 +74,7 @@ public class DataSeeder implements CommandLineRunner {
         this.subs = subs;
         this.service = service;
         this.rechargeService = rechargeService;
+        this.collecteService = collecteService;
         this.encoder = encoder;
         this.jdbc = jdbc;
         this.adminEmail = adminEmail;
@@ -95,6 +99,7 @@ public class DataSeeder implements CommandLineRunner {
         // No demo client-journey data is seeded: subscriptions start empty.
         service.initSequence();
         rechargeService.initSequence();
+        collecteService.initSequence();
     }
 
     /**

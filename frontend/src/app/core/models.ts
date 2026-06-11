@@ -1,6 +1,6 @@
 /** Shared API types mirroring the backend DTOs. */
 
-export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER';
+export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER' | 'COLLECTEUR';
 
 export interface User {
   id: string;
@@ -280,4 +280,40 @@ export interface ClaimResult {
   ok: boolean;
   reason: string | null;
   record: Subscription | null;
+}
+
+// ---- collectes (ventes de produits bancaires) ----
+export type CollecteProduct = 'compte_ouvert' | 'carte_bancaire' | 'sara_money' | 'e_first';
+
+export interface CreateCollecteRequest {
+  product: CollecteProduct | string;
+  clientNom?: string | null;
+  clientPhone?: string | null;
+  accountNumber?: string | null;   // compte_ouvert
+  cardNumber?: string | null;      // carte_bancaire
+  cardType?: string | null;        // carte_bancaire
+}
+
+export interface Collecte {
+  ref: string;
+  product: string;
+  clientNom?: string | null;
+  clientPhone?: string | null;
+  accountNumber?: string | null;
+  cardNumber?: string | null;
+  cardType?: string | null;
+  collectedById?: string | null;
+  collectedByName?: string | null;
+  createdAt: string;
+}
+
+export interface CollecteBucket {
+  key: string;
+  label: string;
+  count: number;
+}
+export interface CollecteStats {
+  total: number;
+  byProduct: CollecteBucket[];
+  byCommercial: CollecteBucket[];
 }

@@ -41,6 +41,14 @@ export const formatPhone = (v: string): string => {
   return p ? p.formatInternational() : v;
 };
 
+/** Collecte products (bank products sold) — codes; labels resolved via i18n `prod_<code>`. */
+export const COLLECTE_PRODUCTS = ['compte_ouvert', 'carte_bancaire', 'sara_money', 'e_first'];
+/** Card types offered for the `carte_bancaire` product — codes; labels via i18n `ct_<code>`. */
+export const CARD_TYPES = [
+  'carte_fellow', 'carte_partner', 'carte_prepayee',
+  'carte_visa_classic', 'carte_visa_gold', 'carte_blanche',
+];
+
 /** Maximum PAN length (ISO/IEC 7812) — digits only, no separators. */
 export const PAN_MAX_DIGITS = 19;
 /** PAN digits only, capped at the normal maximum (drops any spaces/separators). */

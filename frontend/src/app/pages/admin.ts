@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, Agency, CardConfig, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, PaymentStats, Recharge, Role, Subscription, User } from '../core/models';
+import { AdminStats, Agency, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, PaymentStats, Recharge, Role, Subscription, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -13,7 +13,7 @@ import { SpinnerComponent } from '../shared/spinner';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
-import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
 
 @Component({
   selector: 'page-admin',
@@ -42,6 +42,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/con
           <button [class.active]="section() === 'agencies'" (click)="section.set('agencies')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_agencies') }}</button>
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
           <button [class.active]="section() === 'recharges'" (click)="section.set('recharges')"><ic name="phone" [size]="18"></ic> {{ i18n.t('nav_recharges') }}</button>
+          <button [class.active]="section() === 'collectes'" (click)="section.set('collectes')"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
           <button [class.active]="section() === 'map'" (click)="section.set('map')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_map') }}</button>
         </nav>
         <div class="admin-spacer"></div>
@@ -206,6 +207,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/con
               <option value="AGENT">{{ i18n.t('role_agent') }}</option>
               <option value="PRINT_AGENT">{{ i18n.t('role_print') }}</option>
               <option value="CASHIER">{{ i18n.t('role_cashier') }}</option>
+              <option value="COLLECTEUR">{{ i18n.t('role_collecteur') }}</option>
               <option value="ADMIN">{{ i18n.t('role_admin') }}</option>
             </select>
           </field>
@@ -661,6 +663,114 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/con
       </div>
       }
 
+      <!-- ========== COLLECTES (ventes de produits bancaires) ========== -->
+      @if (section() === 'collectes') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_collectes') }}</h1>
+
+      <!-- Stats -->
+      <div class="card" style="padding:14px;margin-top:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <ic name="chart" [size]="16" style="color:var(--primary)"></ic>
+          <h3 style="font-size:14.5px">{{ i18n.t('col_stats_title') }}</h3>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ collectes().length }} {{ i18n.t('col_total') }}</span>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          @for (b of statByProduct(); track b.key) {
+            <div style="flex:1;min-width:120px;border:1px solid var(--border);border-radius:var(--radius);padding:9px 11px">
+              <div class="muted" style="font-size:11px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ i18n.t('prod_' + b.key) }}</div>
+              <div style="font-size:19px;font-weight:800">{{ b.count }}</div>
+            </div>
+          }
+        </div>
+        @if (topCommercials().length) {
+          <div class="kicker" style="margin-top:12px;margin-bottom:5px">{{ i18n.t('col_by_commercial') }}</div>
+          <div style="display:flex;flex-direction:column;gap:4px">
+            @for (b of topCommercials(); track b.key) {
+              <div style="display:flex;align-items:center;gap:8px;font-size:12.5px">
+                <span style="min-width:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ b.label || '—' }}</span>
+                <span style="font-weight:800">{{ b.count }}</span>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <div class="card" style="overflow:hidden;max-width:1180px;margin-top:12px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+          <ic name="store" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">{{ i18n.t('col_all') }}</h3>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredCollectes().length }} {{ i18n.t('tx_count') }}</span>
+        </div>
+        <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
+          <div class="input-prefix">
+            <span class="pfx"><ic name="search" [size]="15"></ic></span>
+            <input [placeholder]="i18n.t('col_search_ph')" [value]="colSearch()" (input)="colSearch.set($any($event.target).value)" />
+          </div>
+          <div style="display:flex;gap:8px">
+            <select class="input" [value]="colProduct()" (change)="colProduct.set($any($event.target).value)" style="flex:1">
+              <option value="all">{{ i18n.t('col_all_products') }}</option>
+              @for (p of productCodes; track p) { <option [value]="p">{{ i18n.t('prod_' + p) }}</option> }
+            </select>
+            <select class="input" [value]="colCommercial()" (change)="colCommercial.set($any($event.target).value)" style="flex:1">
+              <option value="all">{{ i18n.t('col_all_commercials') }}</option>
+              @for (c of commercialOptions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="input" type="date" [value]="colFrom()" (change)="colFrom.set($any($event.target).value)" style="flex:1" />
+            <span class="muted" style="font-size:12px">→</span>
+            <input class="input" type="date" [value]="colTo()" (change)="colTo.set($any($event.target).value)" style="flex:1" />
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" (click)="exportCollectes()" [disabled]="!filteredCollectes().length" style="flex:1;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('tx_export') }}</button>
+            <button class="btn btn-ghost" (click)="clearColFilters()" style="flex:1;padding:9px;font-size:13px">{{ i18n.t('tx_clear') }}</button>
+          </div>
+        </div>
+        @if (colLoading()) {
+          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (filteredCollectes().length === 0) {
+          <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('col_empty') }}</p>
+        } @else {
+          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(68vh,600px);padding:0 2px">
+            <table class="tx-table">
+              <colgroup>
+                <col style="width:150px" /><col /><col style="width:150px" /><col style="width:150px" /><col style="width:120px" /><col style="width:56px" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{{ i18n.t('col_commercial') }}</th>
+                  <th>{{ i18n.t('client') }}</th>
+                  <th>{{ i18n.t('col_product_col') }}</th>
+                  <th>{{ i18n.t('col_details') }}</th>
+                  <th>{{ i18n.t('tx_date') }}</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (c of pagedCollectes(); track c.ref) {
+                  <tr class="tx-tr">
+                    <td><div class="cell-name">{{ c.collectedByName || '—' }}</div><div class="cell-sub">{{ c.ref }}</div></td>
+                    <td [attr.data-label]="i18n.t('client')"><div class="cell-name">{{ c.clientNom || '—' }}</div><div class="cell-sub">{{ c.clientPhone || '—' }}</div></td>
+                    <td [attr.data-label]="i18n.t('col_product_col')">{{ i18n.t('prod_' + c.product) }}</td>
+                    <td class="brk" [attr.data-label]="i18n.t('col_details')">{{ colDetails(c) }}</td>
+                    <td class="nowrap" [attr.data-label]="i18n.t('tx_date')">{{ txDate(c.createdAt) }}</td>
+                    <td><button class="icon-btn" (click)="deleteCollecte(c)" [disabled]="colBusy()" [title]="i18n.t('delete')" style="color:var(--accent)"><ic name="trash" [size]="15"></ic></button></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="tx-pager">
+            <span class="muted" style="font-size:11.5px">{{ filteredCollectes().length }} {{ i18n.t('tx_count') }} · {{ i18n.t('step') }} {{ colPage() + 1 }} {{ i18n.t('of') }} {{ colPageCount() }}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" (click)="colPrev()" [disabled]="colPage() === 0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
+              <button class="btn btn-outline" (click)="colNext()" [disabled]="colPage() >= colPageCount() - 1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
+            </div>
+          </div>
+        }
+      </div>
+      }
+
       <!-- ========== MAP ========== -->
       @if (section() === 'map') {
         <div class="card" style="padding:16px">
@@ -682,7 +792,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private poll?: ReturnType<typeof setInterval>;
 
   /** Active sidebar section. */
-  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'map'>('overview');
+  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'map'>('overview');
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
@@ -861,6 +971,108 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.downloadCsv('recharges.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
   }
 
+  // --- collectes (ventes de produits bancaires) — management view ---
+  collectes = signal<Collecte[]>([]);
+  colLoading = signal(true);
+  colBusy = signal(false);
+  colSearch = signal('');
+  colProduct = signal('all');     // all | <product code>
+  colCommercial = signal('all');  // all | <collectedById>
+  colFrom = signal('');
+  colTo = signal('');
+  colPage = signal(0);
+  readonly colPageSize = 12;
+  readonly productCodes = COLLECTE_PRODUCTS;
+
+  private loadCollectes() {
+    this.colLoading.set(true);
+    this.api.collectes().subscribe({ next: (c) => { this.collectes.set(c); this.colLoading.set(false); }, error: () => this.colLoading.set(false) });
+  }
+
+  /** Distinct commercials present in the data, for the filter dropdown. */
+  commercialOptions = computed(() => {
+    const seen = new Map<string, string>();
+    for (const c of this.collectes()) {
+      const id = c.collectedById ?? '—';
+      if (!seen.has(id)) seen.set(id, c.collectedByName ?? '—');
+    }
+    return [...seen.entries()].map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name));
+  });
+  /** Counts per product (all four, in fixed order) for the stat cards. */
+  statByProduct = computed(() => {
+    const counts = new Map<string, number>(COLLECTE_PRODUCTS.map((p) => [p, 0]));
+    for (const c of this.collectes()) counts.set(c.product, (counts.get(c.product) ?? 0) + 1);
+    return COLLECTE_PRODUCTS.map((key) => ({ key, count: counts.get(key) ?? 0 }));
+  });
+  /** Top commercials by number of collectes (max 8). */
+  topCommercials = computed(() => {
+    const m = new Map<string, { label: string; count: number }>();
+    for (const c of this.collectes()) {
+      const id = c.collectedById ?? '—';
+      const e = m.get(id) ?? { label: c.collectedByName ?? '—', count: 0 };
+      e.count++; m.set(id, e);
+    }
+    return [...m.entries()].map(([key, v]) => ({ key, label: v.label, count: v.count }))
+      .sort((a, b) => b.count - a.count).slice(0, 8);
+  });
+
+  filteredCollectes = computed(() => {
+    const q = this.colSearch().trim().toLowerCase();
+    const digits = this.colSearch().replace(/\D/g, '');
+    const prod = this.colProduct(), com = this.colCommercial(), from = this.colFrom(), to = this.colTo();
+    return this.collectes().filter((c) => {
+      if (prod !== 'all' && c.product !== prod) return false;
+      if (com !== 'all' && (c.collectedById ?? '—') !== com) return false;
+      if (from && c.createdAt.slice(0, 10) < from) return false;
+      if (to && c.createdAt.slice(0, 10) > to) return false;
+      if (q) {
+        const hay = `${c.ref} ${c.collectedByName ?? ''} ${c.clientNom ?? ''} ${c.accountNumber ?? ''} ${c.cardNumber ?? ''}`.toLowerCase();
+        const phone = (c.clientPhone ?? '').replace(/\D/g, '');
+        if (!hay.includes(q) && !(digits && phone.includes(digits))) return false;
+      }
+      return true;
+    });
+  });
+  colPageCount = computed(() => Math.max(1, Math.ceil(this.filteredCollectes().length / this.colPageSize)));
+  pagedCollectes = computed(() => {
+    const all = this.filteredCollectes();
+    const p = Math.min(this.colPage(), this.colPageCount() - 1);
+    return all.slice(p * this.colPageSize, p * this.colPageSize + this.colPageSize);
+  });
+  private readonly _colPageReset = effect(() => { this.filteredCollectes(); this.colPage.set(0); });
+  colPrev() { this.colPage.update((p) => Math.max(0, p - 1)); }
+  colNext() { this.colPage.update((p) => Math.min(this.colPageCount() - 1, p + 1)); }
+  clearColFilters() { this.colSearch.set(''); this.colProduct.set('all'); this.colCommercial.set('all'); this.colFrom.set(''); this.colTo.set(''); }
+
+  /** One-line product-specific detail (account / card no + type). */
+  colDetails(c: Collecte): string {
+    if (c.product === 'compte_ouvert') return c.accountNumber || '—';
+    if (c.product === 'carte_bancaire') {
+      const t = c.cardType ? this.i18n.t('ct_' + c.cardType) : '';
+      return [c.cardNumber, t].filter(Boolean).join(' · ') || '—';
+    }
+    return '—';
+  }
+
+  deleteCollecte(c: Collecte) {
+    if (this.colBusy() || !confirm(this.i18n.t('col_delete_confirm'))) return;
+    this.colBusy.set(true);
+    this.api.deleteCollecte(c.ref).subscribe({
+      next: () => { this.colBusy.set(false); this.collectes.update((list) => list.filter((x) => x.ref !== c.ref)); },
+      error: () => { this.colBusy.set(false); },
+    });
+  }
+
+  exportCollectes() {
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['Reference', 'Commercial', 'Produit', 'Nom client', 'Telephone', 'N° compte', 'N° carte', 'Type carte', 'Date'];
+    const rows = this.filteredCollectes().map((c) => [
+      c.ref, c.collectedByName ?? '', this.i18n.t('prod_' + c.product), c.clientNom ?? '', c.clientPhone ?? '',
+      c.accountNumber ?? '', c.cardNumber ?? '', c.cardType ? this.i18n.t('ct_' + c.cardType) : '', this.fmtDateTime(c.createdAt),
+    ].map((v) => esc(String(v))).join(','));
+    this.downloadCsv('collectes.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
+  }
+
   /** Success rate (%) guarded against division by zero. */
   rate(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
 
@@ -872,6 +1084,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadUsers();
     this.loadAgencies();
     this.loadRecharges();
+    this.loadCollectes();
     // Silent background refresh of the KPIs + transactions table (no spinner, keeps filters intact).
     this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
   }
@@ -915,7 +1128,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     navigator.clipboard?.writeText(this.createdPw()).then(() => this.pwCopied.set(true));
   }
   roleLabel(role: Role) {
-    return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print' : role === 'CASHIER' ? 'role_cashier' : 'role_agent');
+    return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print'
+      : role === 'CASHIER' ? 'role_cashier' : role === 'COLLECTEUR' ? 'role_collecteur' : 'role_agent');
   }
 
   // --- bulk user import ---
@@ -940,7 +1154,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       let status: 'new' | 'duplicate' | 'invalid' = 'new';
       let reason = '';
       if (!name || !/\S+@\S+\.\S+/.test(email)) { status = 'invalid'; reason = 'name_email'; }
-      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT' && role !== 'CASHIER') { status = 'invalid'; reason = 'role'; }
+      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT' && role !== 'CASHIER' && role !== 'COLLECTEUR') { status = 'invalid'; reason = 'role'; }
       else if (role === 'AGENT' && !/^6\d{8}$/.test(phone9)) { status = 'invalid'; reason = 'phone'; }
       else {
         const key = email.toLowerCase();
@@ -997,6 +1211,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (/admin/.test(s)) return 'ADMIN';
     if (/print|impr/.test(s)) return 'PRINT_AGENT';
     if (/caiss|cashier|esp[èe]ce/.test(s)) return 'CASHIER';
+    if (/collect/.test(s)) return 'COLLECTEUR';
     if (/agent|commerc|client/.test(s)) return 'AGENT';
     return (r || '').trim().toUpperCase();
   }

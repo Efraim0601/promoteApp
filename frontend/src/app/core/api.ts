@@ -3,6 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminStats, Agency, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
+  Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ImportUserRow, ImportUsersResult,
   LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Recharge, Subscription, User,
@@ -151,6 +152,32 @@ export class Api {
   /** Admin — all recharges. */
   recharges(): Observable<Recharge[]> {
     return this.http.get<Recharge[]>(`${this.base}/recharges`);
+  }
+
+  // ---- collectes (ventes de produits bancaires) ----
+  /** Collecteur / admin — capture a sale. */
+  createCollecte(req: CreateCollecteRequest): Observable<Collecte> {
+    return this.http.post<Collecte>(`${this.base}/collectes`, req);
+  }
+  /** Collecteur / admin — my own collectes. */
+  myCollectes(): Observable<Collecte[]> {
+    return this.http.get<Collecte[]>(`${this.base}/collectes/mine`);
+  }
+  /** Admin — all collectes. */
+  collectes(): Observable<Collecte[]> {
+    return this.http.get<Collecte[]>(`${this.base}/collectes`);
+  }
+  /** Admin — aggregated stats (by product, by commercial). */
+  collecteStats(): Observable<CollecteStats> {
+    return this.http.get<CollecteStats>(`${this.base}/collectes/stats`);
+  }
+  /** Admin / owner — update a collecte. */
+  updateCollecte(ref: string, req: CreateCollecteRequest): Observable<Collecte> {
+    return this.http.put<Collecte>(`${this.base}/collectes/${ref}`, req);
+  }
+  /** Admin / owner — delete a collecte. */
+  deleteCollecte(ref: string): Observable<void> {
+    return this.http.delete<void>(`${this.base}/collectes/${ref}`);
   }
 
   agents(): Observable<Agent[]> {
