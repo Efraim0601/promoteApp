@@ -45,6 +45,17 @@ export class Auth {
     return !!u && roles.includes(u.role);
   }
 
+  /** True until the user has set their own password (forces the change-password screen). */
+  get mustChangePassword(): boolean {
+    return !!this.user()?.mustChangePassword;
+  }
+
+  /** Persist an updated user (e.g. after a password change clears mustChangePassword). */
+  setUser(u: User): void {
+    localStorage.setItem(USER_KEY, JSON.stringify(u));
+    this.user.set(u);
+  }
+
   /** Landing route for a freshly authenticated user. */
   landingPath(role?: Role): string {
     const r = role ?? this.user()?.role;

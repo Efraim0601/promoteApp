@@ -30,13 +30,21 @@ public final class Dtos {
     public record ImportUsersResult(int created, int updated, int skipped, int invalid,
                                     List<ImportRowResult> rows) {}
 
-    public record UserDto(String id, String name, String email, String role, String agency, String phone) {
+    public record UserDto(String id, String name, String email, String role, String agency, String phone,
+                          boolean mustChangePassword) {
         public static UserDto of(AppUser u) {
-            return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), u.getAgency(), u.getPhone());
+            return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), u.getAgency(), u.getPhone(),
+                    u.isMustChangePassword());
         }
     }
 
     public record LoginResponse(String token, UserDto user) {}
+
+    /** A logged-in user changes their own password. */
+    public record ChangePasswordRequest(@NotBlank String currentPassword, @NotBlank String newPassword) {}
+
+    /** Generic error body: {@code {"error": "code"}}. */
+    public record ErrorResponse(String error) {}
 
     /** Admin creates a staff account. role = ADMIN | AGENT | PRINT_AGENT | CASHIER. */
     public record CreateUserRequest(

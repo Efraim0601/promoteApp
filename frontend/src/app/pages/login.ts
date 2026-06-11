@@ -69,7 +69,7 @@ export class LoginComponent {
     if (this.busy()) return;
     this.busy.set(true);
     this.auth.login(this.email().trim(), this.pw()).subscribe({
-      next: () => this.router.navigateByUrl(this.auth.landingPath()),
+      next: () => this.router.navigateByUrl(this.auth.mustChangePassword ? '/change-password' : this.auth.landingPath()),
       error: () => { this.err.set(true); this.busy.set(false); },
     });
   }

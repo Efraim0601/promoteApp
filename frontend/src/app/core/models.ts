@@ -9,6 +9,12 @@ export interface User {
   role: Role;
   agency: string | null;
   phone: string | null;
+  mustChangePassword?: boolean;   // true until the user sets their own password (first login)
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
 }
 
 export interface LoginResponse {

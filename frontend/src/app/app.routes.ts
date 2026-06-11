@@ -1,9 +1,13 @@
 import { Routes } from '@angular/router';
-import { authGuard, roleGuard } from './core/guards';
+import { authGuard, roleGuard, sessionGuard } from './core/guards';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'login' },
   { path: 'login', loadComponent: () => import('./pages/login').then((m) => m.LoginComponent) },
+
+  // self-service / forced (first-login) password change — any logged-in staff
+  { path: 'change-password', canActivate: [sessionGuard],
+    loadComponent: () => import('./pages/change-password').then((m) => m.ChangePasswordComponent) },
 
   { path: 'admin', canActivate: [roleGuard('ADMIN')], loadComponent: () => import('./pages/admin').then((m) => m.AdminComponent) },
   { path: 'agent', canActivate: [roleGuard('AGENT')], loadComponent: () => import('./pages/agent-home').then((m) => m.AgentHomeComponent) },

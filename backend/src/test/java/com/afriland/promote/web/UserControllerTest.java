@@ -22,7 +22,7 @@ class UserControllerTest {
     private static String user(String name, String email, String role, String phone) {
         String p = phone == null ? "" : ",\"phone\":\"" + phone + "\"";
         return "{\"name\":\"" + name + "\",\"email\":\"" + email + "\",\"role\":\"" + role
-                + "\",\"password\":\"promote\"" + p + "}";
+                + "\",\"password\":\"Promote123\"" + p + "}";
     }
 
     @Test

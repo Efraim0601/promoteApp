@@ -19,6 +19,10 @@ export class Api {
   me(): Observable<User> {
     return this.http.get<User>(`${this.base}/auth/me`);
   }
+  /** Change the logged-in user's own password (returns the updated user). */
+  changePassword(currentPassword: string, newPassword: string): Observable<User> {
+    return this.http.post<User>(`${this.base}/auth/change-password`, { currentPassword, newPassword });
+  }
 
   getConfig(): Observable<CardConfig> {
     return this.http.get<CardConfig>(`${this.base}/config`);

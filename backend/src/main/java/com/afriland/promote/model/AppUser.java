@@ -32,4 +32,8 @@ public class AppUser {
     private String agency;        // null for admin
 
     private String phone;         // used to resolve a referrer ("recommandé par")
+
+    /** True until the user has set their own password (forced change on first login). */
+    @Builder.Default
+    private boolean mustChangePassword = false;
 }

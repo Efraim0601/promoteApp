@@ -17,6 +17,22 @@ spring:
     properties:
       hibernate:
         format_sql: false
+  # SMTP (Office 365 by default). Set MAIL_USERNAME / MAIL_PASSWORD in .env.
+  mail:
+    host: ${MAIL_HOST:smtp.office365.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+        transport:
+          protocol: smtp
+    test-connection: false
 
 app:
   admin:
@@ -33,6 +49,12 @@ app:
     name: ${CASHIER_NAME:Caissier Promote}
   seed:
     test-agent: ${SEED_TEST_AGENT:true}   # set false in production to skip the demo agent
+  # Public URL of the app, used in account emails (login link). e.g. https://<host>:8443
+  public-url: ${APP_PUBLIC_URL:http://localhost:8973}
+  mail:
+    enabled: ${MAIL_ENABLED:true}                 # set false to disable sending (e.g. local dev)
+    from: ${MAIL_FROM:${MAIL_USERNAME:agent_dri_03@afrilandfirstbank.com}}
+    from-name: ${MAIL_FROM_NAME:Afriland Carte Promote}
   jwt:
     secret: ${JWT_SECRET:change-me-in-production-this-secret-must-be-at-least-32-bytes-long}
     expiration-hours: 12

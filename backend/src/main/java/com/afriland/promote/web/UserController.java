@@ -1,8 +1,10 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.email.EmailService;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
+import com.afriland.promote.security.PasswordPolicy;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -25,10 +27,12 @@ public class UserController {
 
     private final AppUserRepository users;
     private final PasswordEncoder encoder;
+    private final EmailService email;
 
-    public UserController(AppUserRepository users, PasswordEncoder encoder) {
+    public UserController(AppUserRepository users, PasswordEncoder encoder, EmailService email) {
         this.users = users;
         this.encoder = encoder;
+        this.email = email;
     }
 
     /** List every staff account (all roles). */
@@ -49,6 +53,9 @@ public class UserController {
         if (users.findByEmailIgnoreCase(req.email().trim()).isPresent()) {
             return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
         }
+        // Admin-set passwords must satisfy the policy too.
+        String pwErr = PasswordPolicy.validate(req.password());
+        if (pwErr != null) return ResponseEntity.badRequest().body(new ErrorResponse(pwErr));
         // Phone stored as the local 9-digit Cameroon number (country code stripped) so it always
         // matches what a client types as their referrer's number → auto-attributed to the agent.
         String phone = req.phone() == null ? "" : req.phone().replaceAll("\\D", "");
@@ -65,6 +72,7 @@ public class UserController {
                 .role(role)
                 .agency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim())
                 .phone(phone.isBlank() ? null : phone)
+                .mustChangePassword(true)   // forced change on first login (all new accounts)
                 .build();
         return ResponseEntity.ok(UserDto.of(users.save(u)));
     }
@@ -136,7 +144,11 @@ public class UserController {
                     .passwordHash(encoder.encode(temp))
                     .role(role).agency(agency)
                     .phone(phone.isBlank() ? null : phone)
+                    .mustChangePassword(true)   // forced change on first login
                     .build());
+            // Email the new user their login link + temporary password (best-effort; the temp
+            // password is also returned below as a fallback for the admin).
+            this.email.sendAccountCreated(email, name, temp);
             out.add(new ImportRowResult(email, name, role.name(), "created", null, temp));
             created++;
         }
@@ -148,11 +160,20 @@ public class UserController {
     private static final char[] PW = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
     private static final SecureRandom RAND = new SecureRandom();
 
-    private static String genPassword() {
-        StringBuilder sb = new StringBuilder(10);
-        for (int i = 0; i < 10; i++) sb.append(PW[RAND.nextInt(PW.length)]);
-        return sb.toString();
-    }
+    // Guarantees the policy (>= 1 letter and >= 1 digit) on a 10-char password.
+    private static final char[] LETTERS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ".toCharArray();
+    private static final char[] DIGITS = "23456789".toCharArray();
 
-    record ErrorResponse(String error) {}
+    private static String genPassword() {
+        char[] out = new char[10];
+        out[0] = LETTERS[RAND.nextInt(LETTERS.length)];   // at least one letter
+        out[1] = DIGITS[RAND.nextInt(DIGITS.length)];     // at least one digit
+        for (int i = 2; i < out.length; i++) out[i] = PW[RAND.nextInt(PW.length)];
+        // Shuffle so the guaranteed letter/digit aren't always first (Fisher–Yates).
+        for (int i = out.length - 1; i > 0; i--) {
+            int j = RAND.nextInt(i + 1);
+            char t = out[i]; out[i] = out[j]; out[j] = t;
+        }
+        return new String(out);
+    }
 }

@@ -69,6 +69,15 @@ services:
       TRUSTPAYWAY_NOTIF_URL: ${TRUSTPAYWAY_NOTIF_URL:-}
       TRUSTPAYWAY_WEBHOOK_SECRET: ${TRUSTPAYWAY_WEBHOOK_SECRET:-}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:8973}
+      # public URL used in account emails (login link), e.g. https://<host>:8443
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
+      # SMTP (Office 365 by default) — set MAIL_USERNAME / MAIL_PASSWORD in .env
+      MAIL_HOST: ${MAIL_HOST:-smtp.office365.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      MAIL_ENABLED: ${MAIL_ENABLED:-true}
       # object storage (MinIO) — S3 API reached over the internal network
       APP_STORAGE_PROVIDER: s3
       S3_ENDPOINT: http://minio:9000

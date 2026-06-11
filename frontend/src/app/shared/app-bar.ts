@@ -1,5 +1,7 @@
 import { Component, inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
+import { Auth } from '../core/auth';
 import { IconComponent } from './icon';
 
 /** Brand header with the Afriland logo, card name and language toggle.
@@ -17,6 +19,11 @@ import { IconComponent } from './icon';
         <div class="brand-sub">{{ i18n.t('brand_tagline') }}</div>
       </div>
       <ng-content select="[appbar-right]"></ng-content>
+      @if (auth.isStaff()) {
+        <button class="icon-btn" (click)="changePassword()" [title]="i18n.t('change_pw')" aria-label="change password">
+          <ic name="lock" [size]="15" [sw]="2"></ic>
+        </button>
+      }
       <button class="icon-btn" (click)="i18n.toggle()" aria-label="language">
         <ic name="globe" [size]="15" [sw]="2"></ic>
         {{ i18n.lang() === 'fr' ? 'EN' : 'FR' }}
@@ -25,4 +32,10 @@ import { IconComponent } from './icon';
 })
 export class AppBarComponent {
   i18n = inject(I18n);
+  auth = inject(Auth);
+  private router = inject(Router);
+
+  changePassword() {
+    this.router.navigateByUrl('/change-password');
+  }
 }
