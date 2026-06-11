@@ -83,7 +83,8 @@ public final class Dtos {
     public record CreateUserResult(UserDto user, String tempPassword) {}
 
     // ---- config ----
-    public record ConfigDto(int price, int fees, int transport, int rechargeMin, int rechargeMax) {}
+    public record ConfigDto(int price, int fees, int transport, int rechargeMin, int rechargeMax,
+                            int rechargeInitiale, int passPremium) {}
 
     // ---- subscriptions ----
     /** Create payload — used by both assisted (agent) and self (client) flows. */

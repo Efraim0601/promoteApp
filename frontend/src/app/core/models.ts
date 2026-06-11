@@ -29,6 +29,8 @@ export interface CardConfig {
   transport: number;
   rechargeMin: number;   // recharge free-entry lower bound (XAF)
   rechargeMax: number;   // recharge free-entry upper bound (XAF)
+  rechargeInitiale: number;  // Offre Promote — recharge initiale (XAF)
+  passPremium: number;       // Offre Promote — Pass Premium (XAF)
 }
 
 export type PayStatus = 'pending' | 'paid' | 'cash' | 'sara_pending' | 'failed';

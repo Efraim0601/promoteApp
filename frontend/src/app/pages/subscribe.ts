@@ -74,7 +74,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly STEP_COUNT = STEP_COUNT;
   readonly payById = payById;
 
-  config: CardConfig = { price: 5000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000 };
+  config: CardConfig = { price: 5000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000, rechargeInitiale: 2500, passPremium: 2000 };
 
   /** Pickup branches (lieux de retrait) loaded from the server — shown when delivery == agence. */
   agencies = signal<Agency[]>([]);
@@ -107,6 +107,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   /** Progressive guidance shown on the CNI capture (i18n keys, rendered as a checklist). */
   readonly cniTips = ['cni_tip_flat', 'cni_tip_light', 'cni_tip_glare', 'cni_tip_frame'];
+  /** SARA money: numbered steps to follow in the SARA app before uploading the receipt. */
+  readonly saraSteps = ['sara_step1', 'sara_step2', 'sara_step3', 'sara_step4'];
 
   form: WizardForm = {
     prenom: '', nom: '', sexe: '', docType: 'cni', cni: '', niu: '', cniExp: '', phone: '',
@@ -191,7 +193,10 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   // ---- derived ----
   get transport() { return this.form.delivery === 'home' ? (this.config.transport || 0) : 0; }
-  get total() { return (this.config.price || 0) + this.transport; }
+  /** Offre Promote : carte gratuite — le client règle la recharge initiale + le Pass Premium. */
+  get rechargeInitiale() { return this.config.rechargeInitiale || 0; }
+  get passPremium() { return this.config.passPremium || 0; }
+  get total() { return this.rechargeInitiale + this.passPremium + this.transport; }
   get fullName() { return (this.form.prenom + ' ' + this.form.nom).trim(); }
   get pm() { return payById(this.form.pay); }
 

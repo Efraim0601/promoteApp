@@ -10,6 +10,34 @@
           <h1 style="font-size:23px">{{ i18n.t('welcome_title') }}</h1>
           <p class="muted" style="font-size:13.5px;line-height:1.55;margin-top:8px">{{ i18n.t('welcome_desc') }}</p>
         </div>
+
+        <!-- ===== Offre Promote : carte gratuite + 1% cashback + prix en 2 lignes ===== -->
+        <div class="card" style="padding:0;overflow:hidden;border:1.5px solid var(--primary)">
+          <div style="background:linear-gradient(135deg, var(--primary), color-mix(in srgb, var(--primary) 60%, #000));color:#fff;padding:11px 16px;display:flex;align-items:center;gap:9px">
+            <ic name="award" [size]="20"></ic>
+            <span style="font-size:14px;font-weight:800;letter-spacing:.04em">{{ i18n.t('offer_title') }}</span>
+          </div>
+          <div style="padding:14px 16px;display:flex;flex-direction:column;gap:13px">
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <span style="font-size:12.5px;font-weight:600;color:var(--muted)">{{ i18n.t('offer_card_label') }}</span>
+              <div style="display:flex;align-items:baseline;gap:9px">
+                <span style="text-decoration:line-through;color:var(--muted);font-size:15px">{{ i18n.money(config.price) }}</span>
+                <span style="font-size:21px;font-weight:800;color:var(--success);letter-spacing:.02em">{{ i18n.t('offer_free') }}</span>
+              </div>
+            </div>
+            <div style="display:flex;gap:9px;align-items:flex-start;background:color-mix(in srgb, var(--af-gold) 14%, transparent);border-radius:var(--radius);padding:10px 12px">
+              <ic name="award" [size]="18" style="color:var(--af-gold);flex-shrink:0;margin-top:1px"></ic>
+              <span style="font-size:12.5px;line-height:1.45;font-weight:700">{{ i18n.t('offer_cashback') }}</span>
+            </div>
+            <div>
+              <div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;margin-bottom:2px">{{ i18n.t('offer_conditions') }}</div>
+              <div class="srow"><span class="lbl">{{ i18n.t('offer_recharge_initiale') }}</span><span class="val">{{ i18n.money(rechargeInitiale) }}</span></div>
+              <div class="srow"><span class="lbl">{{ i18n.t('offer_pass_premium') }}</span><span class="val">{{ i18n.money(passPremium) }}</span></div>
+              <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>
+            </div>
+          </div>
+        </div>
+
         <div class="card" style="padding:6px 14px">
           <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="idcard" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('welcome_step1') }}</span></div>
           <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="phone" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('welcome_step2') }}</span></div>
@@ -282,9 +310,16 @@
         }
         @if (form.pay === 'sara') {
           <!-- SARA is settled in the SARA app first; the client then uploads the proof here. -->
-          <div class="card" style="padding:12px 14px;margin-top:10px;display:flex;gap:9px;align-items:flex-start;background:var(--surface-2)">
-            <ic name="alert" [size]="18" style="color:var(--af-gold);flex-shrink:0;margin-top:1px"></ic>
-            <span style="font-size:12px;line-height:1.5">{{ i18n.t('sara_flow_notice') }}</span>
+          <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:11px;background:var(--surface-2)">
+            <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--primary)"><ic name="phone" [size]="16"></ic> {{ i18n.t('sara_steps_title') }}</div>
+            <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px">
+              @for (s of saraSteps; track $index) {
+                <li style="display:flex;gap:10px;align-items:flex-start">
+                  <span style="flex-shrink:0;width:20px;height:20px;border-radius:50%;background:var(--primary);color:#fff;font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center">{{ $index + 1 }}</span>
+                  <span style="font-size:12px;line-height:1.45">{{ i18n.t(s) }}</span>
+                </li>
+              }
+            </ol>
           </div>
           <!-- Collection account the client must credit in the SARA app before uploading the receipt. -->
           <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--primary)">
@@ -361,7 +396,9 @@
           @if (refAgent()) { <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ refAgent()!.name }}</span></div> }
         </div>
         <div class="card" style="padding:4px 16px">
-          <div class="srow"><span class="lbl">{{ i18n.t('card_price') }}</span><span class="val">{{ i18n.money(config.price) }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('offer_card_label') }}</span><span class="val" style="color:var(--success);font-weight:800">{{ i18n.t('offer_free') }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('offer_recharge_initiale') }}</span><span class="val">{{ i18n.money(rechargeInitiale) }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('offer_pass_premium') }}</span><span class="val">{{ i18n.money(passPremium) }}</span></div>
           <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>
         </div>
       }

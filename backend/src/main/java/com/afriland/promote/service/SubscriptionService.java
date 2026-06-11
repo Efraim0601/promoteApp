@@ -90,11 +90,11 @@ public class SubscriptionService {
                 .orElse(null);
     }
 
-    /** total = price + fees + (transport if delivery == home). Ports kyc.jsx:37. */
+    /** Offre Promote : la carte est gratuite — le client règle la recharge initiale + le Pass
+     *  Premium (+ transport si livraison à domicile, option non proposée actuellement). */
     private int total(CardConfig cfg, String delivery) {
         int transport = "home".equals(delivery) ? cfg.getTransport() : 0;
-        // The client pays the card price only (issuance fee is no longer charged).
-        return cfg.getPrice() + transport;
+        return cfg.rechargeInitialeOr() + cfg.passPremiumOr() + transport;
     }
 
     /** Resolve a referrer (sales agent) by phone — ports app.jsx:findAgentByPhone. */

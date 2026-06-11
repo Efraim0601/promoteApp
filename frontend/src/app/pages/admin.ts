@@ -165,6 +165,21 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
             <div class="input-prefix"><input inputmode="numeric" [value]="cfg().transport" (input)="onCfg('transport', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
           </field>
 
+          <!-- Offre Promote: carte gratuite — le client paie la recharge initiale + le Pass Premium. -->
+          <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:2px">
+            <div style="font-size:12.5px;font-weight:800;color:var(--primary);margin-bottom:4px">{{ i18n.t('cfg_offer_title') }}</div>
+            <p class="muted" style="font-size:11px;line-height:1.4;margin-bottom:10px">{{ i18n.t('cfg_offer_sub') }}</p>
+            <div style="display:flex;gap:10px">
+              <field [label]="i18n.t('offer_recharge_initiale')" style="flex:1">
+                <div class="input-prefix"><input inputmode="numeric" [value]="cfg().rechargeInitiale" (input)="onCfg('rechargeInitiale', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
+              </field>
+              <field [label]="i18n.t('offer_pass_premium')" style="flex:1">
+                <div class="input-prefix"><input inputmode="numeric" [value]="cfg().passPremium" (input)="onCfg('passPremium', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
+              </field>
+            </div>
+            <div class="srow total" style="margin-top:8px"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money((cfg().rechargeInitiale || 0) + (cfg().passPremium || 0)) }}</span></div>
+          </div>
+
           <!-- Recharge (top-up) free-entry amount bounds. -->
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:2px">
             <div style="font-size:12.5px;font-weight:800;color:var(--primary);margin-bottom:10px">{{ i18n.t('cfg_recharge_title') }}</div>
@@ -804,8 +819,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   cfgLoading = signal(true);
   saving = signal(false);
   // Signals so the "save" button's [disabled] binding stays reactive (the app is zoneless).
-  cfg = signal<CardConfig>({ price: 0, fees: 0, transport: 0, rechargeMin: 0, rechargeMax: 0 });
-  private original = signal<CardConfig>({ price: 0, fees: 0, transport: 0, rechargeMin: 0, rechargeMax: 0 });
+  cfg = signal<CardConfig>({ price: 0, fees: 0, transport: 0, rechargeMin: 0, rechargeMax: 0, rechargeInitiale: 0, passPremium: 0 });
+  private original = signal<CardConfig>({ price: 0, fees: 0, transport: 0, rechargeMin: 0, rechargeMax: 0, rechargeInitiale: 0, passPremium: 0 });
   changed = computed(() => {
     const c = this.cfg(), o = this.original();
     return c.price !== o.price || c.fees !== o.fees || c.transport !== o.transport
