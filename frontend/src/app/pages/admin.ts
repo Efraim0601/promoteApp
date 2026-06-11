@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, Agency, CardConfig, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, PaymentStats, Role, Subscription, User } from '../core/models';
+import { AdminStats, Agency, CardConfig, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, PaymentStats, Recharge, Role, Subscription, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -13,7 +13,7 @@ import { SpinnerComponent } from '../shared/spinner';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
-import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/constants';
 
 @Component({
   selector: 'page-admin',
@@ -41,6 +41,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
           <button [class.active]="section() === 'users'" (click)="section.set('users')"><ic name="user" [size]="18"></ic> {{ i18n.t('nav_users') }}</button>
           <button [class.active]="section() === 'agencies'" (click)="section.set('agencies')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_agencies') }}</button>
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
+          <button [class.active]="section() === 'recharges'" (click)="section.set('recharges')"><ic name="phone" [size]="18"></ic> {{ i18n.t('nav_recharges') }}</button>
           <button [class.active]="section() === 'map'" (click)="section.set('map')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_map') }}</button>
         </nav>
         <div class="admin-spacer"></div>
@@ -226,22 +227,25 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
         } @else {
         <div style="display:flex;flex-direction:column">
           @for (u of pagedUsers(); track u.id) {
-            <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border)" [style.opacity]="u.enabled === false ? '.5' : '1'">
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border);flex-wrap:wrap" [style.opacity]="u.enabled === false ? '.5' : '1'">
               <avatar [name]="u.name" [size]="30"></avatar>
-              <div style="min-width:0;flex:1">
+              <div style="min-width:120px;flex:1">
                 <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.name }}</div>
                 <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.email }}</div>
               </div>
-              @if (u.enabled === false) {
-                <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px;flex-shrink:0">{{ i18n.t('user_disabled') }}</span>
-              }
-              <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px;flex-shrink:0">{{ roleLabel(u.role) }}</span>
-              @if (u.id !== auth.user()?.id) {
-                <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
-                        style="padding:5px 9px;font-size:11px;flex-shrink:0;white-space:nowrap">
-                  {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
-                </button>
-              }
+              <!-- Badges + action grouped so they wrap together and never overflow the card on a narrow column. -->
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;flex-shrink:0">
+                @if (u.enabled === false) {
+                  <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px">{{ i18n.t('user_disabled') }}</span>
+                }
+                <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(u.role) }}</span>
+                @if (u.id !== auth.user()?.id) {
+                  <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
+                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
+                    {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
+                  </button>
+                }
+              </div>
             </div>
           }
         </div>
@@ -556,6 +560,93 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
       </div>
       }
 
+      <!-- ========== RECHARGES (paiements de recharge de carte prépayée) ========== -->
+      @if (section() === 'recharges') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_recharges') }}</h1>
+      <div class="card" style="overflow:hidden;max-width:1180px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+          <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">{{ i18n.t('rch_all') }}</h3>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
+          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredRecharges().length }} {{ i18n.t('tx_count') }}</span>
+        </div>
+        <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
+          <div class="input-prefix">
+            <span class="pfx"><ic name="search" [size]="15"></ic></span>
+            <input [placeholder]="i18n.t('rch_search_ph')" [value]="rSearch()" (input)="rSearch.set($any($event.target).value)" />
+          </div>
+          <div style="display:flex;gap:8px">
+            <select class="input" [value]="rStatus()" (change)="rStatus.set($any($event.target).value)" style="flex:1">
+              <option value="all">{{ i18n.t('tx_all_status') }}</option>
+              <option value="paid">{{ i18n.t('st_paid') }}</option>
+              <option value="pending">{{ i18n.t('st_pending') }}</option>
+              <option value="cash">{{ i18n.t('st_cash') }}</option>
+              <option value="sara_pending">{{ i18n.t('st_sara_pending') }}</option>
+              <option value="failed">{{ i18n.t('st_failed') }}</option>
+            </select>
+            <select class="input" [value]="rPayFilter()" (change)="rPayFilter.set($any($event.target).value)" style="flex:1">
+              <option value="all">{{ i18n.t('rch_all_methods') }}</option>
+              <option value="om">Orange Money</option>
+              <option value="mtn">MTN MoMo</option>
+              <option value="sara">SARA Money</option>
+              <option value="cash">{{ i18n.t('pay_cash_name') }}</option>
+            </select>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input class="input" type="date" [value]="rFrom()" (change)="rFrom.set($any($event.target).value)" style="flex:1" />
+            <span class="muted" style="font-size:12px">→</span>
+            <input class="input" type="date" [value]="rTo()" (change)="rTo.set($any($event.target).value)" style="flex:1" />
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-outline" (click)="exportRecharges()" [disabled]="!filteredRecharges().length" style="flex:1;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('tx_export') }}</button>
+            <button class="btn btn-ghost" (click)="clearRFilters()" style="flex:1;padding:9px;font-size:13px">{{ i18n.t('tx_clear') }}</button>
+          </div>
+        </div>
+        @if (rLoading()) {
+          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (filteredRecharges().length === 0) {
+          <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('rch_empty') }}</p>
+        } @else {
+          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(68vh,600px);padding:0 2px">
+            <table class="tx-table">
+              <colgroup>
+                <col /><col style="width:170px" /><col style="width:140px" /><col style="width:140px" /><col style="width:96px" /><col style="width:116px" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{{ i18n.t('client') }}</th>
+                  <th>{{ i18n.t('recharge_pan_short') }}</th>
+                  <th>{{ i18n.t('tx_date') }}</th>
+                  <th>{{ i18n.t('pay_method_label') }}</th>
+                  <th class="num">{{ i18n.t('tx_amount') }}</th>
+                  <th>{{ i18n.t('tx_status') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of pagedRecharges(); track r.ref) {
+                  <tr class="tx-tr">
+                    <td><div class="cell-name">{{ r.fullName }}</div><div class="cell-sub">{{ r.ref }}</div></td>
+                    <td class="brk" [attr.data-label]="i18n.t('recharge_pan_short')">{{ fmtPan(r.pan) }}</td>
+                    <td class="nowrap" [attr.data-label]="i18n.t('tx_date')">{{ txDate(r.createdAt) }}</td>
+                    <td [attr.data-label]="i18n.t('pay_method_label')"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="op-logo" [style.background]="rpm(r).bg" [style.color]="rpm(r).fg" style="width:20px;height:20px;font-size:8px;border-radius:5px;overflow:hidden;flex-shrink:0">@if (rpm(r).logo) { <img [src]="rpm(r).logo" [alt]="rpm(r).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ rpm(r).short }} }</span><span style="overflow-wrap:anywhere;line-height:1.25">{{ r.pay === 'cash' ? i18n.t('pay_cash_short') : rpm(r).name }}</span></span></td>
+                    <td class="num" [attr.data-label]="i18n.t('tx_amount')">{{ i18n.money(r.amount) }}</td>
+                    <td [attr.data-label]="i18n.t('tx_status')"><status-badge [status]="r.status"></status-badge></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="tx-pager">
+            <span class="muted" style="font-size:11.5px">{{ filteredRecharges().length }} {{ i18n.t('tx_count') }} · {{ i18n.t('step') }} {{ rPage() + 1 }} {{ i18n.t('of') }} {{ rPageCount() }}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" (click)="rPrev()" [disabled]="rPage() === 0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
+              <button class="btn btn-outline" (click)="rNext()" [disabled]="rPage() >= rPageCount() - 1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
+            </div>
+          </div>
+        }
+      </div>
+      }
+
       <!-- ========== MAP ========== -->
       @if (section() === 'map') {
         <div class="card" style="padding:16px">
@@ -577,7 +668,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private poll?: ReturnType<typeof setInterval>;
 
   /** Active sidebar section. */
-  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'map'>('overview');
+  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'map'>('overview');
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
@@ -700,6 +791,61 @@ export class AdminComponent implements OnInit, OnDestroy {
   rowStatus = (t: Subscription) => recordStatus(t);
   txDate = (iso: string) => this.fmtDateTime(iso);
 
+  // --- card recharges (top-ups) — separate payments view, with filters ---
+  recharges = signal<Recharge[]>([]);
+  rLoading = signal(true);
+  rSearch = signal('');
+  rStatus = signal('all');   // all | paid | pending | cash | sara_pending | failed
+  rPayFilter = signal('all'); // all | om | mtn | sara | cash
+  rFrom = signal('');
+  rTo = signal('');
+  rPage = signal(0);
+  readonly rPageSize = 12;
+  rpm = (r: Recharge) => payById(r.pay);
+  fmtPan = (v: string) => formatPan(v);
+
+  private loadRecharges() {
+    this.rLoading.set(true);
+    this.api.recharges().subscribe({ next: (r) => { this.recharges.set(r); this.rLoading.set(false); }, error: () => this.rLoading.set(false) });
+  }
+
+  filteredRecharges = computed(() => {
+    const q = this.rSearch().trim().toLowerCase();
+    const digits = this.rSearch().replace(/\D/g, '');
+    const st = this.rStatus(), pay = this.rPayFilter(), from = this.rFrom(), to = this.rTo();
+    return this.recharges().slice().reverse().filter((r) => {
+      if (st !== 'all' && r.status !== st && r.payStatus !== st) return false;
+      if (pay !== 'all' && r.pay !== pay) return false;
+      if (from && r.createdAt.slice(0, 10) < from) return false;
+      if (to && r.createdAt.slice(0, 10) > to) return false;
+      if (q) {
+        const hay = `${r.ref} ${r.fullName}`.toLowerCase();
+        const pan = (r.pan || '').replace(/\D/g, '');
+        if (!hay.includes(q) && !(digits && pan.includes(digits))) return false;
+      }
+      return true;
+    });
+  });
+  rPageCount = computed(() => Math.max(1, Math.ceil(this.filteredRecharges().length / this.rPageSize)));
+  pagedRecharges = computed(() => {
+    const all = this.filteredRecharges();
+    const p = Math.min(this.rPage(), this.rPageCount() - 1);
+    return all.slice(p * this.rPageSize, p * this.rPageSize + this.rPageSize);
+  });
+  private readonly _rPageReset = effect(() => { this.filteredRecharges(); this.rPage.set(0); });
+  rPrev() { this.rPage.update((p) => Math.max(0, p - 1)); }
+  rNext() { this.rPage.update((p) => Math.min(this.rPageCount() - 1, p + 1)); }
+  clearRFilters() { this.rSearch.set(''); this.rStatus.set('all'); this.rPayFilter.set('all'); this.rFrom.set(''); this.rTo.set(''); }
+  exportRecharges() {
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['Reference', 'Nom complet', 'PAN', 'Date', 'Paiement', 'Statut', 'Montant'];
+    const rows = this.filteredRecharges().map((r) => [
+      r.ref, r.fullName, formatPan(r.pan), this.fmtDateTime(r.createdAt),
+      r.pay === 'cash' ? 'Espèces' : payById(r.pay).name, r.status, String(r.amount),
+    ].map((v) => esc(String(v))).join(','));
+    this.downloadCsv('recharges.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
+  }
+
   /** Success rate (%) guarded against division by zero. */
   rate(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
 
@@ -710,6 +856,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.api.getConfig().subscribe({ next: (c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); this.cfgLoading.set(false); }, error: () => this.cfgLoading.set(false) });
     this.loadUsers();
     this.loadAgencies();
+    this.loadRecharges();
     // Silent background refresh of the KPIs + transactions table (no spinner, keeps filters intact).
     this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
   }

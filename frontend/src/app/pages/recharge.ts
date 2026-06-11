@@ -3,9 +3,10 @@ import { Router } from '@angular/router';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
+import { Auth } from '../core/auth';
 import { Geo, GeoFix } from '../core/geo';
 import { Recharge } from '../core/models';
-import { PAY_METHODS, payById, matchesOperator, formatPhone } from '../shared/constants';
+import { PAY_METHODS, payById, matchesOperator, formatPhone, formatPan } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
@@ -158,7 +159,7 @@ interface RechargeForm {
           <p class="muted" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t('recharge_ref_instr') }}</p>
 
           <div class="card" style="padding:4px 16px;width:100%">
-            <div class="srow"><span class="lbl">{{ i18n.t('recharge_pan_short') }}</span><span class="val">{{ result()!.pan }}</span></div>
+            <div class="srow"><span class="lbl">{{ i18n.t('recharge_pan_short') }}</span><span class="val">{{ fmtPan(result()!.pan) }}</span></div>
             <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid'"></status-badge></span></div>
             <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(result()!.amount) }}</span></div>
           </div>
@@ -263,6 +264,7 @@ interface RechargeForm {
 export class RechargeComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   private api = inject(Api);
+  private auth = inject(Auth);
   private geo = inject(Geo);
   private router = inject(Router);
   private receipt = inject(ReceiptService);
@@ -301,7 +303,8 @@ export class RechargeComponent implements OnInit, OnDestroy {
   get showWelcome() { return !this.started() && !this.proc(); }
   begin() { this.started.set(true); }
   back() { this.started.set(false); }
-  exit() { this.router.navigateByUrl('/start'); }
+  // Staff who launched a recharge return to their dashboard; a public client returns to /start.
+  exit() { this.router.navigateByUrl(this.auth.isStaff() ? this.auth.landingPath() : '/start'); }
 
   set<K extends keyof RechargeForm>(k: K, v: RechargeForm[K]) {
     this.form[k] = v;
@@ -309,7 +312,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
     this.persist();
   }
   /** PAN: keep digits + spaces only, cap at 23 chars (19 digits + grouping). */
-  onPan(v: string) { this.form.pan = v.replace(/[^\d ]/g, '').slice(0, 23); this.persist(); }
+  onPan(v: string) { this.form.pan = formatPan(v); this.persist(); }
   /** Amount: digits only. */
   onAmount(v: string) { this.form.amount = v.replace(/\D/g, '').slice(0, 7); this.persist(); }
 
@@ -508,6 +511,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   waitBefore() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[0]; }
   waitAfter() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[1] ?? ''; }
   fmtPhone(v: string) { return formatPhone(v); }
+  fmtPan(v: string) { return formatPan(v); }
 
   // ---- draft persistence ----
   private storageKey() { return 'promote-recharge'; }

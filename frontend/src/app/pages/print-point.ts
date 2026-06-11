@@ -7,7 +7,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { PrintStats, Recharge, Subscription } from '../core/models';
-import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, panDigits } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -119,7 +119,7 @@ import { SpinnerComponent } from '../shared/spinner';
               <div class="muted" style="font-size:12.5px"><ic name="idcard" [size]="13" style="vertical-align:-2px;margin-right:3px"></ic>{{ i18n.t('pp_card_number') }} : <b style="color:var(--text)">{{ r.cardNumber }}</b></div>
             }
             @if (r.pan) {
-              <div class="muted" style="font-size:12.5px"><ic name="idcard" [size]="13" style="vertical-align:-2px;margin-right:3px"></ic>{{ i18n.t('pp_pan') }} : <b style="color:var(--text)">{{ r.pan }}</b></div>
+              <div class="muted" style="font-size:12.5px"><ic name="idcard" [size]="13" style="vertical-align:-2px;margin-right:3px"></ic>{{ i18n.t('pp_pan') }} : <b style="color:var(--text)">{{ fmtPan(r.pan) }}</b></div>
             }
           </div>
         } @else {
@@ -253,7 +253,7 @@ import { SpinnerComponent } from '../shared/spinner';
                   <div class="input-prefix">
                     <span class="pfx"><ic name="idcard" [size]="16"></ic></span>
                     <input inputmode="numeric" [placeholder]="i18n.t('pp_pan_ph')" [value]="pan()"
-                           (input)="pan.set($any($event.target).value)" style="letter-spacing:.04em;font-weight:600" />
+                           (input)="pan.set(fmtPan($any($event.target).value))" style="letter-spacing:.04em;font-weight:600" />
                   </div>
                 </field>
               </div>
@@ -280,7 +280,7 @@ import { SpinnerComponent } from '../shared/spinner';
             </div>
             <div style="padding:16px 16px 6px">
               <div style="font-size:16px;font-weight:800">{{ r.fullName }}</div>
-              <div class="muted" style="font-size:12px;margin-top:3px">{{ i18n.t('recharge_pan_short') }} {{ r.pan }} · {{ r.pay === 'cash' ? i18n.t('pay_cash_name') : rpm(r).name }}</div>
+              <div class="muted" style="font-size:12px;margin-top:3px">{{ i18n.t('recharge_pan_short') }} {{ fmtPan(r.pan) }} · {{ r.pay === 'cash' ? i18n.t('pay_cash_name') : rpm(r).name }}</div>
             </div>
             <div style="padding:0 16px 10px">
               <div class="srow total"><span class="lbl">{{ i18n.t('pp_sara_amount') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
@@ -411,6 +411,7 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   get cardNumberOk() { return this.cardNumber().trim().length >= 4; }
 
   pm = (r: Subscription) => payById(r.pay);
+  fmtPan = (v: string) => formatPan(v);
   status = (r: Subscription) => recordStatus(r);
   /** A card may be activated only when the payment is settled (MoMo paid, or cash to collect here). */
   canPrint = (r: Subscription) => r.payStatus === 'paid' || r.payStatus === 'cash';
@@ -547,7 +548,7 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     this.printErr.set(null);
     if (!this.cardNumberOk || this.printing()) return;
     this.printing.set(true);
-    this.api.print(ref, this.cardNumber().trim(), this.pan().trim() || undefined).subscribe({
+    this.api.print(ref, this.cardNumber().trim(), panDigits(this.pan()) || undefined).subscribe({
       next: (s) => { this.rec.set(s); this.printing.set(false); this.loadStats(); },
       // 409 = the backend refused because the payment is not settled (defence in depth).
       error: (e) => { this.printing.set(false); this.printErr.set(e?.status === 409 ? 'pp_not_payable' : 'pp_print_error'); },
@@ -619,7 +620,7 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     this.rec.set(s);
     this.editingNiu.set(false); this.niuDraft.set('');
     this.retaking.set(false); this.photoBusy.set(false);
-    this.cardTouched.set(false); this.cardNumber.set(s.cardNumber ?? ''); this.pan.set(s.pan ?? '');
+    this.cardTouched.set(false); this.cardNumber.set(s.cardNumber ?? ''); this.pan.set(formatPan(s.pan ?? ''));
     // Prefill the editable SARA receipt fields with what was auto-extracted.
     this.saraRefDraft.set(s.saraRef ?? '');
     this.saraPhoneDraft.set(s.saraPayerPhone ?? '');

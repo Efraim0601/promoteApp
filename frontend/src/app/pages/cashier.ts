@@ -6,7 +6,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { CashierStats, Recharge, Subscription } from '../core/models';
-import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -31,6 +31,14 @@ import { SpinnerComponent } from '../shared/spinner';
         <h1 style="font-size:23px;margin-top:6px">{{ i18n.t('cash_title') }}</h1>
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('cash_sub') }}</p>
       </div>
+
+      <!-- The cashier can also initiate a new subscription or a recharge (hidden while viewing a record). -->
+      @if (!rec() && !rRec()) {
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" (click)="newSub()" style="flex:1"><ic name="plus" [size]="18"></ic> {{ i18n.t('new_sub_btn') }}</button>
+          <button class="btn btn-outline" (click)="newRecharge()" style="flex:1"><ic name="phone" [size]="18"></ic> {{ i18n.t('new_recharge_btn') }}</button>
+        </div>
+      }
 
       <!-- Cashier KPIs (hidden while viewing a single record) -->
       @if (!rec() && stats(); as st) {
@@ -121,7 +129,7 @@ import { SpinnerComponent } from '../shared/spinner';
             </div>
             <div style="padding:16px 16px 6px">
               <div style="font-size:16px;font-weight:800">{{ r.fullName }}</div>
-              <div class="muted" style="font-size:12px;margin-top:3px">{{ i18n.t('recharge_pan_short') }} {{ r.pan }}</div>
+              <div class="muted" style="font-size:12px;margin-top:3px">{{ i18n.t('recharge_pan_short') }} {{ fmtPan(r.pan) }}</div>
             </div>
             <div style="padding:0 16px 14px">
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val">{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : rpm(r).name }}</span></div>
@@ -377,6 +385,7 @@ export class CashierComponent implements OnInit, OnDestroy {
     });
   }
   rpm = (r: Recharge) => payById(r.pay);
+  fmtPan = (v: string) => formatPan(v);
 
   /** Confirm the cash was collected → marks the subscription paid (then printable). */
   doValidate(ref: string) {
@@ -424,4 +433,6 @@ export class CashierComponent implements OnInit, OnDestroy {
   }
 
   exit() { this.router.navigateByUrl(this.auth.landingPath()); }
+  newSub() { this.router.navigateByUrl('/subscribe'); }
+  newRecharge() { this.router.navigateByUrl('/recharge'); }
 }

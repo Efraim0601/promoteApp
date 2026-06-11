@@ -41,6 +41,14 @@ export const formatPhone = (v: string): string => {
   return p ? p.formatInternational() : v;
 };
 
+/** Maximum PAN length (ISO/IEC 7812) — digits only, no separators. */
+export const PAN_MAX_DIGITS = 19;
+/** PAN digits only, capped at the normal maximum (drops any spaces/separators). */
+export const panDigits = (v: string): string => (v || '').replace(/\D/g, '').slice(0, PAN_MAX_DIGITS);
+/** Format a PAN for entry/display: digits grouped in blocks of 4 (e.g. "5078 2300 1234 5678").
+ *  Caps at the normal PAN length so no field can exceed it. */
+export const formatPan = (v: string): string => panDigits(v).replace(/(.{4})/g, '$1 ').trim();
+
 /** Retrait/livraison proposé au client. 'promote' (stand Promote) par défaut, ou 'agence'
  *  (retrait dans une agence Afriland à choisir). 'home' n'est plus proposé mais reste toléré
  *  pour l'affichage des données existantes. */

@@ -3,7 +3,7 @@ import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Subscription } from '../core/models';
-import { payById } from './constants';
+import { payById, formatPan } from './constants';
 import { IconComponent } from './icon';
 import { SpinnerComponent } from './spinner';
 import { ImagePreview } from './image-preview';
@@ -72,7 +72,7 @@ import { ReceiptService } from './receipt';
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ t.delivery === 'agence' && t.pickupAgencyName ? t.pickupAgencyName : i18n.t('del_' + t.delivery + '_title') }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_channel') }}</span><span class="val">{{ t.channel === 'self' ? i18n.t('online_channel') : (sellerName ? (i18n.t('tx_agent') + ' · ' + sellerName) : i18n.t('tx_agent')) }}</span></div>
         @if (t.cardNumber) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pp_card_number') }}</span><span class="val">{{ t.cardNumber }}</span></div> }
-        @if (t.pan) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pp_pan') }}</span><span class="val">{{ t.pan }}</span></div> }
+        @if (t.pan) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pp_pan') }}</span><span class="val">{{ fmtPan(t.pan) }}</span></div> }
         <div class="srow total" style="padding:8px 0"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(t.amount) }}</span></div>
       </div>
 
@@ -135,6 +135,7 @@ export class TxDetailComponent implements OnInit, OnDestroy {
   }
   sexeLabel(s: string) { return s === 'M' ? this.i18n.t('sexe_m') : s === 'F' ? this.i18n.t('sexe_f') : (s || '—'); }
   payName(pay: string) { return payById(pay).name; }
+  fmtPan(v: string) { return formatPan(v); }
 
   /** Download a PNG receipt for this record (re-printable from any list). */
   async downloadReceipt() {
