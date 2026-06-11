@@ -22,6 +22,8 @@ import { QrCodeComponent } from '../shared/qr-code';
 
 const STEP_KEYS = ['step_identity', 'step_documents', 'step_photo', 'step_payment', 'step_recap'];
 const STEP_COUNT = STEP_KEYS.length;
+/** Index de l'étape photo (selfie) — étape obligatoire qui bloque la suite du parcours. */
+const PHOTO_STEP = STEP_KEYS.indexOf('step_photo');
 
 interface WizardForm {
   prenom: string; nom: string; sexe: string; docType: string; cni: string; niu: string; cniExp: string; phone: string;
@@ -290,6 +292,15 @@ export class SubscribeComponent implements OnInit, OnDestroy {
    *  any missing fields (touched) so the client sees what's left; the final confirm stays guarded. */
   goToStep(i: number) {
     if (i === this.step()) return;
+    // La photo selfie est obligatoire : on ne peut pas dépasser l'étape photo tant qu'elle
+    // n'est pas prise (ni via « Continuer », ni via la barre de progression). On ramène le
+    // client sur l'étape photo en signalant le champ manquant.
+    if (i > PHOTO_STEP && !this.selfieOk) {
+      this.touched.set(true);
+      this.step.set(PHOTO_STEP);
+      this.persist();
+      return;
+    }
     this.touched.set(i > this.step());
     this.step.set(Math.min(this.lastStep, Math.max(0, i)));
     if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
