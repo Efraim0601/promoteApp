@@ -283,4 +283,32 @@ public final class Dtos {
                     r.getCreatedAt() == null ? null : r.getCreatedAt().toString(), r.getPaymentMessage());
         }
     }
+
+    // ---- collectes (ventes de produits bancaires) ----
+    /** Create/update payload. Client fields are conditional on {@code product} (validated in the service). */
+    public record CreateCollecteRequest(
+            @NotBlank String product,    // compte_ouvert | carte_bancaire | sara_money | e_first
+            String clientNom,
+            String clientPhone,
+            String accountNumber,        // compte_ouvert
+            String cardNumber,           // carte_bancaire
+            String cardType) {}          // carte_bancaire
+
+    public record CollecteDto(
+            String ref, String product, String clientNom, String clientPhone,
+            String accountNumber, String cardNumber, String cardType,
+            String collectedById, String collectedByName, String createdAt) {
+        public static CollecteDto of(com.afriland.promote.model.Collecte c) {
+            return new CollecteDto(
+                    c.getRef(), c.getProduct(), c.getClientNom(), c.getClientPhone(),
+                    c.getAccountNumber(), c.getCardNumber(), c.getCardType(),
+                    c.getCollectedById(), c.getCollectedByName(),
+                    c.getCreatedAt() == null ? null : c.getCreatedAt().toString());
+        }
+    }
+
+    /** One {key,label,count} bucket for the collecte stats (by product or by commercial). */
+    public record CollecteBucket(String key, String label, long count) {}
+
+    public record CollecteStats(long total, List<CollecteBucket> byProduct, List<CollecteBucket> byCommercial) {}
 }

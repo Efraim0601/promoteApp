@@ -70,6 +70,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/stats/payments").hasRole("ADMIN")
                 .requestMatchers("/api/map/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/recharges").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/collectes").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/collectes/stats").hasRole("ADMIN")
+
+                // ---- collecteur — capture + manage own bank-product sales (admin: everything) ----
+                .requestMatchers(HttpMethod.GET, "/api/collectes/mine").hasAnyRole("COLLECTEUR", "ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/collectes").hasAnyRole("COLLECTEUR", "ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/collectes/*").hasAnyRole("COLLECTEUR", "ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/api/collectes/*").hasAnyRole("COLLECTEUR", "ADMIN")
 
                 // ---- relationship officer (+ cashier, who may also create subscriptions) ----
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions").hasAnyRole("AGENT", "CASHIER")
