@@ -48,8 +48,21 @@ public class EmailService {
                 Pour votre sécurité, vous devrez définir un nouveau mot de passe lors de votre première connexion.
 
                 — Afriland First Bank
-                """.formatted(name == null ? "" : name, publicUrl, to, tempPassword);
+                """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword);
         send(to, subject, body);
+    }
+
+    /**
+     * Login link for the welcome email. Built from the app base URL so the new user lands directly
+     * on the sign-in page (not the public /client subscription form). Tolerant of how
+     * {@code app.public-url} is configured: a trailing slash or a trailing {@code /client} segment is
+     * stripped before appending {@code /login}.
+     */
+    String loginUrl() {
+        String base = publicUrl == null ? "" : publicUrl.trim();
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        if (base.endsWith("/client")) base = base.substring(0, base.length() - "/client".length());
+        return base + "/login";
     }
 
     private void send(String to, String subject, String body) {
