@@ -4,7 +4,9 @@ import com.afriland.promote.model.AppUser;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.security.JwtService;
 import com.afriland.promote.security.PasswordPolicy;
+import com.afriland.promote.service.LoginAuditService;
 import com.afriland.promote.web.dto.Dtos.*;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -18,20 +20,27 @@ public class AuthController {
     private final AppUserRepository users;
     private final PasswordEncoder encoder;
     private final JwtService jwt;
+    private final LoginAuditService audit;
 
-    public AuthController(AppUserRepository users, PasswordEncoder encoder, JwtService jwt) {
+    public AuthController(AppUserRepository users, PasswordEncoder encoder, JwtService jwt, LoginAuditService audit) {
         this.users = users;
         this.encoder = encoder;
         this.jwt = jwt;
+        this.audit = audit;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req) {
-        AppUser u = users.findByEmailIgnoreCase(req.email())
-                .filter(x -> encoder.matches(req.password(), x.getPasswordHash()))
-                .orElse(null);
-        if (u == null) return ResponseEntity.status(401).body("invalid_credentials");
-        if (!u.isEnabled()) return ResponseEntity.status(403).body("account_disabled");
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
+        AppUser u = users.findByEmailIgnoreCase(req.email()).orElse(null);
+        if (u == null || !encoder.matches(req.password(), u.getPasswordHash())) {
+            audit.record(req.email(), null, false, "invalid_credentials", request);
+            return ResponseEntity.status(401).body("invalid_credentials");
+        }
+        if (!u.isEnabled()) {
+            audit.record(req.email(), u, false, "account_disabled", request);
+            return ResponseEntity.status(403).body("account_disabled");
+        }
+        audit.record(req.email(), u, true, "ok", request);
         return ResponseEntity.ok(new LoginResponse(jwt.generate(u), UserDto.of(u)));
     }
 

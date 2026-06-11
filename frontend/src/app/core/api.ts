@@ -5,7 +5,7 @@ import {
   AdminStats, Agency, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
-  ImportUserRow, ImportUsersResult,
+  ImportUserRow, ImportUsersResult, LoginAudit, Role,
   LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Recharge, Subscription, User,
 } from './models';
 
@@ -149,9 +149,17 @@ export class Api {
   ): Observable<Recharge> {
     return this.http.patch<Recharge>(`${this.base}/recharges/${ref}/sara-validate`, { outcome, ...opts });
   }
-  /** Admin — all recharges. */
+  /** Admin/cashier — all recharges. */
   recharges(): Observable<Recharge[]> {
     return this.http.get<Recharge[]>(`${this.base}/recharges`);
+  }
+  /** Cashier — recharges paid but not yet credited to the card (the validation queue). */
+  pendingRecharges(): Observable<Recharge[]> {
+    return this.http.get<Recharge[]>(`${this.base}/recharges/pending-fulfillment`);
+  }
+  /** Cashier — confirm the effective recharge (card credited). */
+  fulfillRecharge(ref: string): Observable<Recharge> {
+    return this.http.patch<Recharge>(`${this.base}/recharges/${ref}/fulfill`, {});
   }
 
   // ---- collectes (ventes de produits bancaires) ----
@@ -194,6 +202,14 @@ export class Api {
   /** Admin — enable or disable a staff account (a disabled account can no longer log in). */
   setUserEnabled(id: string, enabled: boolean): Observable<User> {
     return this.http.patch<User>(`${this.base}/users/${id}/enabled`, { enabled });
+  }
+  /** Admin — set the full role set of an existing account (multi-role). */
+  setUserRoles(id: string, roles: Role[]): Observable<User> {
+    return this.http.put<User>(`${this.base}/users/${id}/roles`, { roles });
+  }
+  /** Admin — recent login attempts (audit trail). */
+  loginAudit(): Observable<LoginAudit[]> {
+    return this.http.get<LoginAudit[]>(`${this.base}/audit/logins`);
   }
   /** Admin — bulk-import staff accounts; duplicates skipped or updated per updateExisting. */
   importUsers(rows: ImportUserRow[], updateExisting: boolean): Observable<ImportUsersResult> {

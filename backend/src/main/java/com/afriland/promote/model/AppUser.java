@@ -26,11 +26,41 @@ public class AppUser {
     @Column(nullable = false)
     private String passwordHash;
 
+    /** Primary role — drives the landing page and is kept for backward compatibility. Always part
+     *  of {@link #effectiveRoles()}. */
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
 
+    /** Additional roles a single account may hold, stored as a comma-separated list (e.g.
+     *  "AGENT,COLLECTEUR"). Null/empty on legacy accounts → the account simply has its primary role.
+     *  A plain string column (not a join table) keeps the migration trivial and avoids a second DB
+     *  enum check constraint to maintain. */
+    @Column(length = 200)
+    private String roles;
+
     private String agency;        // null for admin
+
+    /** Full set of roles the account holds: the primary {@code role} plus any extra {@code roles}. */
+    @Transient
+    public java.util.Set<Role> effectiveRoles() {
+        java.util.LinkedHashSet<Role> set = new java.util.LinkedHashSet<>();
+        if (role != null) set.add(role);
+        if (roles != null && !roles.isBlank()) {
+            for (String r : roles.split(",")) {
+                try { set.add(Role.valueOf(r.trim().toUpperCase())); } catch (IllegalArgumentException ignored) {}
+            }
+        }
+        return set;
+    }
+
+    /** Replace the account's roles: the first becomes the primary, all are stored in {@code roles}. */
+    public void assignRoles(java.util.List<Role> list) {
+        if (list == null || list.isEmpty()) return;
+        java.util.LinkedHashSet<Role> set = new java.util.LinkedHashSet<>(list);
+        this.role = set.iterator().next();
+        this.roles = String.join(",", set.stream().map(Role::name).toList());
+    }
 
     private String phone;         // used to resolve a referrer ("recommandé par")
 

@@ -38,14 +38,22 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 && SecurityContextHolder.getContext().getAuthentication() == null) {
             try {
                 Claims claims = jwtService.parse(header.substring(7));
-                String role = claims.get("role", String.class);
+                // Grant one authority per role the account holds. New tokens carry "roles" (the full
+                // set); older tokens only have "role" — fall back to it for a seamless migration.
+                String rolesClaim = claims.get("roles", String.class);
+                String roleClaim = claims.get("role", String.class);
+                String csv = (rolesClaim != null && !rolesClaim.isBlank()) ? rolesClaim : roleClaim;
+                List<SimpleGrantedAuthority> authorities = csv == null ? List.of()
+                        : java.util.Arrays.stream(csv.split(","))
+                            .map(String::trim).filter(s -> !s.isEmpty())
+                            .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
+                            .toList();
                 // Reject a token whose account has since been disabled (or deleted): the
                 // authentication is simply not set, so protected endpoints answer 401/403.
                 boolean active = users.findById(claims.getSubject()).map(u -> u.isEnabled()).orElse(false);
-                if (active) {
+                if (active && !authorities.isEmpty()) {
                     var auth = new UsernamePasswordAuthenticationToken(
-                            claims.getSubject(), null,
-                            List.of(new SimpleGrantedAuthority("ROLE_" + role)));
+                            claims.getSubject(), null, authorities);
                     auth.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(auth);
                 }

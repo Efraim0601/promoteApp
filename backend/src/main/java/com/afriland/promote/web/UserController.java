@@ -56,7 +56,7 @@ public class UserController {
             if (id.equals(auth.getName())) {
                 return ResponseEntity.badRequest().body(new ErrorResponse("cannot_disable_self"));
             }
-            if (u.getRole() == Role.ADMIN && lastActiveAdmin(u.getId())) {
+            if (u.effectiveRoles().contains(Role.ADMIN) && lastActiveAdmin(u.getId())) {
                 return ResponseEntity.badRequest().body(new ErrorResponse("last_admin"));
             }
         }
@@ -64,22 +64,60 @@ public class UserController {
         return ResponseEntity.ok(UserDto.of(users.save(u)));
     }
 
+    /** Admin sets the full role set of an existing account (multi-role). At least one valid role;
+     *  removing ADMIN from the last remaining admin is refused. */
+    @PutMapping("/{id}/roles")
+    public ResponseEntity<?> setRoles(@PathVariable String id, @RequestBody SetRolesRequest req) {
+        AppUser u = users.findById(id).orElse(null);
+        if (u == null) return ResponseEntity.notFound().build();
+        List<Role> roles;
+        try {
+            roles = parseRoles(req.roles());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("invalid_role"));
+        }
+        if (roles.isEmpty()) return ResponseEntity.badRequest().body(new ErrorResponse("invalid_role"));
+        // Don't let the last enabled admin lose the ADMIN role (would lock everyone out).
+        if (u.getRole() == Role.ADMIN && !roles.contains(Role.ADMIN) && lastActiveAdmin(u.getId())) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("last_admin"));
+        }
+        // An account that holds AGENT must keep a valid commercial phone (referral attribution).
+        if (roles.contains(Role.AGENT) && (u.getPhone() == null || !u.getPhone().matches("6\\d{8}"))) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("agent_phone_required"));
+        }
+        u.assignRoles(roles);
+        return ResponseEntity.ok(UserDto.of(users.save(u)));
+    }
+
+    /** Parse + validate a list of role names (case-insensitive, de-duplicated, order preserved). */
+    private static List<Role> parseRoles(List<String> names) {
+        List<Role> out = new ArrayList<>();
+        for (String n : names == null ? List.<String>of() : names) {
+            if (n == null || n.isBlank()) continue;
+            Role r = Role.valueOf(n.trim().toUpperCase());   // throws IllegalArgumentException on unknown
+            if (!out.contains(r)) out.add(r);
+        }
+        return out;
+    }
+
     /** True if {@code candidateId} is the only enabled ADMIN left. */
     private boolean lastActiveAdmin(String candidateId) {
         return users.findAll().stream()
-                .filter(a -> a.getRole() == Role.ADMIN && a.isEnabled() && !a.getId().equals(candidateId))
+                .filter(a -> a.effectiveRoles().contains(Role.ADMIN) && a.isEnabled() && !a.getId().equals(candidateId))
                 .findAny().isEmpty();
     }
 
     /** Create a staff account. Rejects a duplicate email or an unknown role. */
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody CreateUserRequest req) {
-        Role role;
+        List<Role> roles;
         try {
-            role = Role.valueOf(req.role().trim().toUpperCase());
+            roles = parseRoles(req.rolesOrSingle());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(new ErrorResponse("invalid_role"));
         }
+        if (roles.isEmpty()) return ResponseEntity.badRequest().body(new ErrorResponse("invalid_role"));
+        Role role = roles.get(0);   // primary
         if (users.findByEmailIgnoreCase(req.email().trim()).isPresent()) {
             return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
         }
@@ -91,7 +129,7 @@ public class UserController {
         String phone = req.phone() == null ? "" : req.phone().replaceAll("\\D", "");
         if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
         // A commercial (agent) MUST have a valid phone — it links client referrals to their sales stats.
-        if (role == Role.AGENT && !phone.matches("6\\d{8}")) {
+        if (roles.contains(Role.AGENT) && !phone.matches("6\\d{8}")) {
             return ResponseEntity.badRequest().body(new ErrorResponse("agent_phone_required"));
         }
         AppUser u = AppUser.builder()
@@ -104,6 +142,7 @@ public class UserController {
                 .phone(phone.isBlank() ? null : phone)
                 .mustChangePassword(true)   // forced change on first login (all new accounts)
                 .build();
+        u.assignRoles(roles);
         AppUser saved = users.save(u);
         // Welcome email: login link + identifier + the generated temporary password (best-effort —
         // an SMTP failure never breaks creation; the password is also returned below as a fallback).

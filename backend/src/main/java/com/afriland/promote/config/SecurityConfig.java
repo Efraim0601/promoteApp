@@ -69,9 +69,13 @@ public class SecurityConfig {
                 .requestMatchers("/api/stats/admin").hasRole("ADMIN")
                 .requestMatchers("/api/stats/payments").hasRole("ADMIN")
                 .requestMatchers("/api/map/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/recharges").hasRole("ADMIN")
+                // Cashier validates the effective recharge, so it needs to list recharges + the queue.
+                .requestMatchers(HttpMethod.GET, "/api/recharges").hasAnyRole("CASHIER", "ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/recharges/pending-fulfillment").hasAnyRole("CASHIER", "ADMIN")
+                .requestMatchers("/api/audit/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/collectes").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/collectes/stats").hasRole("ADMIN")
+                // Collecte stats: admin AND the dedicated collecte supervisor (separate stats view).
+                .requestMatchers(HttpMethod.GET, "/api/collectes/stats").hasAnyRole("ADMIN", "SUPERVISEUR")
 
                 // ---- collecteur — capture + manage own bank-product sales (admin: everything) ----
                 .requestMatchers(HttpMethod.GET, "/api/collectes/mine").hasAnyRole("COLLECTEUR", "ADMIN")
@@ -101,6 +105,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/recharges/*/image/*").hasAnyRole("PRINT_AGENT", "CASHIER", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/recharges/*/sara-validate").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/recharges/*/cash-validate").hasAnyRole("CASHIER", "ADMIN")
+                .requestMatchers(HttpMethod.PATCH, "/api/recharges/*/fulfill").hasAnyRole("CASHIER", "ADMIN")
 
                 .anyRequest().authenticated())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

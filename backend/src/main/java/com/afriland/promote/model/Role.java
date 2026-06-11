@@ -6,5 +6,6 @@ public enum Role {
     AGENT,        // Chargé de clientèle — assisted subscriptions, own sales, QR claim
     PRINT_AGENT,  // Point d'impression — retrieve KYC file by reference, print/hand over
     CASHIER,      // Caissier — retrouve une souscription et valide l'encaissement en espèces
-    COLLECTEUR    // Collecteur — saisit les ventes de produits bancaires (collectes), voit les siennes
+    COLLECTEUR,   // Collecteur — saisit les ventes de produits bancaires (collectes), voit les siennes
+    SUPERVISEUR   // Superviseur collecte — vue dédiée des statistiques globales de collecte (hors admin)
 }

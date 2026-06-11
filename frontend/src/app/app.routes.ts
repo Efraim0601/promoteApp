@@ -36,6 +36,9 @@ export const routes: Routes = [
   // collecteur — capture + manage own bank-product sales (collectes)
   { path: 'collecte', canActivate: [roleGuard('COLLECTEUR', 'ADMIN')], loadComponent: () => import('./pages/collecte').then((m) => m.CollecteComponent) },
 
+  // collecte supervisor — global collecte statistics, separate from the admin dashboard
+  { path: 'collecte-stats', canActivate: [roleGuard('SUPERVISEUR', 'ADMIN')], loadComponent: () => import('./pages/collecte-stats').then((m) => m.CollecteStatsComponent) },
+
   // Unknown URLs fall back to the public start page (not the staff login).
   { path: '**', redirectTo: 'start' },
 ];

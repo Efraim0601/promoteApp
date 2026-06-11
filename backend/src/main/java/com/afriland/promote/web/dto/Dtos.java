@@ -51,16 +51,30 @@ public final class Dtos {
     public record ImportUsersResult(int created, int updated, int skipped, int invalid,
                                     List<ImportRowResult> rows) {}
 
-    public record UserDto(String id, String name, String email, String role, String agency, String phone,
-                          boolean mustChangePassword, boolean enabled) {
+    public record UserDto(String id, String name, String email, String role, List<String> roles,
+                          String agency, String phone, boolean mustChangePassword, boolean enabled) {
         public static UserDto of(AppUser u) {
-            return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), u.getAgency(), u.getPhone(),
+            List<String> roles = u.effectiveRoles().stream().map(Enum::name).toList();
+            return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), roles, u.getAgency(), u.getPhone(),
                     u.isMustChangePassword(), u.isEnabled());
         }
     }
 
     /** Admin enables/disables a staff account. */
     public record SetEnabledRequest(boolean enabled) {}
+
+    /** Admin sets the full role set of an existing account (at least one role). */
+    public record SetRolesRequest(List<String> roles) {}
+
+    /** One audited login attempt (admin view). */
+    public record LoginAuditDto(String id, String userId, String name, String email, String roles,
+                                boolean success, String reason, String ip, String userAgent, String at) {
+        public static LoginAuditDto of(com.afriland.promote.model.LoginAudit a) {
+            return new LoginAuditDto(a.getId(), a.getUserId(), a.getName(), a.getEmail(), a.getRoles(),
+                    a.isSuccess(), a.getReason(), a.getIp(), a.getUserAgent(),
+                    a.getAt() == null ? null : a.getAt().toString());
+        }
+    }
 
     public record LoginResponse(String token, UserDto user) {}
 
@@ -70,13 +84,21 @@ public final class Dtos {
     /** Generic error body: {@code {"error": "code"}}. */
     public record ErrorResponse(String error) {}
 
-    /** Admin creates a staff account. role = ADMIN | AGENT | PRINT_AGENT | CASHIER. */
+    /** Admin creates a staff account. {@code roles} may carry several roles; {@code role} stays
+     *  supported as a single-role fallback (older callers / imports). */
     public record CreateUserRequest(
             @NotBlank String name,
             @NotBlank String email,
-            @NotBlank String role,
+            String role,                 // single-role fallback (used when roles is empty)
+            List<String> roles,          // one or more roles
             String agency,
-            String phone) {}
+            String phone) {
+        /** Effective requested roles: the list if present, else the single role. */
+        public List<String> rolesOrSingle() {
+            if (roles != null && !roles.isEmpty()) return roles;
+            return role == null || role.isBlank() ? List.of() : List.of(role);
+        }
+    }
 
     /** Result of a staff creation: the account + the auto-generated temporary password (emailed to
      *  the user; also returned so the admin can hand it out if mail delivery fails). */
@@ -274,6 +296,7 @@ public final class Dtos {
             String pay, String payPhone, String payStatus, String status,
             boolean hasSaraReceipt, String saraRef, String saraPayerPhone, Integer saraAmount,
             String cashCollectedBy, String cashCollectedAt,
+            boolean fulfilled, String fulfilledBy, String fulfilledAt,
             String createdAt, String paymentMessage) {
         public static RechargeDto of(com.afriland.promote.model.Recharge r) {
             return new RechargeDto(
@@ -281,6 +304,7 @@ public final class Dtos {
                     r.getPay(), r.getPayPhone(), r.getPayStatus().name(), r.getStatus(),
                     r.getSaraReceiptKey() != null, r.getSaraRef(), r.getSaraPayerPhone(), r.getSaraAmount(),
                     r.getCashCollectedBy(), r.getCashCollectedAt() == null ? null : r.getCashCollectedAt().toString(),
+                    r.isFulfilled(), r.getFulfilledBy(), r.getFulfilledAt() == null ? null : r.getFulfilledAt().toString(),
                     r.getCreatedAt() == null ? null : r.getCreatedAt().toString(), r.getPaymentMessage());
         }
     }

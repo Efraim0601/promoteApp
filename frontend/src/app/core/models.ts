@@ -1,16 +1,34 @@
 /** Shared API types mirroring the backend DTOs. */
 
-export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER' | 'COLLECTEUR';
+export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER' | 'COLLECTEUR' | 'SUPERVISEUR';
+
+/** All assignable roles, in landing-priority order (first present drives the landing page). */
+export const ALL_ROLES: Role[] = ['ADMIN', 'SUPERVISEUR', 'AGENT', 'CASHIER', 'PRINT_AGENT', 'COLLECTEUR'];
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: Role;
+  role: Role;          // primary role (kept for landing/compat)
+  roles?: Role[];      // full set of roles the account holds
   agency: string | null;
   phone: string | null;
   mustChangePassword?: boolean;   // true until the user sets their own password (first login)
   enabled?: boolean;              // false → account disabled by an admin (cannot log in)
+}
+
+/** One audited login attempt (admin view). */
+export interface LoginAudit {
+  id: string;
+  userId: string | null;
+  name: string | null;
+  email: string;
+  roles: string | null;     // CSV of roles at login time
+  success: boolean;
+  reason: string | null;    // ok | invalid_credentials | account_disabled
+  ip: string | null;
+  userAgent: string | null;
+  at: string;
 }
 
 export interface ChangePasswordRequest {
@@ -150,6 +168,9 @@ export interface Recharge {
   saraAmount?: number | null;
   cashCollectedBy?: string | null;
   cashCollectedAt?: string | null;
+  fulfilled: boolean;            // true once the cashier credited the card and validated
+  fulfilledBy?: string | null;
+  fulfilledAt?: string | null;
   createdAt: string;
   paymentMessage?: string | null;
 }
@@ -157,7 +178,8 @@ export interface Recharge {
 export interface CreateUserRequest {
   name: string;
   email: string;
-  role: Role;
+  role: Role;          // primary (kept for compat)
+  roles?: Role[];      // full set chosen at creation
   agency?: string | null;
   phone?: string | null;
 }

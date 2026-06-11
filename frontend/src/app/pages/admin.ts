@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, Agency, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, PaymentStats, Recharge, Role, Subscription, User } from '../core/models';
+import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, Recharge, Role, Subscription, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -43,6 +43,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
           <button [class.active]="section() === 'recharges'" (click)="section.set('recharges')"><ic name="phone" [size]="18"></ic> {{ i18n.t('nav_recharges') }}</button>
           <button [class.active]="section() === 'collectes'" (click)="section.set('collectes')"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
+          <button [class.active]="section() === 'audit'" (click)="section.set('audit')"><ic name="shield" [size]="18"></ic> {{ i18n.t('nav_audit') }}</button>
           <button [class.active]="section() === 'map'" (click)="section.set('map')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_map') }}</button>
         </nav>
         <div class="admin-spacer"></div>
@@ -217,16 +218,16 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         <div style="display:flex;flex-direction:column;gap:10px">
           <field [label]="i18n.t('user_name')"><input class="input" [value]="nu().name" (input)="onNu('name', $event)" /></field>
           <field [label]="i18n.t('user_email')"><input class="input" type="email" [value]="nu().email" (input)="onNu('email', $event)" /></field>
-          <field [label]="i18n.t('user_role')">
-            <select class="input" [value]="nu().role" (change)="onNu('role', $event)">
-              <option value="AGENT">{{ i18n.t('role_agent') }}</option>
-              <option value="PRINT_AGENT">{{ i18n.t('role_print') }}</option>
-              <option value="CASHIER">{{ i18n.t('role_cashier') }}</option>
-              <option value="COLLECTEUR">{{ i18n.t('role_collecteur') }}</option>
-              <option value="ADMIN">{{ i18n.t('role_admin') }}</option>
-            </select>
+          <field [label]="i18n.t('user_roles')" [hint]="i18n.t('user_roles_hint')">
+            <div style="display:flex;flex-wrap:wrap;gap:7px">
+              @for (r of allRoles; track r) {
+                <button type="button" (click)="toggleNuRole(r)"
+                        [class.btn-primary]="nuHasRole(r)" [class.btn-outline]="!nuHasRole(r)"
+                        class="btn" style="padding:6px 11px;font-size:12px">{{ roleLabel(r) }}</button>
+              }
+            </div>
           </field>
-          @if (nu().role === 'AGENT') {
+          @if (nuHasRole('AGENT')) {
             <field [label]="i18n.t('user_agency')"><input class="input" [value]="nu().agency || ''" (input)="onNu('agency', $event)" /></field>
             <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
                    [err]="(nu().phone || '') && !agentPhoneOk() ? i18n.t('user_phone_invalid') : null">
@@ -269,7 +270,10 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                 @if (u.enabled === false) {
                   <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px">{{ i18n.t('user_disabled') }}</span>
                 }
-                <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(u.role) }}</span>
+                @for (r of userRoles(u); track r) {
+                  <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(r) }}</span>
+                }
+                <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
                 @if (u.id !== auth.user()?.id) {
                   <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
                           style="padding:5px 9px;font-size:11px;white-space:nowrap">
@@ -277,6 +281,25 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                   </button>
                 }
               </div>
+              <!-- Inline role editor (multi-role). -->
+              @if (editRolesId() === u.id) {
+                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;flex-wrap:wrap;gap:7px">
+                    @for (r of allRoles; track r) {
+                      <button type="button" (click)="toggleEditRole(r)"
+                              [class.btn-primary]="editRoles().includes(r)" [class.btn-outline]="!editRoles().includes(r)"
+                              class="btn" style="padding:5px 10px;font-size:11.5px">{{ roleLabel(r) }}</button>
+                    }
+                  </div>
+                  @if (editRolesErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(editRolesErr()) }}</span> }
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" (click)="saveRoles(u)" [disabled]="!editRoles().length || editRolesSaving()" style="padding:7px 12px;font-size:12.5px">
+                      @if (editRolesSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
+                    </button>
+                    <button class="btn btn-ghost" (click)="editRolesId.set(null)" [disabled]="editRolesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
+                  </div>
+                </div>
+              }
             </div>
           }
         </div>
@@ -786,6 +809,73 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       </div>
       }
 
+      <!-- ========== AUDIT (journal des connexions) ========== -->
+      @if (section() === 'audit') {
+      <h1 style="font-size:21px">{{ i18n.t('nav_audit') }}</h1>
+      <div class="card" style="overflow:hidden;max-width:1180px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+          <ic name="shield" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">{{ i18n.t('audit_title') }}</h3>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredAudit().length }}</span>
+        </div>
+        <p class="muted" style="font-size:11.5px;padding:0 14px 8px">{{ i18n.t('audit_sub') }}</p>
+        <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
+          <div class="input-prefix">
+            <span class="pfx"><ic name="search" [size]="15"></ic></span>
+            <input [placeholder]="i18n.t('audit_search_ph')" [value]="auditSearch()" (input)="auditSearch.set($any($event.target).value)" />
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn" [class.btn-primary]="auditFilter()==='all'" [class.btn-outline]="auditFilter()!=='all'" (click)="auditFilter.set('all')" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('audit_all') }}</button>
+            <button class="btn" [class.btn-primary]="auditFilter()==='ok'" [class.btn-outline]="auditFilter()!=='ok'" (click)="auditFilter.set('ok')" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('audit_ok') }}</button>
+            <button class="btn" [class.btn-primary]="auditFilter()==='ko'" [class.btn-outline]="auditFilter()!=='ko'" (click)="auditFilter.set('ko')" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('audit_ko') }}</button>
+          </div>
+        </div>
+        @if (auditLoading()) {
+          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (filteredAudit().length === 0) {
+          <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('audit_empty') }}</p>
+        } @else {
+          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(70vh,620px);padding:0 2px">
+            <table class="tx-table">
+              <colgroup><col style="width:150px" /><col /><col style="width:150px" /><col style="width:130px" /></colgroup>
+              <thead>
+                <tr>
+                  <th>{{ i18n.t('audit_when') }}</th>
+                  <th>{{ i18n.t('audit_user') }}</th>
+                  <th>{{ i18n.t('audit_result') }}</th>
+                  <th>{{ i18n.t('audit_ip') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of pagedAudit(); track a.id) {
+                  <tr class="tx-tr">
+                    <td class="nowrap" [attr.data-label]="i18n.t('audit_when')">{{ txDate(a.at) }}</td>
+                    <td [attr.data-label]="i18n.t('audit_user')"><div class="cell-name">{{ a.name || a.email }}</div><div class="cell-sub">{{ a.email }}@if (a.roles) { · {{ a.roles }} }</div></td>
+                    <td [attr.data-label]="i18n.t('audit_result')">
+                      @if (a.success) {
+                        <span class="badge" style="background:color-mix(in srgb, var(--success) 18%, transparent);color:var(--success);font-size:10.5px">{{ i18n.t('audit_success') }}</span>
+                      } @else {
+                        <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10.5px">{{ i18n.t('audit_failure') }}</span>
+                        <span class="muted" style="font-size:10.5px;margin-left:5px">{{ auditReason(a.reason) }}</span>
+                      }
+                    </td>
+                    <td class="brk muted" [attr.data-label]="i18n.t('audit_ip')" style="font-size:11.5px">{{ a.ip || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="tx-pager">
+            <span class="muted" style="font-size:11.5px">{{ filteredAudit().length }} · {{ i18n.t('step') }} {{ auditPage() + 1 }} {{ i18n.t('of') }} {{ auditPageCount() }}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" (click)="auditPrev()" [disabled]="auditPage() === 0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
+              <button class="btn btn-outline" (click)="auditNext()" [disabled]="auditPage() >= auditPageCount() - 1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
+            </div>
+          </div>
+        }
+      </div>
+      }
+
       <!-- ========== MAP ========== -->
       @if (section() === 'map') {
         <div class="card" style="padding:16px">
@@ -807,7 +897,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private poll?: ReturnType<typeof setInterval>;
 
   /** Active sidebar section. */
-  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'map'>('overview');
+  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map'>('overview');
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
@@ -866,19 +956,61 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
     });
   }
+  readonly allRoles = ALL_ROLES;
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
+  /** Roles selected on the create form (multi-role). */
+  nuRoles = signal<Role[]>(['AGENT']);
   userMsg = signal<'' | 'created' | 'exists' | 'invalid'>('');
   userBusy = signal(false);
   /** Temporary password returned on the last successful creation (also emailed to the user). */
   createdPw = signal('');
   pwCopied = signal(false);
+  nuHasRole(r: Role) { return this.nuRoles().includes(r); }
+  toggleNuRole(r: Role) {
+    this.nuRoles.update((list) => list.includes(r) ? list.filter((x) => x !== r) : [...list, r]);
+  }
+  /** The full role set of an account (for the user list badges). */
+  userRoles(u: User): Role[] { return u.roles && u.roles.length ? u.roles : [u.role]; }
   /** A commercial's phone must be a valid local 9-digit number (links client referrals to their stats). */
   agentPhoneOk = computed(() => /^6\d{8}$/.test((this.nu().phone ?? '').replace(/\D/g, '')));
   userValid = computed(() => {
     const u = this.nu();
-    const base = !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && !!u.role;
-    return base && (u.role !== 'AGENT' || this.agentPhoneOk());
+    const base = !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && this.nuRoles().length > 0;
+    return base && (!this.nuRoles().includes('AGENT') || this.agentPhoneOk());
   });
+
+  // --- inline role editing (existing accounts) ---
+  editRolesId = signal<string | null>(null);
+  editRoles = signal<Role[]>([]);
+  editRolesSaving = signal(false);
+  editRolesErr = signal('');
+  startEditRoles(u: User) {
+    this.editRolesId.set(u.id);
+    this.editRoles.set([...this.userRoles(u)]);
+    this.editRolesErr.set('');
+  }
+  toggleEditRole(r: Role) {
+    this.editRoles.update((list) => list.includes(r) ? list.filter((x) => x !== r) : [...list, r]);
+    this.editRolesErr.set('');
+  }
+  saveRoles(u: User) {
+    const roles = this.editRoles();
+    if (!roles.length || this.editRolesSaving()) return;
+    this.editRolesSaving.set(true); this.editRolesErr.set('');
+    this.api.setUserRoles(u.id, roles).subscribe({
+      next: (updated) => {
+        this.editRolesSaving.set(false); this.editRolesId.set(null);
+        this.usersList.update((list) => list.map((x) => (x.id === u.id ? updated : x)));
+        if (updated.id === this.auth.user()?.id) this.auth.setUser(updated);
+      },
+      error: (err) => {
+        this.editRolesSaving.set(false);
+        const code = err?.error?.error;
+        this.editRolesErr.set(code === 'last_admin' ? 'user_err_last_admin'
+          : code === 'agent_phone_required' ? 'user_err_agent_phone' : 'user_err_roles');
+      },
+    });
+  }
 
   // --- transaction filters ---
   txSearch = signal('');
@@ -1088,6 +1220,46 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.downloadCsv('collectes.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
   }
 
+  // --- login audit (journal des connexions) ---
+  loginAudits = signal<LoginAudit[]>([]);
+  auditLoading = signal(true);
+  auditSearch = signal('');
+  auditFilter = signal<'all' | 'ok' | 'ko'>('all');
+  auditPage = signal(0);
+  readonly auditPageSize = 20;
+
+  private loadAudit() {
+    this.auditLoading.set(true);
+    this.api.loginAudit().subscribe({ next: (a) => { this.loginAudits.set(a); this.auditLoading.set(false); }, error: () => this.auditLoading.set(false) });
+  }
+  filteredAudit = computed(() => {
+    const q = this.auditSearch().trim().toLowerCase();
+    const f = this.auditFilter();
+    return this.loginAudits().filter((a) => {
+      if (f === 'ok' && !a.success) return false;
+      if (f === 'ko' && a.success) return false;
+      if (q) {
+        const hay = `${a.email} ${a.name ?? ''} ${a.ip ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  });
+  auditPageCount = computed(() => Math.max(1, Math.ceil(this.filteredAudit().length / this.auditPageSize)));
+  pagedAudit = computed(() => {
+    const all = this.filteredAudit();
+    const p = Math.min(this.auditPage(), this.auditPageCount() - 1);
+    return all.slice(p * this.auditPageSize, p * this.auditPageSize + this.auditPageSize);
+  });
+  private readonly _auditPageReset = effect(() => { this.filteredAudit(); this.auditPage.set(0); });
+  auditPrev() { this.auditPage.update((p) => Math.max(0, p - 1)); }
+  auditNext() { this.auditPage.update((p) => Math.min(this.auditPageCount() - 1, p + 1)); }
+  auditReason(reason: string | null) {
+    const key = 'audit_reason_' + (reason || 'ok');
+    const t = this.i18n.t(key);
+    return t === key ? (reason || '') : t;
+  }
+
   /** Success rate (%) guarded against division by zero. */
   rate(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
 
@@ -1100,6 +1272,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadAgencies();
     this.loadRecharges();
     this.loadCollectes();
+    this.loadAudit();
     // Silent background refresh of the KPIs + transactions table (no spinner, keeps filters intact).
     this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
   }
@@ -1115,7 +1288,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.usersLoading.set(true);
     this.api.users().subscribe({ next: (u) => { this.usersList.set(u); this.usersLoading.set(false); }, error: () => this.usersLoading.set(false) });
   }
-  get agentUsers() { return this.usersList().filter((u) => u.role === 'AGENT'); }
+  get agentUsers() { return this.usersList().filter((u) => this.userRoles(u).includes('AGENT')); }
 
   onNu(k: keyof CreateUserRequest, e: Event) {
     const v = (e.target as HTMLInputElement | HTMLSelectElement).value;
@@ -1126,11 +1299,13 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (!this.userValid() || this.userBusy()) { if (!this.userValid()) this.userMsg.set('invalid'); return; }
     this.userBusy.set(true);
     const u = this.nu();
-    this.api.createUser({ ...u, name: u.name.trim(), email: u.email.trim() }).subscribe({
+    const roles = this.nuRoles();
+    this.api.createUser({ ...u, name: u.name.trim(), email: u.email.trim(), role: roles[0], roles }).subscribe({
       next: (res) => {
         this.userBusy.set(false); this.userMsg.set('created');
         this.createdPw.set(res.tempPassword); this.pwCopied.set(false);
         this.nu.set({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
+        this.nuRoles.set(['AGENT']);
         this.loadUsers();
       },
       error: (err) => {
@@ -1144,7 +1319,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
   roleLabel(role: Role) {
     return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print'
-      : role === 'CASHIER' ? 'role_cashier' : role === 'COLLECTEUR' ? 'role_collecteur' : 'role_agent');
+      : role === 'CASHIER' ? 'role_cashier' : role === 'COLLECTEUR' ? 'role_collecteur'
+      : role === 'SUPERVISEUR' ? 'role_superviseur' : 'role_agent');
   }
 
   // --- bulk user import ---
@@ -1169,7 +1345,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       let status: 'new' | 'duplicate' | 'invalid' = 'new';
       let reason = '';
       if (!name || !/\S+@\S+\.\S+/.test(email)) { status = 'invalid'; reason = 'name_email'; }
-      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT' && role !== 'CASHIER' && role !== 'COLLECTEUR') { status = 'invalid'; reason = 'role'; }
+      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT' && role !== 'CASHIER' && role !== 'COLLECTEUR' && role !== 'SUPERVISEUR') { status = 'invalid'; reason = 'role'; }
       else if (role === 'AGENT' && !/^6\d{8}$/.test(phone9)) { status = 'invalid'; reason = 'phone'; }
       else {
         const key = email.toLowerCase();
@@ -1226,6 +1402,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (/admin/.test(s)) return 'ADMIN';
     if (/print|impr/.test(s)) return 'PRINT_AGENT';
     if (/caiss|cashier|esp[èe]ce/.test(s)) return 'CASHIER';
+    if (/supervis/.test(s)) return 'SUPERVISEUR';
     if (/collect/.test(s)) return 'COLLECTEUR';
     if (/agent|commerc|client/.test(s)) return 'AGENT';
     return (r || '').trim().toUpperCase();

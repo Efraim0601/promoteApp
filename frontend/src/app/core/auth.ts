@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { Api } from './api';
 import { Geo } from './geo';
-import { Role, User } from './models';
+import { ALL_ROLES, Role, User } from './models';
 
 const TOKEN_KEY = 'promote.token';
 const USER_KEY = 'promote.user';
@@ -52,9 +52,15 @@ export class Auth {
     this.router.navigateByUrl('/login');
   }
 
-  hasRole(...roles: Role[]): boolean {
+  /** Effective roles of the current user (the full set, or just the primary on older sessions). */
+  roles(): Role[] {
     const u = this.user();
-    return !!u && roles.includes(u.role);
+    if (!u) return [];
+    return u.roles && u.roles.length ? u.roles : (u.role ? [u.role] : []);
+  }
+  hasRole(...roles: Role[]): boolean {
+    const mine = this.roles();
+    return roles.some((r) => mine.includes(r));
   }
 
   /** True until the user has set their own password (forces the change-password screen). */
@@ -68,14 +74,16 @@ export class Auth {
     this.user.set(u);
   }
 
-  /** Landing route for a freshly authenticated user. */
+  /** Landing route for a freshly authenticated user. For a multi-role account, the highest-priority
+   *  role wins (ADMIN → Superviseur → Agent → Cashier → Print → Collecteur). */
   landingPath(role?: Role): string {
-    const r = role ?? this.user()?.role;
-    if (r === 'ADMIN') return '/admin';
-    if (r === 'AGENT') return '/agent';
-    if (r === 'PRINT_AGENT') return '/print';
-    if (r === 'CASHIER') return '/cashier';
-    if (r === 'COLLECTEUR') return '/collecte';
+    const home: Record<Role, string> = {
+      ADMIN: '/admin', SUPERVISEUR: '/collecte-stats', AGENT: '/agent',
+      CASHIER: '/cashier', PRINT_AGENT: '/print', COLLECTEUR: '/collecte',
+    };
+    if (role) return home[role] ?? '/login';
+    const mine = this.roles();
+    for (const r of ALL_ROLES) if (mine.includes(r)) return home[r];
     return '/login';
   }
 }
