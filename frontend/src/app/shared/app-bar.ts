@@ -14,7 +14,7 @@ import { IconComponent } from './icon';
       <div class="brand">
         <img src="assets/main_logo.png" alt="Carte Promote" class="brand-logo" />
         <span class="brand-sep" aria-hidden="true"></span>
-        <div class="brand-sub">{{ i18n.t('card_name') }}</div>
+        <div class="brand-sub">{{ i18n.t('brand_tagline') }}</div>
       </div>
       <ng-content select="[appbar-right]"></ng-content>
       <button class="icon-btn" (click)="i18n.toggle()" aria-label="language">

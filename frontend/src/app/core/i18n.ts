@@ -6,6 +6,7 @@ export type Lang = 'fr' | 'en';
 const FR: Record<string, string> = {
   bank: 'Afriland First Bank',
   card_name: 'Carte Promote',
+  brand_tagline: 'Offre Promotionnelle pour votre carte prépayée AFB',
   lang_name: 'FR',
   home_kicker: 'Souscription en ligne',
   home_title: 'Souscrivez à votre carte Promote prépayée',
@@ -303,7 +304,7 @@ const FR: Record<string, string> = {
 };
 
 const EN: Record<string, string> = {
-  bank: 'Afriland First Bank', card_name: 'Promote Card', lang_name: 'EN',
+  bank: 'Afriland First Bank', card_name: 'Promote Card', brand_tagline: 'Promotional offer for your AFB prepaid card', lang_name: 'EN',
   home_kicker: 'Online subscription', home_title: 'Subscribe to your Promote prepaid card',
   home_sub: 'Choose how you want to subscribe',
   mode_assisted_title: 'Assisted subscription',
