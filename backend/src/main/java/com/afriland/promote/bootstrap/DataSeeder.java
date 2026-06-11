@@ -5,6 +5,7 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.service.SubscriptionService;
+import com.afriland.promote.service.RechargeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,6 +34,7 @@ public class DataSeeder implements CommandLineRunner {
     private final CardConfigRepository configs;
     private final SubscriptionRepository subs;
     private final SubscriptionService service;
+    private final RechargeService rechargeService;
     private final PasswordEncoder encoder;
     private final JdbcTemplate jdbc;
 
@@ -53,7 +55,7 @@ public class DataSeeder implements CommandLineRunner {
     private final String cashierName;
 
     public DataSeeder(AppUserRepository users, CardConfigRepository configs, SubscriptionRepository subs,
-                      SubscriptionService service, PasswordEncoder encoder, JdbcTemplate jdbc,
+                      SubscriptionService service, RechargeService rechargeService, PasswordEncoder encoder, JdbcTemplate jdbc,
                       @Value("${app.admin.email}") String adminEmail,
                       @Value("${app.admin.password}") String adminPassword,
                       @Value("${app.admin.name:Administrateur Promote}") String adminName,
@@ -68,6 +70,7 @@ public class DataSeeder implements CommandLineRunner {
         this.configs = configs;
         this.subs = subs;
         this.service = service;
+        this.rechargeService = rechargeService;
         this.encoder = encoder;
         this.jdbc = jdbc;
         this.adminEmail = adminEmail;
@@ -91,6 +94,7 @@ public class DataSeeder implements CommandLineRunner {
         seedCashier();    // idem — completes the four roles on existing deployments too
         // No demo client-journey data is seeded: subscriptions start empty.
         service.initSequence();
+        rechargeService.initSequence();
     }
 
     /**

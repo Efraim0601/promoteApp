@@ -1,7 +1,6 @@
 package com.afriland.promote.payment;
 
 import com.afriland.promote.model.PayStatus;
-import com.afriland.promote.model.Subscription;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,7 +56,7 @@ public class TrustPayWayGateway implements PaymentGateway {
     }
 
     @Override
-    public PaymentRequest requestPayment(Subscription sub, String operator) {
+    public PaymentRequest requestPayment(Payable sub, String operator) {
         String network = network(operator);
         String msisdn = msisdn(sub);
         // Send the globally-unique gateway order id (falls back to the bare ref for safety). It is
@@ -149,7 +148,7 @@ public class TrustPayWayGateway implements PaymentGateway {
     }
 
     @Override
-    public Optional<PayStatus> queryStatus(Subscription sub) {
+    public Optional<PayStatus> queryStatus(Payable sub) {
         if (sub.getPaymentTxId() == null) return Optional.empty();
         try {
             StatusResponse resp = http.get()
@@ -201,8 +200,10 @@ public class TrustPayWayGateway implements PaymentGateway {
      *  Uses the payment number the client gave for this operator (payPhone), falling back to the KYC
      *  phone. Numbers carry their country code (E.164, "+CC…"); a bare national number is assumed
      *  Cameroon for backward compatibility. */
-    private String msisdn(Subscription sub) {
-        String raw = sub.getPayPhone() != null && !sub.getPayPhone().isBlank() ? sub.getPayPhone() : sub.getPhone();
+    private String msisdn(Payable order) {
+        // payPhone is the number the client gave for this operator; for MoMo it is always set
+        // (the create flow defaults it to the KYC phone), so it is the single source here.
+        String raw = order.getPayPhone();
         boolean hasCountryCode = raw != null && raw.trim().startsWith("+");
         String digits = raw == null ? "" : raw.replaceAll("\\D", "");
         if (hasCountryCode) return digits;

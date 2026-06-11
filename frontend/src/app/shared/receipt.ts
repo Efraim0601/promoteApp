@@ -13,6 +13,8 @@ export interface ReceiptData {
   payStatus?: string | null;
   amount?: number | null;
   createdAt?: string | null;
+  kind?: 'card' | 'recharge';   // 'recharge' tweaks the title/note and shows the PAN (default 'card')
+  pan?: string | null;          // shown on recharge receipts (the card topped up)
 }
 
 /**
@@ -32,11 +34,13 @@ export class ReceiptService {
 
   async download(d: ReceiptData) {
     const r = d;
+    const isRecharge = d.kind === 'recharge';
     const W = 760, DARK = '#0F2A1B', RED = '#C8102E', MUTED = '#6b7770', LINE = '#e3e8e5';
-    // QR encoding the print-point deep link.
+    // QR: card receipts deep-link to the print point; a recharge isn't collected, so it just encodes the ref.
     let qrImg: HTMLImageElement | null = null;
     try {
-      const url = await QRCode.toDataURL(this.refUrl(r.ref), { width: 520, margin: 1, errorCorrectionLevel: 'M', color: { dark: DARK, light: '#ffffff' } });
+      const payload = isRecharge ? r.ref : this.refUrl(r.ref);
+      const url = await QRCode.toDataURL(payload, { width: 520, margin: 1, errorCorrectionLevel: 'M', color: { dark: DARK, light: '#ffffff' } });
       qrImg = await this.loadImg(url);
     } catch { /* QR optional */ }
 
@@ -44,16 +48,17 @@ export class ReceiptService {
     const rows: [string, string][] = [
       [this.i18n.t('tx_datetime'), this.fmtDateTime(r.createdAt ?? undefined)],
       [this.i18n.t('receipt_holder'), r.fullName || '—'],
-      [this.i18n.t('pay_method_label'), this.payDisplay(r.pay ?? undefined)],
     ];
+    if (isRecharge && r.pan) rows.push([this.i18n.t('recharge_pan_short'), r.pan]);
+    rows.push([this.i18n.t('pay_method_label'), this.payDisplay(r.pay ?? undefined)]);
     if (r.payPhone) rows.push([this.i18n.t('tx_pay_phone'), r.payPhone]);
     rows.push([this.i18n.t('receipt_status'), this.statusLabel(r.payStatus ?? undefined)]);
     rows.push([this.i18n.t('amount_paid'), this.i18n.money(r.amount ?? 0)]);
 
-    // Measure the footer (pickup note) to size the canvas.
+    // Measure the footer note to size the canvas (pickup for a card; a recharge note otherwise).
     const meas = document.createElement('canvas').getContext('2d')!;
     meas.font = '14px system-ui, sans-serif';
-    const noteLines = this.wrap(meas, this.i18n.t('pickup_notice'), W - 96);
+    const noteLines = this.wrap(meas, this.i18n.t(isRecharge ? 'recharge_receipt_note' : 'pickup_notice'), W - 96);
 
     const qrTop = 230, qrSize = 260;
     const rowsTop = qrTop + qrSize + 130;
@@ -75,7 +80,7 @@ export class ReceiptService {
     ctx.font = '700 28px system-ui, sans-serif'; ctx.fillText(this.i18n.t('card_name').toUpperCase(), 48, 52);
     ctx.font = '400 16px system-ui, sans-serif'; ctx.globalAlpha = 0.85; ctx.fillText(this.i18n.t('bank'), 48, 82); ctx.globalAlpha = 1;
     // Title + status
-    ctx.fillStyle = DARK; ctx.font = '700 25px system-ui, sans-serif'; ctx.fillText(this.i18n.t('receipt_title'), 48, 165);
+    ctx.fillStyle = DARK; ctx.font = '700 25px system-ui, sans-serif'; ctx.fillText(this.i18n.t(isRecharge ? 'receipt_title_recharge' : 'receipt_title'), 48, 165);
     ctx.fillStyle = RED; ctx.font = '700 16px system-ui, sans-serif'; ctx.fillText(this.statusLabel(r.payStatus ?? undefined), 48, 194);
     // QR
     if (qrImg) ctx.drawImage(qrImg, (W - qrSize) / 2, qrTop, qrSize, qrSize);

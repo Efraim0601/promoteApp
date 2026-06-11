@@ -1,6 +1,5 @@
 package com.afriland.promote.payment;
 
-import com.afriland.promote.model.Subscription;
 import org.springframework.stereotype.Component;
 
 import java.util.UUID;
@@ -22,7 +21,7 @@ public class SimulatedPaymentGateway implements PaymentGateway {
     }
 
     @Override
-    public PaymentRequest requestPayment(Subscription sub, String operator) {
+    public PaymentRequest requestPayment(Payable order, String operator) {
         // In a real gateway this would call the aggregator API and return its reference.
         return new PaymentRequest("SIM-" + UUID.randomUUID(), operator, true, null);
     }

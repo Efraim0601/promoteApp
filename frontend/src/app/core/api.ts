@@ -3,9 +3,9 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminStats, Agency, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
-  CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
+  CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ImportUserRow, ImportUsersResult,
-  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Subscription, User,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Recharge, Subscription, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -113,6 +113,44 @@ export class Api {
   /** Agent/admin — add or correct a client's NIU on an existing subscription. */
   updateNiu(ref: string, niu: string): Observable<Subscription> {
     return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/niu`, { niu });
+  }
+
+  // ---- card recharge (top-up) ----
+  /** Public — create a recharge (returns the created record + payment status). */
+  createRecharge(req: CreateRechargeRequest): Observable<Recharge> {
+    return this.http.post<Recharge>(`${this.base}/recharges`, req);
+  }
+  /** Public — poll the live payment status of a recharge. */
+  rechargeStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus; message?: string | null }> {
+    return this.http.get<{ ref: string; payStatus: PayStatus; message?: string | null }>(`${this.base}/recharges/${ref}/status`);
+  }
+  /** Staff — search recharges by reference, holder name, or PAN. */
+  searchRecharges(q: string): Observable<Recharge[]> {
+    return this.http.get<Recharge[]>(`${this.base}/recharges/search`, { params: { q } });
+  }
+  /** Staff — fetch a single recharge by reference. */
+  rechargeByRef(ref: string): Observable<Recharge> {
+    return this.http.get<Recharge>(`${this.base}/recharges/${ref}`);
+  }
+  /** Staff — fetch a recharge's stored SARA receipt as a blob. */
+  rechargeImageBlob(ref: string, kind: string): Observable<Blob> {
+    return this.http.get(`${this.base}/recharges/${ref}/image/${kind}`, { responseType: 'blob' });
+  }
+  /** Cashier — validate/reject an in-person cash recharge. */
+  cashValidateRecharge(ref: string, outcome: 'validate' | 'reject', reason?: string): Observable<Recharge> {
+    return this.http.patch<Recharge>(`${this.base}/recharges/${ref}/cash-validate`, { outcome, reason });
+  }
+  /** Point of sale — validate/reject a SARA recharge receipt. */
+  saraValidateRecharge(
+    ref: string,
+    outcome: 'validate' | 'reject',
+    opts?: { reason?: string; saraRef?: string; saraPayerPhone?: string; saraAmount?: number },
+  ): Observable<Recharge> {
+    return this.http.patch<Recharge>(`${this.base}/recharges/${ref}/sara-validate`, { outcome, ...opts });
+  }
+  /** Admin — all recharges. */
+  recharges(): Observable<Recharge[]> {
+    return this.http.get<Recharge[]>(`${this.base}/recharges`);
   }
 
   agents(): Observable<Agent[]> {

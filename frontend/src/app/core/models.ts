@@ -114,6 +114,42 @@ export interface MapPoint {
   place: string | null;    // coarse locality (city / agency) to geocode when lat/lng are null
 }
 
+// ---- card recharge (top-up) ----
+export interface CreateRechargeRequest {
+  prenom: string;
+  nom: string;
+  pan: string;
+  amount: number;
+  pay: string;
+  payPhone?: string | null;
+  saraReceiptKey?: string | null;
+  saraRef?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  geoAccuracy?: number | null;
+}
+
+export interface Recharge {
+  ref: string;
+  prenom: string;
+  nom: string;
+  fullName: string;
+  pan: string;
+  amount: number;
+  pay: string;
+  payPhone?: string | null;
+  payStatus: PayStatus;
+  status: string;
+  hasSaraReceipt: boolean;
+  saraRef?: string | null;
+  saraPayerPhone?: string | null;
+  saraAmount?: number | null;
+  cashCollectedBy?: string | null;
+  cashCollectedAt?: string | null;
+  createdAt: string;
+  paymentMessage?: string | null;
+}
+
 export interface CreateUserRequest {
   name: string;
   email: string;

@@ -5,6 +5,7 @@ import com.afriland.promote.model.Subscription;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.TrustPayWayGateway;
 import com.afriland.promote.payment.TrustPayWayProperties;
+import com.afriland.promote.service.RechargeService;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.slf4j.Logger;
@@ -20,12 +21,14 @@ public class PaymentController {
     private static final Logger log = LoggerFactory.getLogger(PaymentController.class);
 
     private final SubscriptionService service;
+    private final RechargeService rechargeService;
     private final PaymentGateway gateway;            // the active (@Primary) gateway
     private final TrustPayWayProperties trustPayWay;
 
-    public PaymentController(SubscriptionService service, PaymentGateway gateway,
+    public PaymentController(SubscriptionService service, RechargeService rechargeService, PaymentGateway gateway,
                             TrustPayWayProperties trustPayWay) {
         this.service = service;
+        this.rechargeService = rechargeService;
         this.gateway = gateway;
         this.trustPayWay = trustPayWay;
     }
@@ -69,7 +72,13 @@ public class PaymentController {
             log.debug(line, body.orderId(), body.status(), status, reason, body.amount(), body.transactionId(),
                     body.description(), body.confirmationStatus());
         }
-        service.applyWebhook(body.orderId(), status, reason);
+        // The webhook is shared: route by order id. A subscription takes priority; if none matches,
+        // it's a recharge (order ids are globally unique, so there is no ambiguity).
+        if (before != null) {
+            service.applyWebhook(body.orderId(), status, reason);
+        } else {
+            rechargeService.applyWebhook(body.orderId(), status, reason);
+        }
         return ResponseEntity.ok().build();
     }
 

@@ -1,7 +1,6 @@
 package com.afriland.promote.payment;
 
 import com.afriland.promote.model.PayStatus;
-import com.afriland.promote.model.Subscription;
 
 import java.util.Optional;
 
@@ -20,14 +19,14 @@ public interface PaymentGateway {
      * Push a payment request to the customer's phone (USSD prompt).
      * Returns the operator-side request reference.
      */
-    PaymentRequest requestPayment(Subscription sub, String operator);
+    PaymentRequest requestPayment(Payable order, String operator);
 
     /**
      * Pull the current status from the aggregator (fallback for polling when the
      * webhook has not arrived yet). Default: unknown — the simulated gateway and
      * any provider without a status API simply return empty.
      */
-    default Optional<PayStatus> queryStatus(Subscription sub) {
+    default Optional<PayStatus> queryStatus(Payable order) {
         return Optional.empty();
     }
 

@@ -46,12 +46,19 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions/self").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/pay").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/status").permitAll()
+                // ---- public: card recharge (open path) ----
+                .requestMatchers(HttpMethod.POST, "/api/recharges").permitAll()
+                .requestMatchers(HttpMethod.PATCH, "/api/recharges/*/pay").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/recharges/*/status").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/kyc/image").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/kyc/receipt").permitAll()
                 // ---- payment aggregator: webhook (push) + which provider is live ----
                 .requestMatchers(HttpMethod.POST, "/api/payment/webhook/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/payment/provider").permitAll()
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
+                // Validation errors on public endpoints re-dispatch to /error — permit it so the real
+                // 4xx status reaches the client instead of being masked as 403 for anonymous callers.
+                .requestMatchers("/error").permitAll()
 
                 // ---- admin only ----
                 .requestMatchers(HttpMethod.PUT, "/api/config").hasRole("ADMIN")
@@ -62,6 +69,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/stats/admin").hasRole("ADMIN")
                 .requestMatchers("/api/stats/payments").hasRole("ADMIN")
                 .requestMatchers("/api/map/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/recharges").hasRole("ADMIN")
 
                 // ---- relationship officer ----
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions").hasRole("AGENT")
@@ -81,6 +89,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/sara-validate").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
                 // ---- cashier — validate an in-person cash payment (cash → paid) ----
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/cash-validate").hasAnyRole("CASHIER", "ADMIN")
+                // ---- recharge staff validation (mirror the subscription roles) ----
+                .requestMatchers(HttpMethod.GET, "/api/recharges/*/image/*").hasAnyRole("PRINT_AGENT", "CASHIER", "ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.PATCH, "/api/recharges/*/sara-validate").hasAnyRole("PRINT_AGENT", "ADMIN", "AGENT")
+                .requestMatchers(HttpMethod.PATCH, "/api/recharges/*/cash-validate").hasAnyRole("CASHIER", "ADMIN")
 
                 .anyRequest().authenticated())
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);

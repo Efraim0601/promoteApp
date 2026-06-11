@@ -50,9 +50,9 @@ export class QrComponent {
   i18n = inject(I18n);
   private router = inject(Router);
 
-  /** Absolute URL of the public client form — adapts to the deployed origin. */
-  clientUrl = (typeof window !== 'undefined' ? window.location.origin : '') + '/client';
+  /** Absolute URL of the public open path (buy a card / recharge one) — adapts to the deployed origin. */
+  clientUrl = (typeof window !== 'undefined' ? window.location.origin : '') + '/start';
 
   back() { this.router.navigateByUrl('/login'); }
-  openHere() { this.router.navigateByUrl('/client'); }
+  openHere() { this.router.navigateByUrl('/start'); }
 }

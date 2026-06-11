@@ -6,7 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { PrintStats, Subscription } from '../core/models';
+import { PrintStats, Recharge, Subscription } from '../core/models';
 import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
@@ -77,6 +77,23 @@ import { SpinnerComponent } from '../shared/spinner';
         </div>
       }
 
+      <!-- Recharge matches (top-ups have no KYC; SARA ones are validated here). -->
+      @if (!rec() && !rRec() && rechargeResults().length) {
+        <div class="card" style="overflow:hidden">
+          <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px"><ic name="phone" [size]="12" style="vertical-align:-1px;margin-right:4px"></ic>{{ i18n.t('pp_recharges') }}</div>
+          @for (r of rechargeResults(); track r.ref) {
+            <button (click)="openRecharge(r.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:11px;padding:11px 14px;border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer">
+              <div style="min-width:0;flex:1">
+                <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.fullName }}</div>
+                <div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.ref }} · {{ i18n.money(r.amount) }}</div>
+              </div>
+              <status-badge [status]="r.status"></status-badge>
+              <ic name="chevR" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
+            </button>
+          }
+        </div>
+      }
+
       @if (!searched()) {
         <div class="card" style="padding:14px;display:flex;gap:9px;align-items:center">
           <ic name="hash" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
@@ -84,7 +101,7 @@ import { SpinnerComponent } from '../shared/spinner';
         </div>
       }
 
-      @if (searched() && !rec() && !loading() && !results().length) {
+      @if (searched() && !rec() && !rRec() && !loading() && !results().length && !rechargeResults().length) {
         <div class="card" style="padding:18px;display:flex;flex-direction:column;align-items:center;gap:10px;text-align:center">
           <span style="width:48px;height:48px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center"><ic name="alert" [size]="24"></ic></span>
           <p style="font-size:13.5px;font-weight:700">{{ i18n.t('pp_notfound') }}</p>
@@ -244,6 +261,57 @@ import { SpinnerComponent } from '../shared/spinner';
           </div>
         }
       }
+
+      <!-- Recharge SARA record -->
+      @if (rRec(); as r) {
+        @if (rValidated()) {
+          <div class="card" style="padding:20px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center">
+            <span style="width:64px;height:64px;border-radius:50%;background:var(--success);color:#fff;display:flex;align-items:center;justify-content:center;animation:pop .45s cubic-bezier(.2,.8,.3,1.2)"><ic name="check" [size]="32" [sw]="2.5"></ic></span>
+            <h2 style="font-size:18px">{{ i18n.t('pp_sara_validated') }}</h2>
+            <div style="font-weight:800;letter-spacing:.06em;white-space:nowrap">{{ r.ref }}</div>
+            <div style="font-size:18px;font-weight:800;color:var(--success)">{{ i18n.money(r.amount) }}</div>
+          </div>
+        } @else {
+          <div class="card" style="overflow:hidden">
+            <div style="padding:13px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+              <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
+              <h3 style="font-size:15px">{{ i18n.t('pp_recharge_record') }}</h3>
+              <span style="margin-left:auto"><status-badge [status]="r.status"></status-badge></span>
+            </div>
+            <div style="padding:16px 16px 6px">
+              <div style="font-size:16px;font-weight:800">{{ r.fullName }}</div>
+              <div class="muted" style="font-size:12px;margin-top:3px">{{ i18n.t('recharge_pan_short') }} {{ r.pan }} · {{ r.pay === 'cash' ? i18n.t('pay_cash_name') : rpm(r).name }}</div>
+            </div>
+            <div style="padding:0 16px 10px">
+              <div class="srow total"><span class="lbl">{{ i18n.t('pp_sara_amount') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
+              @if (r.payStatus === 'failed' && r.paymentMessage) { <div class="srow"><span class="lbl">{{ i18n.t('pp_sara_rejected') }}</span><span class="val" style="color:var(--accent)">{{ r.paymentMessage }}</span></div> }
+            </div>
+
+            @if (r.hasSaraReceipt && (receiptImg() || receiptPdf())) {
+              <div style="padding:0 16px 12px">
+                <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pp_sara_receipt') }}</div>
+                @if (receiptPdf()) {
+                  <iframe [src]="receiptPdf()" style="width:100%;height:360px;border:1px solid var(--border);border-radius:10px"></iframe>
+                } @else if (receiptImg()) {
+                  <img [src]="receiptImg()" alt="reçu SARA" (click)="preview.open(receiptImg())" style="width:100%;max-height:380px;object-fit:contain;background:var(--surface-2);border:1px solid var(--border);border-radius:10px;cursor:zoom-in" />
+                }
+                @if (receiptOpenUrl()) { <a [href]="receiptOpenUrl()" target="_blank" rel="noopener" class="btn btn-ghost" style="margin-top:8px;width:auto;padding:8px 12px;font-size:12.5px;text-decoration:none"><ic name="scan" [size]="15"></ic> {{ i18n.t('pp_sara_open') }}</a> }
+              </div>
+            }
+
+            @if (r.payStatus === 'sara_pending') {
+              <div style="padding:0 16px 14px">
+                <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:8px">{{ i18n.t('pp_sara_extracted') }}</div>
+                <field [label]="i18n.t('pp_sara_ref')"><input class="input" [placeholder]="i18n.t('pp_sara_ref_ph')" [value]="saraRefDraft()" (input)="saraRefDraft.set($any($event.target).value)" /></field>
+                <field [label]="i18n.t('pp_sara_payer')"><input class="input" inputmode="tel" [placeholder]="i18n.t('pp_sara_payer_ph')" [value]="saraPhoneDraft()" (input)="saraPhoneDraft.set($any($event.target).value)" /></field>
+                <field [label]="i18n.t('pp_sara_amount_field')"><input class="input" inputmode="numeric" [placeholder]="i18n.t('pp_sara_amount_ph')" [value]="saraAmountDraft()" (input)="saraAmountDraft.set($any($event.target).value)" /></field>
+                <p class="muted" style="font-size:11px;line-height:1.4;margin-top:2px;display:flex;gap:5px;align-items:flex-start"><ic name="alert" [size]="13" style="flex-shrink:0;margin-top:1px"></ic>{{ i18n.t('pp_sara_extracted_hint') }}</p>
+              </div>
+            }
+          </div>
+        }
+      }
+
       <div style="flex:1"></div>
     </div>
 
@@ -279,6 +347,20 @@ import { SpinnerComponent } from '../shared/spinner';
           <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
         </div>
       }
+    } @else if (rRec(); as r) {
+      @if (rValidated() || r.payStatus !== 'sara_pending') {
+        <div class="scr-foot"><button class="btn btn-ghost" (click)="again()">{{ i18n.t('pp_again') }}</button></div>
+      } @else {
+        <div class="scr-foot">
+          <button class="btn btn-primary" (click)="doValidateSaraRecharge(r.ref)" [disabled]="validating()">
+            @if (validating()) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('pp_sara_validate') }} }
+          </button>
+          <div style="display:flex;gap:10px">
+            <button class="btn btn-ghost" (click)="doRejectSaraRecharge(r.ref)" [disabled]="validating()" style="font-size:13px;color:var(--accent)"><ic name="x" [size]="16"></ic> {{ i18n.t('pp_sara_reject') }}</button>
+            <button class="btn btn-ghost" (click)="again()" style="font-size:13px">{{ i18n.t('pp_again') }}</button>
+          </div>
+        </div>
+      }
     }
   </div>`,
 })
@@ -296,6 +378,10 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   loading = signal(false);
   results = signal<Subscription[]>([]);
   rec = signal<Subscription | null>(null);
+  // Recharge SARA validation runs in parallel signals so the printing pipeline is untouched.
+  rechargeResults = signal<Recharge[]>([]);
+  rRec = signal<Recharge | null>(null);
+  rValidated = signal(false);
   stats = signal<PrintStats | null>(null);
   selfieUrl = signal<SafeUrl | null>(null);
   rectoUrl = signal<SafeUrl | null>(null);
@@ -353,6 +439,8 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     this.loadStats();
     if (this.loading() || this.printing() || this.validating() || this.savingNiu()
         || this.photoBusy() || this.retaking() || this.editingNiu()) return;
+    // An open recharge reuses the SARA drafts — don't refresh it (would reset the agent's edits).
+    if (this.rRec()) return;
     const r = this.rec();
     if (r) {
       if (r.printed) return; // success screen — nothing left to update
@@ -373,11 +461,14 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     const q = this.ref().trim();
     if (!q) return;
     this.lastQuery = q;
-    this.searched.set(true); this.loading.set(true); this.clearSelfie(); this.rec.set(null); this.results.set([]);
+    this.searched.set(true); this.loading.set(true); this.clearSelfie();
+    this.rec.set(null); this.results.set([]); this.rRec.set(null); this.rechargeResults.set([]);
+    // Recharges with a SARA receipt are validated here too; show them as a separate list.
+    this.api.searchRecharges(q).subscribe({ next: (list) => this.rechargeResults.set(list), error: () => {} });
     this.api.searchSubscriptions(q).subscribe({
       next: (list) => {
         this.loading.set(false);
-        if (list.length === 1) this.open(list[0].ref);
+        if (list.length === 1 && !this.rechargeResults().length) this.open(list[0].ref);
         else this.results.set(list);
       },
       error: () => { this.loading.set(false); this.results.set([]); },
@@ -386,15 +477,69 @@ export class PrintPointComponent implements OnInit, OnDestroy {
 
   /** Load the full record (incl. images) for a chosen reference. */
   open(ref: string) {
-    this.searched.set(true); this.loading.set(true); this.results.set([]); this.clearSelfie(); this.rec.set(null);
+    this.searched.set(true); this.loading.set(true); this.results.set([]); this.rechargeResults.set([]);
+    this.clearSelfie(); this.rec.set(null); this.rRec.set(null);
     this.api.byRef(ref).subscribe({
       next: (s) => { this.setRecord(s); this.loading.set(false); },
       error: () => { this.rec.set(null); this.loading.set(false); },
     });
   }
+
+  /** Open a recharge for SARA validation (loads its receipt + prefills the editable fields). */
+  openRecharge(ref: string) {
+    this.searched.set(true); this.loading.set(true); this.results.set([]); this.rechargeResults.set([]);
+    this.clearSelfie(); this.rec.set(null); this.rRec.set(null); this.rValidated.set(false);
+    this.api.rechargeByRef(ref).subscribe({
+      next: (r) => {
+        this.rRec.set(r);
+        this.saraRefDraft.set(r.saraRef ?? '');
+        this.saraPhoneDraft.set(r.saraPayerPhone ?? '');
+        this.saraAmountDraft.set(r.saraAmount != null ? String(r.saraAmount) : '');
+        if (r.hasSaraReceipt) this.loadRechargeReceipt(r.ref);
+        this.loading.set(false);
+      },
+      error: () => { this.rRec.set(null); this.loading.set(false); },
+    });
+  }
+
   again() {
     this.ref.set(''); this.searched.set(false); this.rec.set(null); this.results.set([]); this.clearSelfie();
+    this.rRec.set(null); this.rechargeResults.set([]); this.rValidated.set(false);
     this.cardNumber.set(''); this.pan.set(''); this.cardTouched.set(false); this.retaking.set(false);
+  }
+
+  /** Validate / reject a recharge's SARA receipt (mirrors the subscription SARA flow). */
+  doValidateSaraRecharge(ref: string) {
+    if (this.validating()) return;
+    this.validating.set(true);
+    this.api.saraValidateRecharge(ref, 'validate', this.saraOpts()).subscribe({
+      next: (r) => { this.rRec.set(r); this.rValidated.set(true); this.validating.set(false); },
+      error: () => this.validating.set(false),
+    });
+  }
+  doRejectSaraRecharge(ref: string) {
+    if (this.validating()) return;
+    const reason = window.prompt(this.i18n.t('pp_sara_reject_reason')) ?? '';
+    if (reason === null) return;
+    this.validating.set(true);
+    this.api.saraValidateRecharge(ref, 'reject', { reason: reason || undefined, ...this.saraOpts() }).subscribe({
+      next: (r) => { this.rRec.set(r); this.validating.set(false); },
+      error: () => this.validating.set(false),
+    });
+  }
+  rpm = (r: Recharge) => payById(r.pay);
+
+  private loadRechargeReceipt(ref: string) {
+    this.api.rechargeImageBlob(ref, 'sara-receipt').subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        this.objectUrls.push(url);
+        this.receiptOpenUrl.set(url);
+        if (blob.type === 'application/pdf') this.receiptPdf.set(this.sanitizer.bypassSecurityTrustResourceUrl(url));
+        else this.receiptImg.set(this.sanitizer.bypassSecurityTrustUrl(url));
+      },
+      error: () => { this.receiptImg.set(null); this.receiptPdf.set(null); this.receiptOpenUrl.set(null); },
+    });
   }
   /** Validate the print — card number is required and stored with the record. */
   doPrint(ref: string) {

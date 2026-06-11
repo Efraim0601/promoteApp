@@ -18,8 +18,12 @@ export const routes: Routes = [
 
   // public client (QR) path
   { path: 'qr', loadComponent: () => import('./pages/qr').then((m) => m.QrComponent) },
+  // public open path — choose between buying a card and recharging one
+  { path: 'start', loadComponent: () => import('./pages/services').then((m) => m.ServicesComponent) },
   { path: 'client', data: { channel: 'self' },
     loadComponent: () => import('./pages/subscribe').then((m) => m.SubscribeComponent) },
+  // public prepaid-card recharge (top-up)
+  { path: 'recharge', loadComponent: () => import('./pages/recharge').then((m) => m.RechargeComponent) },
 
   // print point (staff)
   { path: 'print', canActivate: [authGuard], loadComponent: () => import('./pages/print-point').then((m) => m.PrintPointComponent) },

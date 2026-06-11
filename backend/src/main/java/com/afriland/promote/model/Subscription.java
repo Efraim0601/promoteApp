@@ -1,5 +1,6 @@
 package com.afriland.promote.model;
 
+import com.afriland.promote.payment.Payable;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -23,7 +24,7 @@ import java.time.Instant;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Subscription {
+public class Subscription implements Payable {
 
     @Id
     private String ref;             // business reference, e.g. "PRM-1009"

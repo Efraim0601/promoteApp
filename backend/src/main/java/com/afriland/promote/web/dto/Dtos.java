@@ -251,4 +251,36 @@ public final class Dtos {
     public record MapPointDto(String type, String label, Double lat, Double lng,
                               String role, String status, String ref, String date,
                               Double accuracy, String place) {}
+
+    // ---- recharge (card top-up) ----
+    /** Public create payload for a prepaid-card recharge. KYC-light: holder name + PAN + amount +
+     *  payment method. {@code amount} is free-entry (bounds enforced server-side). The sara* /
+     *  geolocation fields mirror the subscription flow and are optional. */
+    public record CreateRechargeRequest(
+            @NotBlank String prenom,
+            @NotBlank String nom,
+            @NotBlank String pan,        // card PAN being topped up (captured, format-checked client-side)
+            int amount,                  // XAF (free entry)
+            @NotBlank String pay,        // om | mtn | cash | sara
+            String payPhone,             // MoMo number (required for om/mtn)
+            String saraReceiptKey,       // required when pay == sara
+            String saraRef,              // client-confirmed receipt reference (sara)
+            Double latitude, Double longitude, Double geoAccuracy) {}
+
+    /** Recharge view returned to the client / staff. */
+    public record RechargeDto(
+            String ref, String prenom, String nom, String fullName, String pan, int amount,
+            String pay, String payPhone, String payStatus, String status,
+            boolean hasSaraReceipt, String saraRef, String saraPayerPhone, Integer saraAmount,
+            String cashCollectedBy, String cashCollectedAt,
+            String createdAt, String paymentMessage) {
+        public static RechargeDto of(com.afriland.promote.model.Recharge r) {
+            return new RechargeDto(
+                    r.getRef(), r.getPrenom(), r.getNom(), r.getFullName(), r.getPan(), r.getAmount(),
+                    r.getPay(), r.getPayPhone(), r.getPayStatus().name(), r.getStatus(),
+                    r.getSaraReceiptKey() != null, r.getSaraRef(), r.getSaraPayerPhone(), r.getSaraAmount(),
+                    r.getCashCollectedBy(), r.getCashCollectedAt() == null ? null : r.getCashCollectedAt().toString(),
+                    r.getCreatedAt() == null ? null : r.getCreatedAt().toString(), r.getPaymentMessage());
+        }
+    }
 }
