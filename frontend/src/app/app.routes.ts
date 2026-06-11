@@ -2,7 +2,9 @@ import { Routes } from '@angular/router';
 import { authGuard, roleGuard, sessionGuard } from './core/guards';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'login' },
+  // Public entry point: the bare domain serves the open "start" page (buy a card / recharge).
+  { path: '', pathMatch: 'full', redirectTo: 'start' },
+  // Staff sign-in — a route on its own; also where logout redirects (see Auth.logout()).
   { path: 'login', loadComponent: () => import('./pages/login').then((m) => m.LoginComponent) },
 
   // self-service / forced (first-login) password change — any logged-in staff
@@ -31,5 +33,6 @@ export const routes: Routes = [
   // cashier — validate in-person cash payments
   { path: 'cashier', canActivate: [roleGuard('CASHIER', 'ADMIN')], loadComponent: () => import('./pages/cashier').then((m) => m.CashierComponent) },
 
-  { path: '**', redirectTo: 'login' },
+  // Unknown URLs fall back to the public start page (not the staff login).
+  { path: '**', redirectTo: 'start' },
 ];

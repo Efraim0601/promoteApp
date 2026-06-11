@@ -42,6 +42,11 @@ import { PromoteCardComponent } from '../shared/promote-card';
           </span>
           <ic name="arrowR" [size]="20" style="color:var(--muted)"></ic>
         </button>
+
+        <!-- Accès discret à l'espace collaborateur (connexion staff). -->
+        <button class="staff-link" (click)="login()">
+          <ic name="lock" [size]="14" [sw]="2"></ic> {{ i18n.t('staff_login_link') }}
+        </button>
       </div>
     </div>
   </div>`,
@@ -55,6 +60,10 @@ import { PromoteCardComponent } from '../shared/promote-card';
     .svc-txt { display:flex; flex-direction:column; gap:3px; min-width:0; flex:1; }
     .svc-title { font-size:15.5px; font-weight:800; }
     .svc-desc { font-size:12.5px; color:var(--muted); line-height:1.4; }
+    .staff-link { display:inline-flex; align-items:center; justify-content:center; gap:6px;
+      align-self:center; margin-top:8px; padding:8px 12px; background:none; border:none; cursor:pointer;
+      font-size:12.5px; font-weight:600; color:var(--muted); }
+    .staff-link:hover { color:var(--primary); text-decoration:underline; }
   `],
 })
 export class ServicesComponent {
@@ -63,4 +72,5 @@ export class ServicesComponent {
 
   buy() { this.router.navigateByUrl('/client'); }
   recharge() { this.router.navigateByUrl('/recharge'); }
+  login() { this.router.navigateByUrl('/login'); }
 }
