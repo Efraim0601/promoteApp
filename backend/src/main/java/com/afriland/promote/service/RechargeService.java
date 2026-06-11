@@ -69,11 +69,13 @@ public class RechargeService {
         return String.format("RC%06d", seq.incrementAndGet());
     }
 
-    /** Globally-unique aggregator order id (epoch+random base36) — never collides after a DB reset. */
+    /** Globally-unique aggregator order id — same shape as the card flow ({@code ref-suffix}), so the
+     *  payload sent to TrustPayWay is structurally identical. The hyphen is only in this internal
+     *  order id; the user-facing reference ({@link #newRef()}) stays hyphen-free (RC######). */
     private String newGatewayRef(String ref) {
         String suffix = Long.toString(Instant.now().toEpochMilli(), 36)
                 + Integer.toString(rnd.nextInt(0x1000), 36);
-        return (ref + suffix).toUpperCase();
+        return (ref + "-" + suffix).toUpperCase();
     }
 
     @Transactional
