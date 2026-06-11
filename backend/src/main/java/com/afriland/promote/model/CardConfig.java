@@ -19,4 +19,9 @@ public class CardConfig {
     private int price;        // card price
     private int fees;         // issuance fee
     private int transport;    // home-delivery transport fee
+
+    /** Recharge (top-up) free-entry bounds, in XAF. Nullable so the columns add cleanly to an
+     *  existing row (ddl-auto: update); null falls back to the built-in defaults. */
+    private Integer rechargeMin;
+    private Integer rechargeMax;
 }

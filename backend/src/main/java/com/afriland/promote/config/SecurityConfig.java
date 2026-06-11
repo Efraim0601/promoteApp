@@ -71,8 +71,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/map/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/recharges").hasRole("ADMIN")
 
-                // ---- relationship officer ----
-                .requestMatchers(HttpMethod.POST, "/api/subscriptions").hasRole("AGENT")
+                // ---- relationship officer (+ cashier, who may also create subscriptions) ----
+                .requestMatchers(HttpMethod.POST, "/api/subscriptions").hasAnyRole("AGENT", "CASHIER")
                 .requestMatchers("/api/subscriptions/mine").hasRole("AGENT")
                 .requestMatchers("/api/subscriptions/claim").hasRole("AGENT")
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/niu").hasAnyRole("AGENT", "ADMIN")

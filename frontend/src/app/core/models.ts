@@ -27,6 +27,8 @@ export interface CardConfig {
   price: number;
   fees: number;
   transport: number;
+  rechargeMin: number;   // recharge free-entry lower bound (XAF)
+  rechargeMax: number;   // recharge free-entry upper bound (XAF)
 }
 
 export type PayStatus = 'pending' | 'paid' | 'cash' | 'sara_pending' | 'failed';

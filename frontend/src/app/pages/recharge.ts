@@ -282,6 +282,9 @@ export class RechargeComponent implements OnInit, OnDestroy {
   receiptBusy = signal(false);
   saraExtracting = signal(false);
   result = signal<Recharge | null>(null);
+  // Admin-configurable amount bounds (loaded from /api/config); fall back to the defaults until loaded.
+  min = signal(MIN_AMOUNT);
+  max = signal(MAX_AMOUNT);
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
@@ -297,6 +300,11 @@ export class RechargeComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.restore();
     this.geo.current().then((f) => (this.geoFix = f));
+    // Apply the admin-configured recharge bounds.
+    this.api.getConfig().subscribe({
+      next: (c) => { if (c.rechargeMin) this.min.set(c.rechargeMin); if (c.rechargeMax) this.max.set(c.rechargeMax); },
+      error: () => { /* keep defaults */ },
+    });
   }
   ngOnDestroy() { this.stopPolling(); }
 
@@ -323,7 +331,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   get amountValue() { return parseInt(this.form.amount || '0', 10) || 0; }
   get isCash() { return this.result()?.payStatus === 'cash'; }
   get isSaraPending() { return this.result()?.payStatus === 'sara_pending'; }
-  get amountHint() { return this.i18n.t('recharge_amount_hint', { min: this.i18n.money(MIN_AMOUNT), max: this.i18n.money(MAX_AMOUNT) }); }
+  get amountHint() { return this.i18n.t('recharge_amount_hint', { min: this.i18n.money(this.min()), max: this.i18n.money(this.max()) }); }
 
   get payTiles(): TileOption[] {
     const desc: Record<string, string> = {
@@ -339,7 +347,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   // ---- validation ----
   get nameOk() { return !!this.form.prenom.trim() && !!this.form.nom.trim(); }
   get panOk() { const n = this.panDigits.length; return n >= 12 && n <= 19; }
-  get amountOk() { const a = this.amountValue; return a >= MIN_AMOUNT && a <= MAX_AMOUNT; }
+  get amountOk() { const a = this.amountValue; return a >= this.min() && a <= this.max(); }
   get payPhoneOk() {
     const v = this.form.payPhone;
     if (!isValidPhoneNumber(v)) return false;

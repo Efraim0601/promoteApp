@@ -17,7 +17,7 @@ frontend/.angular/
 wallet_transaction_detail.docx
 
 # Source artwork dropped at the repo root (the app uses optimised copies in frontend/public/assets)
-/main_logo.png
+/main_logo.svg
 /sara_logo.png
 /Modèle_de_carte_pour_impression.jpg
 .idea/

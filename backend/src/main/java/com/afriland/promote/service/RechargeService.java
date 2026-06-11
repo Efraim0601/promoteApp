@@ -3,10 +3,12 @@ package com.afriland.promote.service;
 import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Recharge;
 import com.afriland.promote.model.AppUser;
+import com.afriland.promote.model.CardConfig;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.receipt.SaraReceipt;
 import com.afriland.promote.receipt.SaraReceiptExtractor;
 import com.afriland.promote.repo.AppUserRepository;
+import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.RechargeRepository;
 import com.afriland.promote.storage.ImageStorage;
 import com.afriland.promote.web.dto.Dtos.*;
@@ -40,18 +42,29 @@ public class RechargeService {
     private final PaymentGateway gateway;
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
+    private final CardConfigRepository configs;
 
     /** RC###### sequence (hyphen-free, 8-char ref). */
     private final AtomicInteger seq = new AtomicInteger(0);
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
 
     public RechargeService(RechargeRepository recharges, AppUserRepository users, PaymentGateway gateway,
-                           ImageStorage storage, SaraReceiptExtractor receiptExtractor) {
+                           ImageStorage storage, SaraReceiptExtractor receiptExtractor,
+                           CardConfigRepository configs) {
         this.recharges = recharges;
         this.users = users;
         this.gateway = gateway;
         this.storage = storage;
         this.receiptExtractor = receiptExtractor;
+        this.configs = configs;
+    }
+
+    /** Effective recharge bounds (admin-configured value, or the built-in default when unset). */
+    private int minAmount() {
+        return configs.findById(1L).map(CardConfig::getRechargeMin).filter(java.util.Objects::nonNull).orElse(MIN_AMOUNT);
+    }
+    private int maxAmount() {
+        return configs.findById(1L).map(CardConfig::getRechargeMax).filter(java.util.Objects::nonNull).orElse(MAX_AMOUNT);
     }
 
     /** Initialise the sequence above the highest existing recharge reference (after seeding). */
@@ -81,7 +94,7 @@ public class RechargeService {
     @Transactional
     public Recharge create(CreateRechargeRequest req) {
         int amount = req.amount();
-        if (amount < MIN_AMOUNT || amount > MAX_AMOUNT) {
+        if (amount < minAmount() || amount > maxAmount()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "amount_out_of_range");
         }
         boolean cash = "cash".equals(req.pay());

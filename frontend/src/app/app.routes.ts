@@ -14,8 +14,8 @@ export const routes: Routes = [
   { path: 'admin', canActivate: [roleGuard('ADMIN')], loadComponent: () => import('./pages/admin').then((m) => m.AdminComponent) },
   { path: 'agent', canActivate: [roleGuard('AGENT')], loadComponent: () => import('./pages/agent-home').then((m) => m.AgentHomeComponent) },
 
-  // assisted (relationship officer) subscription
-  { path: 'subscribe', canActivate: [roleGuard('AGENT')], data: { channel: 'agent' },
+  // assisted subscription — relationship officers and cashiers
+  { path: 'subscribe', canActivate: [roleGuard('AGENT', 'CASHIER')], data: { channel: 'agent' },
     loadComponent: () => import('./pages/subscribe').then((m) => m.SubscribeComponent) },
 
   // public client (QR) path

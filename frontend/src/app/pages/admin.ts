@@ -163,6 +163,20 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/con
           <field [label]="i18n.t('transport_fee')">
             <div class="input-prefix"><input inputmode="numeric" [value]="cfg().transport" (input)="onCfg('transport', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
           </field>
+
+          <!-- Recharge (top-up) free-entry amount bounds. -->
+          <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:2px">
+            <div style="font-size:12.5px;font-weight:800;color:var(--primary);margin-bottom:10px">{{ i18n.t('cfg_recharge_title') }}</div>
+            <div style="display:flex;gap:10px">
+              <field [label]="i18n.t('cfg_recharge_min')" style="flex:1">
+                <div class="input-prefix"><input inputmode="numeric" [value]="cfg().rechargeMin" (input)="onCfg('rechargeMin', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
+              </field>
+              <field [label]="i18n.t('cfg_recharge_max')" style="flex:1">
+                <div class="input-prefix"><input inputmode="numeric" [value]="cfg().rechargeMax" (input)="onCfg('rechargeMax', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
+              </field>
+            </div>
+          </div>
+
           <button class="btn btn-primary" [disabled]="!changed() || saving()" (click)="saveCfg()" style="padding:12px">
             @if (saving()) { <spinner></spinner> } @else if (saved()) { <ic name="check" [size]="18" [sw]="2.5"></ic> {{ i18n.t('saved') }} } @else { {{ i18n.t('save') }} }
           </button>
@@ -680,11 +694,12 @@ export class AdminComponent implements OnInit, OnDestroy {
   cfgLoading = signal(true);
   saving = signal(false);
   // Signals so the "save" button's [disabled] binding stays reactive (the app is zoneless).
-  cfg = signal<CardConfig>({ price: 0, fees: 0, transport: 0 });
-  private original = signal<CardConfig>({ price: 0, fees: 0, transport: 0 });
+  cfg = signal<CardConfig>({ price: 0, fees: 0, transport: 0, rechargeMin: 0, rechargeMax: 0 });
+  private original = signal<CardConfig>({ price: 0, fees: 0, transport: 0, rechargeMin: 0, rechargeMax: 0 });
   changed = computed(() => {
     const c = this.cfg(), o = this.original();
-    return c.price !== o.price || c.fees !== o.fees || c.transport !== o.transport;
+    return c.price !== o.price || c.fees !== o.fees || c.transport !== o.transport
+      || c.rechargeMin !== o.rechargeMin || c.rechargeMax !== o.rechargeMax;
   });
   saved = signal(false);
   saveErr = signal(false);

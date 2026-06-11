@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
+import { Auth } from '../core/auth';
 import { Geo, GeoFix } from '../core/geo';
 import { Agency, Agent, CardConfig, Subscription } from '../core/models';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
@@ -59,6 +60,7 @@ const fmtExp = (d: string) => (d.length === 8 ? `${d.slice(0, 2)}/${d.slice(2, 4
 export class SubscribeComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   private api = inject(Api);
+  private auth = inject(Auth);
   private geo = inject(Geo);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
@@ -72,7 +74,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly STEP_COUNT = STEP_COUNT;
   readonly payById = payById;
 
-  config: CardConfig = { price: 5000, fees: 500, transport: 1000 };
+  config: CardConfig = { price: 5000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000 };
 
   /** Pickup branches (lieux de retrait) loaded from the server — shown when delivery == agence. */
   agencies = signal<Agency[]>([]);
@@ -378,8 +380,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       else this.exit();
     } else { this.touched.set(false); this.step.set(this.step() - 1); this.persist(); }
   }
-  exit() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
-  home() { this.router.navigateByUrl(this.isSelf ? '/qr' : '/agent'); }
+  // Staff (agent OR cashier) return to their own dashboard; the public/QR client returns to /qr.
+  exit() { this.router.navigateByUrl(this.isSelf ? '/qr' : this.auth.landingPath()); }
+  home() { this.router.navigateByUrl(this.isSelf ? '/qr' : this.auth.landingPath()); }
 
   /** Client photo captured (front or rear camera): keep preview + upload. */
   onSelfie(dataUrl: string) {

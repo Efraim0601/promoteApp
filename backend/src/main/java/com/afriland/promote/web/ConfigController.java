@@ -2,6 +2,7 @@ package com.afriland.promote.web;
 
 import com.afriland.promote.model.CardConfig;
 import com.afriland.promote.repo.CardConfigRepository;
+import com.afriland.promote.service.RechargeService;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.web.dto.Dtos.ConfigDto;
 import jakarta.validation.Valid;
@@ -19,11 +20,19 @@ public class ConfigController {
         this.repo = repo;
     }
 
-    /** Public — the client form needs the current amounts. */
+    /** Effective recharge bounds (config value, or the built-in default when unset). */
+    private static int min(CardConfig c) {
+        return c.getRechargeMin() != null ? c.getRechargeMin() : RechargeService.MIN_AMOUNT;
+    }
+    private static int max(CardConfig c) {
+        return c.getRechargeMax() != null ? c.getRechargeMax() : RechargeService.MAX_AMOUNT;
+    }
+
+    /** Public — the client form (subscription + recharge) needs the current amounts. */
     @GetMapping
     public ConfigDto get() {
         CardConfig c = service.config();
-        return new ConfigDto(c.getPrice(), c.getFees(), c.getTransport());
+        return new ConfigDto(c.getPrice(), c.getFees(), c.getTransport(), min(c), max(c));
     }
 
     /** Admin only (enforced in SecurityConfig). */
@@ -33,7 +42,12 @@ public class ConfigController {
         c.setPrice(Math.max(0, dto.price()));
         c.setFees(Math.max(0, dto.fees()));
         c.setTransport(Math.max(0, dto.transport()));
+        // Recharge bounds: a sane floor of 1, and a max never below the min.
+        int rMin = Math.max(1, dto.rechargeMin());
+        int rMax = Math.max(rMin, dto.rechargeMax());
+        c.setRechargeMin(rMin);
+        c.setRechargeMax(rMax);
         repo.save(c);
-        return new ConfigDto(c.getPrice(), c.getFees(), c.getTransport());
+        return new ConfigDto(c.getPrice(), c.getFees(), c.getTransport(), min(c), max(c));
     }
 }
