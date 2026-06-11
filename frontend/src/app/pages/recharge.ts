@@ -160,7 +160,7 @@ interface RechargeForm {
 
           <div class="card" style="padding:4px 16px;width:100%">
             <div class="srow"><span class="lbl">{{ i18n.t('recharge_pan_short') }}</span><span class="val">{{ fmtPan(result()!.pan) }}</span></div>
-            <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid'"></status-badge></span></div>
+            <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid_done'"></status-badge></span></div>
             <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(result()!.amount) }}</span></div>
           </div>
 

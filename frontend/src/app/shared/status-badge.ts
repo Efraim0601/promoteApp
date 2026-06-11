@@ -16,7 +16,8 @@ export class StatusBadgeComponent {
     pending: { cls: 'pending', key: 'st_pending' },     // en attente de paiement (PIN client)
     cash: { cls: 'pending', key: 'st_cash' },            // espèces à encaisser
     sara_pending: { cls: 'pending', key: 'st_sara_pending' },
-    paid: { cls: 'info', key: 'st_to_print' },           // payée, pas encore imprimée
+    paid: { cls: 'info', key: 'st_to_print' },           // payée, pas encore imprimée (souscription)
+    paid_done: { cls: 'success', key: 'st_paid' },       // payée & terminée (recharge — rien à imprimer)
     printed: { cls: 'success', key: 'st_printed' },      // imprimée (terminé)
     failed: { cls: 'failed', key: 'st_failed' },
     awaiting: { cls: 'pending', key: 'st_pending' },     // rétro-compatibilité

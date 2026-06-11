@@ -85,6 +85,6 @@ public class Recharge implements Payable {
         if (payStatus == PayStatus.cash) return "cash";
         if (payStatus == PayStatus.sara_pending) return "sara_pending";
         if (payStatus == PayStatus.pending) return "pending";
-        return "paid";
+        return "paid_done";   // payée & terminée — une recharge ne s'imprime pas
     }
 }
