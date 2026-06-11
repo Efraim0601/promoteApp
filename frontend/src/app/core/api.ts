@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
   AdminStats, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
-  CreateSubscriptionRequest, CreateUserRequest, ImportUserRow, ImportUsersResult,
+  CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportUserRow, ImportUsersResult,
   LoginResponse, PaymentStats, PayStatus, PrintStats, Subscription, User,
 } from './models';
 
@@ -104,9 +104,9 @@ export class Api {
   users(): Observable<User[]> {
     return this.http.get<User[]>(`${this.base}/users`);
   }
-  /** Admin — create a staff account. */
-  createUser(req: CreateUserRequest): Observable<User> {
-    return this.http.post<User>(`${this.base}/users`, req);
+  /** Admin — create a staff account; the backend generates and emails a temporary password. */
+  createUser(req: CreateUserRequest): Observable<CreateUserResult> {
+    return this.http.post<CreateUserResult>(`${this.base}/users`, req);
   }
   /** Admin — bulk-import staff accounts; duplicates skipped or updated per updateExisting. */
   importUsers(rows: ImportUserRow[], updateExisting: boolean): Observable<ImportUsersResult> {

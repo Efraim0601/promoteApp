@@ -51,9 +51,12 @@ public final class Dtos {
             @NotBlank String name,
             @NotBlank String email,
             @NotBlank String role,
-            @NotBlank String password,
             String agency,
             String phone) {}
+
+    /** Result of a staff creation: the account + the auto-generated temporary password (emailed to
+     *  the user; also returned so the admin can hand it out if mail delivery fails). */
+    public record CreateUserResult(UserDto user, String tempPassword) {}
 
     // ---- config ----
     public record ConfigDto(int price, int fees, int transport) {}

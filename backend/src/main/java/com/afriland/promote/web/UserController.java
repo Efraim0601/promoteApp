@@ -4,7 +4,6 @@ import com.afriland.promote.email.EmailService;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
-import com.afriland.promote.security.PasswordPolicy;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -53,9 +52,9 @@ public class UserController {
         if (users.findByEmailIgnoreCase(req.email().trim()).isPresent()) {
             return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
         }
-        // Admin-set passwords must satisfy the policy too.
-        String pwErr = PasswordPolicy.validate(req.password());
-        if (pwErr != null) return ResponseEntity.badRequest().body(new ErrorResponse(pwErr));
+        // The admin no longer sets the password: a temporary one is generated and emailed to the
+        // user, who must change it on first login.
+        String temp = genPassword();
         // Phone stored as the local 9-digit Cameroon number (country code stripped) so it always
         // matches what a client types as their referrer's number → auto-attributed to the agent.
         String phone = req.phone() == null ? "" : req.phone().replaceAll("\\D", "");
@@ -68,13 +67,17 @@ public class UserController {
                 .id("u-" + UUID.randomUUID().toString().substring(0, 8))
                 .name(req.name().trim())
                 .email(req.email().trim())
-                .passwordHash(encoder.encode(req.password()))
+                .passwordHash(encoder.encode(temp))
                 .role(role)
                 .agency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim())
                 .phone(phone.isBlank() ? null : phone)
                 .mustChangePassword(true)   // forced change on first login (all new accounts)
                 .build();
-        return ResponseEntity.ok(UserDto.of(users.save(u)));
+        AppUser saved = users.save(u);
+        // Welcome email: login link + identifier + the generated temporary password (best-effort —
+        // an SMTP failure never breaks creation; the password is also returned below as a fallback).
+        email.sendAccountCreated(saved.getEmail(), saved.getName(), temp);
+        return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), temp));
     }
 
     /**

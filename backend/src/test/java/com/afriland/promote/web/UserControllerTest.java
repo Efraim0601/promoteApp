@@ -21,8 +21,7 @@ class UserControllerTest {
 
     private static String user(String name, String email, String role, String phone) {
         String p = phone == null ? "" : ",\"phone\":\"" + phone + "\"";
-        return "{\"name\":\"" + name + "\",\"email\":\"" + email + "\",\"role\":\"" + role
-                + "\",\"password\":\"Promote123\"" + p + "}";
+        return "{\"name\":\"" + name + "\",\"email\":\"" + email + "\",\"role\":\"" + role + "\"" + p + "}";
     }
 
     @Test
@@ -46,8 +45,9 @@ class UserControllerTest {
         mvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content(user("Francklin Youmbi", "francklin@test.cm", "AGENT", "+237 690 12 34 56")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.role").value("AGENT"))
-                .andExpect(jsonPath("$.phone").value("690123456"));
+                .andExpect(jsonPath("$.user.role").value("AGENT"))
+                .andExpect(jsonPath("$.user.phone").value("690123456"))
+                .andExpect(jsonPath("$.tempPassword").isNotEmpty());
     }
 
     @Test

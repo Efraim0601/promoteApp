@@ -98,9 +98,14 @@ export interface CreateUserRequest {
   name: string;
   email: string;
   role: Role;
-  password: string;
   agency?: string | null;
   phone?: string | null;
+}
+
+/** Result of a staff creation: the account + the auto-generated temporary password (also emailed). */
+export interface CreateUserResult {
+  user: User;
+  tempPassword: string;
 }
 
 export interface Agent {

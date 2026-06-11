@@ -191,7 +191,6 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
               <option value="ADMIN">{{ i18n.t('role_admin') }}</option>
             </select>
           </field>
-          <field [label]="i18n.t('user_password')"><input class="input" type="text" [value]="nu().password" (input)="onNu('password', $event)" /></field>
           @if (nu().role === 'AGENT') {
             <field [label]="i18n.t('user_agency')"><input class="input" [value]="nu().agency || ''" (input)="onNu('agency', $event)" /></field>
             <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
@@ -199,10 +198,21 @@ import { LIVE_REFRESH_MS, payById, recordStatus } from '../shared/constants';
               <input class="input" inputmode="numeric" maxlength="9" [value]="nu().phone || ''" (input)="onNu('phone', $event)" />
             </field>
           }
+          <p class="muted" style="font-size:11.5px;line-height:1.4;margin:-2px 0 2px">{{ i18n.t('user_pw_note') }}</p>
           <button class="btn btn-primary" [disabled]="!userValid() || userBusy()" (click)="createUser()" style="padding:12px">
             @if (userBusy()) { <spinner></spinner> } @else { <ic name="plus" [size]="17"></ic> {{ i18n.t('user_create') }} }
           </button>
-          @if (userMsg() === 'created') { <p style="font-size:12px;text-align:center;color:var(--success);font-weight:700">{{ i18n.t('user_created') }}</p> }
+          @if (userMsg() === 'created' && createdPw()) {
+            <div class="feedback" style="flex-direction:column;align-items:stretch;gap:6px;background:var(--surface-2);border-radius:10px;padding:10px 12px">
+              <span style="font-size:12px;color:var(--success);font-weight:700">{{ i18n.t('user_created_pw') }}</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <code style="font-size:14px;font-weight:700;letter-spacing:.5px;flex:1">{{ createdPw() }}</code>
+                <button class="btn btn-outline" style="padding:6px 10px;font-size:12px" (click)="copyPw()">
+                  <ic name="copy" [size]="15"></ic> {{ pwCopied() ? i18n.t('copied') : i18n.t('copy_btn') }}
+                </button>
+              </div>
+            </div>
+          }
           @if (userMsg() === 'exists') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_exists') }}</p> }
           @if (userMsg() === 'invalid') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_invalid') }}</p> }
         </div>
@@ -461,14 +471,17 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   // --- user management ---
   usersList = signal<User[]>([]);
-  nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', password: '', agency: '', phone: '' });
+  nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
   userMsg = signal<'' | 'created' | 'exists' | 'invalid'>('');
   userBusy = signal(false);
+  /** Temporary password returned on the last successful creation (also emailed to the user). */
+  createdPw = signal('');
+  pwCopied = signal(false);
   /** A commercial's phone must be a valid local 9-digit number (links client referrals to their stats). */
   agentPhoneOk = computed(() => /^6\d{8}$/.test((this.nu().phone ?? '').replace(/\D/g, '')));
   userValid = computed(() => {
     const u = this.nu();
-    const base = !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && !!u.role && (u.password ?? '').length >= 4;
+    const base = !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && !!u.role;
     return base && (u.role !== 'AGENT' || this.agentPhoneOk());
   });
 
@@ -559,17 +572,20 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.userBusy.set(true);
     const u = this.nu();
     this.api.createUser({ ...u, name: u.name.trim(), email: u.email.trim() }).subscribe({
-      next: () => {
+      next: (res) => {
         this.userBusy.set(false); this.userMsg.set('created');
-        this.nu.set({ name: '', email: '', role: 'AGENT', password: '', agency: '', phone: '' });
+        this.createdPw.set(res.tempPassword); this.pwCopied.set(false);
+        this.nu.set({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
         this.loadUsers();
-        setTimeout(() => this.userMsg.set(''), 2500);
       },
       error: (err) => {
         this.userBusy.set(false);
         this.userMsg.set(err?.status === 409 ? 'exists' : 'invalid');
       },
     });
+  }
+  copyPw() {
+    navigator.clipboard?.writeText(this.createdPw()).then(() => this.pwCopied.set(true));
   }
   roleLabel(role: Role) {
     return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print' : role === 'CASHIER' ? 'role_cashier' : 'role_agent');
