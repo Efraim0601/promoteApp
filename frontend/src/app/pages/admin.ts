@@ -32,19 +32,25 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <avatar [name]="auth.user()!.name" role="admin" [size]="40"></avatar>
           <div style="min-width:0">
             <div style="font-size:13.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ auth.user()!.name }}</div>
-            <div class="muted" style="font-size:11px">{{ i18n.t('role_admin') }}</div>
+            <div class="muted" style="font-size:11px">{{ i18n.t(isSupervisor() ? 'role_superviseur' : 'role_admin') }}</div>
           </div>
         </div>
         <nav class="admin-nav">
+          @if (!isSupervisor()) {
           <button [class.active]="section() === 'overview'" (click)="section.set('overview')"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_overview') }}</button>
           <button [class.active]="section() === 'config'" (click)="section.set('config')"><ic name="gear" [size]="18"></ic> {{ i18n.t('nav_config') }}</button>
-          <button [class.active]="section() === 'users'" (click)="section.set('users')"><ic name="user" [size]="18"></ic> {{ i18n.t('nav_users') }}</button>
+          }
+          <button [class.active]="section() === 'users'" (click)="section.set('users')"><ic name="user" [size]="18"></ic> {{ i18n.t(isSupervisor() ? 'nav_collecteurs' : 'nav_users') }}</button>
+          @if (!isSupervisor()) {
           <button [class.active]="section() === 'agencies'" (click)="section.set('agencies')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_agencies') }}</button>
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
           <button [class.active]="section() === 'recharges'" (click)="section.set('recharges')"><ic name="phone" [size]="18"></ic> {{ i18n.t('nav_recharges') }}</button>
           <button [class.active]="section() === 'collectes'" (click)="section.set('collectes')"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
           <button [class.active]="section() === 'audit'" (click)="section.set('audit')"><ic name="shield" [size]="18"></ic> {{ i18n.t('nav_audit') }}</button>
           <button [class.active]="section() === 'map'" (click)="section.set('map')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_map') }}</button>
+          }
+          <!-- Collecte statistics — reachable by supervisor (and admin) on a page of its own. -->
+          <button (click)="goCollecteStats()"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_collecte_stats') }}</button>
         </nav>
         <div class="admin-spacer"></div>
         <nav class="admin-nav admin-logout">
@@ -61,11 +67,11 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       @if (statsLoading()) {
       <div class="card load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
       } @else {
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}</div></div>
         <div class="kpi"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(stats()?.collected ?? 0) }}</div><div class="kl">{{ i18n.t('kpi_collected') }}</div></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px">
         <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
         <!-- Failed payments — click to jump to the filtered transactions table. -->
@@ -84,7 +90,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
             <h3 style="font-size:15px">{{ i18n.t('pay_funnel_title') }}</h3>
             <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
             <div class="kpi"><div class="kv">{{ p.momoTotal }}</div><div class="kl">{{ i18n.t('pay_funnel_total') }}</div></div>
             <div class="kpi"><div class="kv" style="color:var(--success)">{{ rate(p.momoPaid, p.momoTotal) }}%</div><div class="kl">{{ i18n.t('pay_funnel_success_rate') }}</div></div>
             <div class="kpi"><div class="kv" style="font-size:17px">{{ p.medianConfirmSeconds }}s</div><div class="kl">{{ i18n.t('pay_funnel_median') }}</div></div>
@@ -170,7 +176,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:2px">
             <div style="font-size:12.5px;font-weight:800;color:var(--primary);margin-bottom:4px">{{ i18n.t('cfg_offer_title') }}</div>
             <p class="muted" style="font-size:11px;line-height:1.4;margin-bottom:10px">{{ i18n.t('cfg_offer_sub') }}</p>
-            <div style="display:flex;gap:10px">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
               <field [label]="i18n.t('offer_recharge_initiale')" style="flex:1">
                 <div class="input-prefix"><input inputmode="numeric" [value]="cfg().rechargeInitiale" (input)="onCfg('rechargeInitiale', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
               </field>
@@ -184,7 +190,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <!-- Recharge (top-up) free-entry amount bounds. -->
           <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:2px">
             <div style="font-size:12.5px;font-weight:800;color:var(--primary);margin-bottom:10px">{{ i18n.t('cfg_recharge_title') }}</div>
-            <div style="display:flex;gap:10px">
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">
               <field [label]="i18n.t('cfg_recharge_min')" style="flex:1">
                 <div class="input-prefix"><input inputmode="numeric" [value]="cfg().rechargeMin" (input)="onCfg('rechargeMin', $event)" /><span class="pfx" style="border-right:none;border-left:1.5px solid var(--border)">{{ i18n.t('fcfa') }}</span></div>
               </field>
@@ -218,14 +224,18 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         <div style="display:flex;flex-direction:column;gap:10px">
           <field [label]="i18n.t('user_name')"><input class="input" [value]="nu().name" (input)="onNu('name', $event)" /></field>
           <field [label]="i18n.t('user_email')"><input class="input" type="email" [value]="nu().email" (input)="onNu('email', $event)" /></field>
-          <field [label]="i18n.t('user_roles')" [hint]="i18n.t('user_roles_hint')">
-            <div style="display:flex;flex-wrap:wrap;gap:7px">
-              @for (r of allRoles; track r) {
-                <button type="button" (click)="toggleNuRole(r)"
-                        [class.btn-primary]="nuHasRole(r)" [class.btn-outline]="!nuHasRole(r)"
-                        class="btn" style="padding:6px 11px;font-size:12px">{{ roleLabel(r) }}</button>
-              }
-            </div>
+          <field [label]="i18n.t('user_roles')" [hint]="i18n.t(isSupervisor() ? 'sup_collecteur_only' : 'user_roles_hint')">
+            @if (isSupervisor()) {
+              <span class="badge" style="background:var(--surface-2);color:var(--text);font-size:12px;padding:6px 11px">{{ roleLabel('COLLECTEUR') }}</span>
+            } @else {
+              <div style="display:flex;flex-wrap:wrap;gap:7px">
+                @for (r of allRoles; track r) {
+                  <button type="button" (click)="toggleNuRole(r)"
+                          [class.btn-primary]="nuHasRole(r)" [class.btn-outline]="!nuHasRole(r)"
+                          class="btn" style="padding:6px 11px;font-size:12px">{{ roleLabel(r) }}</button>
+                }
+              </div>
+            }
           </field>
           @if (nuHasRole('AGENT')) {
             <field [label]="i18n.t('user_agency')"><input class="input" [value]="nu().agency || ''" (input)="onNu('agency', $event)" /></field>
@@ -273,8 +283,11 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                 @for (r of userRoles(u); track r) {
                   <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(r) }}</span>
                 }
-                <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
-                @if (u.id !== auth.user()?.id) {
+                @if (!isSupervisor()) {
+                  <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
+                }
+                <!-- Supervisor may only enable/disable collecteurs (not supervisors/admins). -->
+                @if (u.id !== auth.user()?.id && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
                   <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
                           style="padding:5px 9px;font-size:11px;white-space:nowrap">
                     {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
@@ -316,7 +329,8 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         }
       </div>
 
-      <!-- Bulk import users -->
+      <!-- Bulk import users — admin only (a supervisor only creates collecteurs one by one). -->
+      @if (!isSupervisor()) {
       <div class="card" style="padding:16px;margin-top:12px">
         <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
           <ic name="download" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
@@ -401,6 +415,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           </div>
         }
       </div>
+      }
 
       }
 
@@ -506,7 +521,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       @if (section() === 'transactions') {
       <h1 style="font-size:21px">{{ i18n.t('nav_transactions') }}</h1>
       <div class="card" style="overflow:hidden;max-width:1180px">
-        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('all_sales') }}</h3>
           <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
@@ -543,10 +558,10 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
               @for (a of agentUsers; track a.id) { <option [value]="a.id">{{ a.name }}</option> }
             </select>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input class="input" type="date" [value]="txFrom()" (change)="txFrom.set($any($event.target).value)" style="flex:1" />
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="input" type="date" [value]="txFrom()" (change)="txFrom.set($any($event.target).value)" style="flex:1;min-width:105px" />
             <span class="muted" style="font-size:12px">→</span>
-            <input class="input" type="date" [value]="txTo()" (change)="txTo.set($any($event.target).value)" style="flex:1" />
+            <input class="input" type="date" [value]="txTo()" (change)="txTo.set($any($event.target).value)" style="flex:1;min-width:105px" />
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-outline" (click)="exportCsv()" [disabled]="!filteredTxs().length" style="flex:1;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('tx_export') }}</button>
@@ -558,7 +573,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         } @else if (filteredTxs().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('tx_empty') }}</p>
         } @else {
-          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(68vh,600px);padding:0 2px">
+          <div style="overflow-y:auto;overflow-x:auto;max-height:min(68vh,600px);padding:0 2px">
             <table class="tx-table">
               <colgroup>
                 <col style="width:44px" />
@@ -618,7 +633,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       @if (section() === 'recharges') {
       <h1 style="font-size:21px">{{ i18n.t('nav_recharges') }}</h1>
       <div class="card" style="overflow:hidden;max-width:1180px">
-        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('rch_all') }}</h3>
           <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
@@ -646,10 +661,10 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
               <option value="cash">{{ i18n.t('pay_cash_name') }}</option>
             </select>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input class="input" type="date" [value]="rFrom()" (change)="rFrom.set($any($event.target).value)" style="flex:1" />
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="input" type="date" [value]="rFrom()" (change)="rFrom.set($any($event.target).value)" style="flex:1;min-width:105px" />
             <span class="muted" style="font-size:12px">→</span>
-            <input class="input" type="date" [value]="rTo()" (change)="rTo.set($any($event.target).value)" style="flex:1" />
+            <input class="input" type="date" [value]="rTo()" (change)="rTo.set($any($event.target).value)" style="flex:1;min-width:105px" />
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-outline" (click)="exportRecharges()" [disabled]="!filteredRecharges().length" style="flex:1;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('tx_export') }}</button>
@@ -661,7 +676,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         } @else if (filteredRecharges().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('rch_empty') }}</p>
         } @else {
-          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(68vh,600px);padding:0 2px">
+          <div style="overflow-y:auto;overflow-x:auto;max-height:min(68vh,600px);padding:0 2px">
             <table class="tx-table">
               <colgroup>
                 <col /><col style="width:170px" /><col style="width:140px" /><col style="width:140px" /><col style="width:96px" /><col style="width:116px" />
@@ -734,7 +749,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       </div>
 
       <div class="card" style="overflow:hidden;max-width:1180px;margin-top:12px">
-        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="store" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('col_all') }}</h3>
           <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredCollectes().length }} {{ i18n.t('tx_count') }}</span>
@@ -754,10 +769,10 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
               @for (c of commercialOptions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
             </select>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input class="input" type="date" [value]="colFrom()" (change)="colFrom.set($any($event.target).value)" style="flex:1" />
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="input" type="date" [value]="colFrom()" (change)="colFrom.set($any($event.target).value)" style="flex:1;min-width:105px" />
             <span class="muted" style="font-size:12px">→</span>
-            <input class="input" type="date" [value]="colTo()" (change)="colTo.set($any($event.target).value)" style="flex:1" />
+            <input class="input" type="date" [value]="colTo()" (change)="colTo.set($any($event.target).value)" style="flex:1;min-width:105px" />
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-outline" (click)="exportCollectes()" [disabled]="!filteredCollectes().length" style="flex:1;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('tx_export') }}</button>
@@ -769,7 +784,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         } @else if (filteredCollectes().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('col_empty') }}</p>
         } @else {
-          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(68vh,600px);padding:0 2px">
+          <div style="overflow-y:auto;overflow-x:auto;max-height:min(68vh,600px);padding:0 2px">
             <table class="tx-table">
               <colgroup>
                 <col style="width:150px" /><col /><col style="width:150px" /><col style="width:150px" /><col style="width:120px" /><col style="width:56px" />
@@ -813,7 +828,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       @if (section() === 'audit') {
       <h1 style="font-size:21px">{{ i18n.t('nav_audit') }}</h1>
       <div class="card" style="overflow:hidden;max-width:1180px">
-        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="shield" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('audit_title') }}</h3>
           <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredAudit().length }}</span>
@@ -835,7 +850,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         } @else if (filteredAudit().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('audit_empty') }}</p>
         } @else {
-          <div style="overflow-y:auto;overflow-x:hidden;max-height:min(70vh,620px);padding:0 2px">
+          <div style="overflow-y:auto;overflow-x:auto;max-height:min(70vh,620px);padding:0 2px">
             <table class="tx-table">
               <colgroup><col style="width:150px" /><col /><col style="width:150px" /><col style="width:130px" /></colgroup>
               <thead>
@@ -898,6 +913,10 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   /** Active sidebar section. */
   section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map'>('overview');
+
+  /** A supervisor (without ADMIN) gets a restricted view: only collecteur user management. */
+  readonly isSupervisor = computed(() => this.auth.hasRole('SUPERVISEUR') && !this.auth.hasRole('ADMIN'));
+  goCollecteStats() { this.router.navigateByUrl('/collecte-stats'); }
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
@@ -1002,6 +1021,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         this.editRolesSaving.set(false); this.editRolesId.set(null);
         this.usersList.update((list) => list.map((x) => (x.id === u.id ? updated : x)));
         if (updated.id === this.auth.user()?.id) this.auth.setUser(updated);
+        this.loadUsers();   // re-sync from the server so the displayed roles can never desync
       },
       error: (err) => {
         this.editRolesSaving.set(false);
@@ -1264,6 +1284,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   rate(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
 
   ngOnInit() {
+    // Supervisor: restricted to collecteur user management — load only users, no admin-only data/poll.
+    if (this.isSupervisor()) {
+      this.section.set('users');
+      this.nuRoles.set(['COLLECTEUR']);
+      this.loadUsers();
+      return;
+    }
     this.api.adminStats().subscribe({ next: (s) => { this.stats.set(s); this.statsLoading.set(false); }, error: () => this.statsLoading.set(false) });
     this.api.paymentStats().subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
     this.api.allSubscriptions().subscribe({ next: (t) => { this.txs.set(t); this.txLoading.set(false); }, error: () => this.txLoading.set(false) });

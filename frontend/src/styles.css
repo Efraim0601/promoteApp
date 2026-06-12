@@ -446,9 +446,10 @@ app-root{ display:block; height:100dvh; }
   .admin-layout{ flex-direction:column; }
   .admin-side{
     width:auto; flex-direction:row; align-items:center; gap:6px; padding:10px 12px;
-    border-right:none; border-bottom:1px solid var(--border); overflow-x:auto; overflow-y:hidden;
+    border-right:none; border-bottom:1px solid var(--border); overflow-x:hidden; overflow-y:hidden;
   }
   .admin-userbox, .admin-spacer, .admin-logout{ display:none; }
-  .admin-nav{ flex-direction:row; gap:6px; }
+  /* Wrap the nav onto as many rows as needed so every item stays visible — no horizontal scroll. */
+  .admin-nav{ flex-direction:row; flex-wrap:wrap; gap:6px; width:100%; }
   .admin-nav button{ width:auto; white-space:nowrap; padding:9px 14px; }
 }

@@ -76,10 +76,10 @@ import { ReceiptService } from '../shared/receipt';
               @for (p of payMethods; track p.id) { <option [value]="p.id">{{ p.name }}</option> }
             </select>
           </div>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input class="input" type="date" [value]="txFrom()" (change)="txFrom.set($any($event.target).value)" style="flex:1" />
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <input class="input" type="date" [value]="txFrom()" (change)="txFrom.set($any($event.target).value)" style="flex:1;min-width:105px" />
             <span class="muted" style="font-size:12px">→</span>
-            <input class="input" type="date" [value]="txTo()" (change)="txTo.set($any($event.target).value)" style="flex:1" />
+            <input class="input" type="date" [value]="txTo()" (change)="txTo.set($any($event.target).value)" style="flex:1;min-width:105px" />
           </div>
           <div style="display:flex;gap:8px">
             <button class="btn btn-outline" (click)="exportCsv()" [disabled]="!filtered().length" style="flex:1;padding:9px;font-size:13px"><ic name="copy" [size]="15"></ic> {{ i18n.t('tx_export') }}</button>

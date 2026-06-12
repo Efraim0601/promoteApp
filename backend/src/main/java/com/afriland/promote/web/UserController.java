@@ -66,6 +66,13 @@ public class UserController {
                                         Authentication auth) {
         AppUser u = users.findById(id).orElse(null);
         if (u == null) return ResponseEntity.notFound().build();
+        // A supervisor may only enable/disable COLLECTEUR accounts (never admins/supervisors/others).
+        if (isSupervisorOnly(auth)) {
+            Set<Role> tr = u.effectiveRoles();
+            if (!tr.contains(Role.COLLECTEUR) || tr.contains(Role.ADMIN) || tr.contains(Role.SUPERVISEUR)) {
+                return ResponseEntity.status(403).body(new ErrorResponse("forbidden_target"));
+            }
+        }
         if (!req.enabled()) {
             if (id.equals(auth.getName())) {
                 return ResponseEntity.badRequest().body(new ErrorResponse("cannot_disable_self"));
@@ -127,9 +134,10 @@ public class UserController {
                 .findAny().isEmpty();
     }
 
-    /** Create a staff account. Rejects a duplicate email or an unknown role. */
+    /** Create a staff account. Rejects a duplicate email or an unknown role. A supervisor may only
+     *  create COLLECTEUR accounts. */
     @PostMapping
-    public ResponseEntity<?> create(@Valid @RequestBody CreateUserRequest req) {
+    public ResponseEntity<?> create(@Valid @RequestBody CreateUserRequest req, Authentication auth) {
         List<Role> roles;
         try {
             roles = parseRoles(req.rolesOrSingle());
@@ -137,6 +145,10 @@ public class UserController {
             return ResponseEntity.badRequest().body(new ErrorResponse("invalid_role"));
         }
         if (roles.isEmpty()) return ResponseEntity.badRequest().body(new ErrorResponse("invalid_role"));
+        // A supervisor may only create COLLECTEUR accounts (single role).
+        if (isSupervisorOnly(auth) && (roles.size() != 1 || roles.get(0) != Role.COLLECTEUR)) {
+            return ResponseEntity.status(403).body(new ErrorResponse("forbidden_role"));
+        }
         Role role = roles.get(0);   // primary
         if (users.findByEmailIgnoreCase(req.email().trim()).isPresent()) {
             return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));

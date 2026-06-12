@@ -49,15 +49,15 @@ import { SpinnerComponent } from '../shared/spinner';
       @if (mode() === 'caisse') {
       <!-- The cashier can also initiate a new subscription or a recharge (hidden while viewing a record). -->
       @if (!rec() && !rRec()) {
-        <div style="display:flex;gap:10px">
-          <button class="btn btn-primary" (click)="newSub()" style="flex:1"><ic name="plus" [size]="18"></ic> {{ i18n.t('new_sub_btn') }}</button>
-          <button class="btn btn-outline" (click)="newRecharge()" style="flex:1"><ic name="phone" [size]="18"></ic> {{ i18n.t('new_recharge_btn') }}</button>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn btn-primary" (click)="newSub()" style="flex:1;min-width:150px"><ic name="plus" [size]="18"></ic> {{ i18n.t('new_sub_btn') }}</button>
+          <button class="btn btn-outline" (click)="newRecharge()" style="flex:1;min-width:150px"><ic name="phone" [size]="18"></ic> {{ i18n.t('new_recharge_btn') }}</button>
         </div>
       }
 
       <!-- Cashier KPIs (hidden while viewing a single record) -->
       @if (!rec() && stats(); as st) {
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
           <div class="kpi"><div class="kv" style="color:var(--primary)">{{ st.myCount }}</div><div class="kl">{{ i18n.t('cash_kpi_mine') }}</div></div>
           <div class="kpi"><div class="kv" style="color:var(--success)">{{ st.myCountToday }}</div><div class="kl">{{ i18n.t('kpi_today') }}</div></div>
           <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.pendingCount }}</div><div class="kl">{{ i18n.t('cash_kpi_queue') }}</div></div>

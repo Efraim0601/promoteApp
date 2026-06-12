@@ -11,7 +11,7 @@ export const routes: Routes = [
   { path: 'change-password', canActivate: [sessionGuard],
     loadComponent: () => import('./pages/change-password').then((m) => m.ChangePasswordComponent) },
 
-  { path: 'admin', canActivate: [roleGuard('ADMIN')], loadComponent: () => import('./pages/admin').then((m) => m.AdminComponent) },
+  { path: 'admin', canActivate: [roleGuard('ADMIN', 'SUPERVISEUR')], loadComponent: () => import('./pages/admin').then((m) => m.AdminComponent) },
   { path: 'agent', canActivate: [roleGuard('AGENT')], loadComponent: () => import('./pages/agent-home').then((m) => m.AgentHomeComponent) },
 
   // assisted subscription — relationship officers and cashiers

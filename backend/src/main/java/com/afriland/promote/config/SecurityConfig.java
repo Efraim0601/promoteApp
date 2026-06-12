@@ -65,6 +65,13 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/agents").hasRole("ADMIN")
                 .requestMatchers("/api/agencies/**").hasRole("ADMIN")
+                // User management: role changes + import are ADMIN-only; listing, creation and
+                // enable/disable are also open to the SUPERVISEUR (restricted to collecteurs in the controller).
+                .requestMatchers(HttpMethod.PUT, "/api/users/*/roles").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/api/users/import").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.POST, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.PATCH, "/api/users/*/enabled").hasAnyRole("ADMIN", "SUPERVISEUR")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/stats/admin").hasRole("ADMIN")
                 .requestMatchers("/api/stats/payments").hasRole("ADMIN")
