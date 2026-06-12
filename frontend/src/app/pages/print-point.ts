@@ -199,7 +199,7 @@ import { SpinnerComponent } from '../shared/spinner';
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm(r).bg" [style.color]="pm(r).fg" style="width:22px;height:22px;font-size:9px;border-radius:6px;overflow:hidden">@if (pm(r).logo) { <img [src]="pm(r).logo" [alt]="pm(r).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(r).short }} }</span>{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : pm(r).name }}</span></div>
               <div class="srow"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ r.delivery === 'agence' && r.pickupAgencyName ? r.pickupAgencyName : i18n.t('del_' + r.delivery + '_title') }}</span></div>
               @if (r.payStatus === 'cash') {
-                <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--accent)">{{ i18n.money(r.amount) }}</span></div>
+                <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--warning)">{{ i18n.money(r.amount) }}</span></div>
               } @else if (r.payStatus === 'sara_pending') {
                 <div class="srow total"><span class="lbl">{{ i18n.t('pp_sara_amount') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
               } @else {

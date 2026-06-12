@@ -43,7 +43,7 @@ import { SpinnerComponent } from '../shared/spinner';
       <!-- Tabs: cash desk vs recharge validation. -->
       <div style="display:flex;gap:8px">
         <button class="btn" [class.btn-primary]="mode()==='caisse'" [class.btn-outline]="mode()!=='caisse'" (click)="setMode('caisse')" style="flex:1;padding:9px;font-size:13px"><ic name="store" [size]="16"></ic> {{ i18n.t('cash_tab_cash') }}</button>
-        <button class="btn" [class.btn-primary]="mode()==='recharges'" [class.btn-outline]="mode()!=='recharges'" (click)="setMode('recharges')" style="flex:1;padding:9px;font-size:13px"><ic name="phone" [size]="16"></ic> {{ i18n.t('cash_tab_recharges') }}@if (pendingRch().length) { <span style="margin-left:5px;background:var(--accent);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ pendingRch().length }}</span> }</button>
+        <button class="btn" [class.btn-primary]="mode()==='recharges'" [class.btn-outline]="mode()!=='recharges'" (click)="setMode('recharges')" style="flex:1;padding:9px;font-size:13px"><ic name="phone" [size]="16"></ic> {{ i18n.t('cash_tab_recharges') }}@if (pendingRch().length) { <span style="margin-left:5px;background:var(--warning);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ pendingRch().length }}</span> }</button>
       </div>
 
       @if (mode() === 'caisse') {
@@ -64,7 +64,7 @@ import { SpinnerComponent } from '../shared/spinner';
         </div>
         <p class="muted" style="font-size:11.5px;margin-top:-4px;text-align:center">
           {{ i18n.t('cash_kpi_collected') }} : <b style="color:var(--text)">{{ i18n.money(st.myCollected) }}</b>
-          · {{ i18n.t('cash_kpi_pending_amount') }} : <b style="color:var(--accent)">{{ i18n.money(st.pendingAmount) }}</b>
+          · {{ i18n.t('cash_kpi_pending_amount') }} : <b style="color:var(--warning)">{{ i18n.money(st.pendingAmount) }}</b>
         </p>
         <p class="muted" style="font-size:10.5px;margin-top:-8px;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</p>
       }
@@ -150,7 +150,7 @@ import { SpinnerComponent } from '../shared/spinner';
             <div style="padding:0 16px 14px">
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val">{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : rpm(r).name }}</span></div>
               @if (r.payStatus === 'cash') {
-                <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--accent)">{{ i18n.money(r.amount) }}</span></div>
+                <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--warning)">{{ i18n.money(r.amount) }}</span></div>
               } @else {
                 <div class="srow total"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
               }
@@ -209,7 +209,7 @@ import { SpinnerComponent } from '../shared/spinner';
             <div style="padding:0 16px 14px">
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm(r).bg" [style.color]="pm(r).fg" style="width:22px;height:22px;font-size:9px;border-radius:6px;overflow:hidden">@if (pm(r).logo) { <img [src]="pm(r).logo" [alt]="pm(r).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(r).short }} }</span>{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : pm(r).name }}</span></div>
               @if (r.payStatus === 'cash') {
-                <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--accent)">{{ i18n.money(r.amount) }}</span></div>
+                <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--warning)">{{ i18n.money(r.amount) }}</span></div>
               } @else {
                 <div class="srow total"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
               }
