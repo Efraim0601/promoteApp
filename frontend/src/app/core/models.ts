@@ -141,6 +141,7 @@ export interface MapPoint {
 export interface CreateRechargeRequest {
   prenom: string;
   nom: string;
+  phone: string;
   pan: string;
   amount: number;
   pay: string;
@@ -157,6 +158,7 @@ export interface Recharge {
   prenom: string;
   nom: string;
   fullName: string;
+  phone?: string | null;
   pan: string;
   amount: number;
   pay: string;

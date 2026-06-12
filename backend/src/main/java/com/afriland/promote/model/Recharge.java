@@ -33,6 +33,9 @@ public class Recharge implements Payable {
     private String nom;
     private String fullName;
 
+    /** Cardholder's contact phone — may differ from the MoMo number used to pay ({@link #payPhone}). */
+    private String phone;
+
     /** Primary Account Number of the card being topped up. Captured as-is (format-checked only). */
     private String pan;
 

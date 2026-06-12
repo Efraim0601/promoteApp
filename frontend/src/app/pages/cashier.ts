@@ -6,7 +6,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { CashierStats, Recharge, Subscription } from '../core/models';
-import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, formatPhone } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -145,6 +145,7 @@ import { SpinnerComponent } from '../shared/spinner';
             <div style="padding:16px 16px 6px">
               <div style="font-size:16px;font-weight:800">{{ r.fullName }}</div>
               <div class="muted" style="font-size:12px;margin-top:3px">{{ i18n.t('recharge_pan_short') }} {{ fmtPan(r.pan) }}</div>
+              @if (r.phone) { <div class="muted" style="font-size:12px;margin-top:2px"><ic name="phone" [size]="12" style="vertical-align:-1px;margin-right:4px"></ic>{{ fmtPhone(r.phone) }}</div> }
             </div>
             <div style="padding:0 16px 14px">
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val">{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : rpm(r).name }}</span></div>
@@ -541,6 +542,7 @@ export class CashierComponent implements OnInit, OnDestroy {
   }
   rpm = (r: Recharge) => payById(r.pay);
   fmtPan = (v: string) => formatPan(v);
+  fmtPhone = (v: string) => formatPhone(v);
 
   /** Confirm the cash was collected → marks the subscription paid (then printable). */
   doValidate(ref: string) {

@@ -292,6 +292,7 @@ public final class Dtos {
     public record CreateRechargeRequest(
             @NotBlank String prenom,
             @NotBlank String nom,
+            @NotBlank String phone,      // cardholder contact number (may differ from the MoMo payPhone)
             @NotBlank String pan,        // card PAN being topped up (captured, format-checked client-side)
             int amount,                  // XAF (free entry)
             @NotBlank String pay,        // om | mtn | cash | sara
@@ -302,7 +303,7 @@ public final class Dtos {
 
     /** Recharge view returned to the client / staff. */
     public record RechargeDto(
-            String ref, String prenom, String nom, String fullName, String pan, int amount,
+            String ref, String prenom, String nom, String fullName, String phone, String pan, int amount,
             String pay, String payPhone, String payStatus, String status,
             boolean hasSaraReceipt, String saraRef, String saraPayerPhone, Integer saraAmount,
             String cashCollectedBy, String cashCollectedAt,
@@ -310,7 +311,7 @@ public final class Dtos {
             String createdAt, String paymentMessage) {
         public static RechargeDto of(com.afriland.promote.model.Recharge r) {
             return new RechargeDto(
-                    r.getRef(), r.getPrenom(), r.getNom(), r.getFullName(), r.getPan(), r.getAmount(),
+                    r.getRef(), r.getPrenom(), r.getNom(), r.getFullName(), r.getPhone(), r.getPan(), r.getAmount(),
                     r.getPay(), r.getPayPhone(), r.getPayStatus().name(), r.getStatus(),
                     r.getSaraReceiptKey() != null, r.getSaraRef(), r.getSaraPayerPhone(), r.getSaraAmount(),
                     r.getCashCollectedBy(), r.getCashCollectedAt() == null ? null : r.getCashCollectedAt().toString(),

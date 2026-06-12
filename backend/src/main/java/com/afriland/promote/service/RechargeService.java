@@ -119,6 +119,7 @@ public class RechargeService {
                 .prenom(req.prenom().trim())
                 .nom(req.nom().trim())
                 .fullName((req.prenom().trim() + " " + req.nom().trim()).trim())
+                .phone(req.phone() == null ? null : req.phone().trim())
                 .pan(pan)
                 .amount(amount)
                 .latitude(req.latitude())

@@ -22,7 +22,7 @@ const MIN_AMOUNT = 500;
 const MAX_AMOUNT = 1_000_000;
 
 interface RechargeForm {
-  prenom: string; nom: string; pan: string; amount: string;
+  prenom: string; nom: string; phone: string; pan: string; amount: string;
   pay: string; payPhone: string;
   saraReceiptData: string | null; saraReceiptKey: string | null; saraRef: string;
 }
@@ -193,6 +193,8 @@ interface RechargeForm {
         <field [label]="i18n.t('prenom')" [err]="e('prenom')"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('prenom_ph')" [value]="form.prenom" (input)="set('prenom', $any($event.target).value)" /></div></field>
         <field [label]="i18n.t('nom')" [err]="e('nom')"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('nom_ph')" [value]="form.nom" (input)="set('nom', $any($event.target).value)" /></div></field>
 
+        <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
+
         <field [label]="i18n.t('recharge_pan_label')" [hint]="i18n.t('recharge_pan_hint')" [err]="e('pan')">
           <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
             <input inputmode="numeric" maxlength="19" [placeholder]="i18n.t('recharge_pan_ph')" [value]="form.pan" (input)="onPan($any($event.target).value)" style="letter-spacing:.06em" />
@@ -301,7 +303,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   readonly saraSteps = ['sara_step1', 'sara_step2', 'sara_step3', 'sara_step4', 'sara_step5'];
 
   form: RechargeForm = {
-    prenom: '', nom: '', pan: '', amount: '',
+    prenom: '', nom: '', phone: '', pan: '', amount: '',
     pay: 'om', payPhone: '',
     saraReceiptData: null, saraReceiptKey: null, saraRef: '',
   };
@@ -325,7 +327,9 @@ export class RechargeComponent implements OnInit, OnDestroy {
 
   set<K extends keyof RechargeForm>(k: K, v: RechargeForm[K]) {
     this.form[k] = v;
-    // When a MoMo method is picked, default the payment number to the contact... (none here) — leave blank.
+    // When a MoMo method is picked, default the payment number to the contact phone (still editable):
+    // the client may pay from a different number, which they can correct at the payment step.
+    if (k === 'pay' && (v === 'om' || v === 'mtn') && !this.form.payPhone) this.form.payPhone = this.form.phone;
     this.persist();
   }
   /** PAN: keep digits only, capped at 16 (grouped in blocks of 4 for display). */
@@ -355,6 +359,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
 
   // ---- validation ----
   get nameOk() { return !!this.form.prenom.trim() && !!this.form.nom.trim(); }
+  get phoneOk() { return isValidPhoneNumber(this.form.phone); }
   get panOk() { return this.panDigits.length === PAN_DIGITS; }
   get amountOk() { const a = this.amountValue; return a >= this.min() && a <= this.max(); }
   get payPhoneOk() {
@@ -382,13 +387,14 @@ export class RechargeComponent implements OnInit, OnDestroy {
     if (this.form.pay === 'sara') return !!this.form.saraReceiptKey && !!this.form.saraRef.trim();
     return true;  // cash
   }
-  get formComplete() { return this.nameOk && this.panOk && this.amountOk && this.payStepOk; }
+  get formComplete() { return this.nameOk && this.phoneOk && this.panOk && this.amountOk && this.payStepOk; }
 
   /** Field error (shown once touched). */
-  e(field: 'prenom' | 'nom' | 'pan' | 'amount'): string | null {
+  e(field: 'prenom' | 'nom' | 'phone' | 'pan' | 'amount'): string | null {
     if (!this.touched()) return null;
     if (field === 'prenom') return this.form.prenom.trim() ? null : this.i18n.t('required');
     if (field === 'nom') return this.form.nom.trim() ? null : this.i18n.t('required');
+    if (field === 'phone') return !this.form.phone ? this.i18n.t('required') : !this.phoneOk ? this.i18n.t('invalid_phone') : null;
     if (field === 'pan') return this.panOk ? null : this.i18n.t('recharge_pan_invalid');
     if (field === 'amount') return this.amountOk ? null : this.i18n.t('recharge_amount_invalid');
     return null;
@@ -412,7 +418,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   // ---- submit ----
   private payload() {
     return {
-      prenom: this.form.prenom.trim(), nom: this.form.nom.trim(),
+      prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), phone: this.form.phone,
       pan: this.panDigits, amount: this.amountValue, pay: this.form.pay,
       payPhone: this.isMomo ? this.form.payPhone : undefined,
       saraReceiptKey: this.form.pay === 'sara' ? this.form.saraReceiptKey : undefined,
@@ -499,7 +505,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   reset() {
     this.stopPolling();
     this.clearPersist();
-    this.form = { prenom: '', nom: '', pan: '', amount: '', pay: 'om', payPhone: '', saraReceiptData: null, saraReceiptKey: null, saraRef: '' };
+    this.form = { prenom: '', nom: '', phone: '', pan: '', amount: '', pay: 'om', payPhone: '', saraReceiptData: null, saraReceiptKey: null, saraRef: '' };
     this.touched.set(false); this.result.set(null); this.proc.set(null);
     this.waitLong.set(false); this.refreshing.set(false);
     this.started.set(true);
