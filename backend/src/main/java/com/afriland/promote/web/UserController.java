@@ -35,10 +35,24 @@ public class UserController {
         this.email = email;
     }
 
-    /** List every staff account (all roles). */
+    /** List staff accounts. Admin sees everyone; a supervisor sees only collecteurs + supervisors. */
     @GetMapping
-    public List<UserDto> list() {
-        return users.findAll().stream().map(UserDto::of).toList();
+    public List<UserDto> list(Authentication auth) {
+        boolean supOnly = isSupervisorOnly(auth);
+        return users.findAll().stream()
+                .filter(u -> !supOnly
+                        || u.effectiveRoles().contains(Role.COLLECTEUR)
+                        || u.effectiveRoles().contains(Role.SUPERVISEUR))
+                .map(UserDto::of).toList();
+    }
+
+    /** True when the caller holds SUPERVISEUR but not ADMIN (restricted scope: collecteurs only). */
+    private boolean isSupervisorOnly(Authentication auth) {
+        if (auth == null) return false;
+        AppUser caller = users.findById(auth.getName()).orElse(null);
+        if (caller == null) return false;
+        Set<Role> r = caller.effectiveRoles();
+        return r.contains(Role.SUPERVISEUR) && !r.contains(Role.ADMIN);
     }
 
     /**
@@ -87,6 +101,12 @@ public class UserController {
         }
         u.assignRoles(roles);
         return ResponseEntity.ok(UserDto.of(users.save(u)));
+    }
+
+    /** Split a role cell into individual role tokens (separators: | / or +). */
+    private static List<String> splitRoles(String cell) {
+        if (cell == null || cell.isBlank()) return List.of();
+        return java.util.Arrays.stream(cell.split("[|/+]")).map(String::trim).filter(s -> !s.isEmpty()).toList();
     }
 
     /** Parse + validate a list of role names (case-insensitive, de-duplicated, order preserved). */
@@ -174,55 +194,63 @@ public class UserController {
                 out.add(new ImportRowResult(email, name, roleRaw, "invalid", "invalid_name_or_email", null));
                 invalid++; continue;
             }
-            Role role;
+            // The role cell may carry several roles separated by | / or + (e.g. "AGENT|COLLECTEUR").
+            List<Role> roles;
             try {
-                role = Role.valueOf(roleRaw.toUpperCase());
+                roles = parseRoles(splitRoles(roleRaw));
             } catch (IllegalArgumentException e) {
                 out.add(new ImportRowResult(email, name, roleRaw, "invalid", "invalid_role", null));
                 invalid++; continue;
             }
+            if (roles.isEmpty()) {
+                out.add(new ImportRowResult(email, name, roleRaw, "invalid", "invalid_role", null));
+                invalid++; continue;
+            }
+            String rolesLabel = String.join(",", roles.stream().map(Role::name).toList());
             String phone = row.phone() == null ? "" : row.phone().replaceAll("\\D", "");
             if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
-            if (role == Role.AGENT && !phone.matches("6\\d{8}")) {
-                out.add(new ImportRowResult(email, name, role.name(), "invalid", "agent_phone_required", null));
+            if (roles.contains(Role.AGENT) && !phone.matches("6\\d{8}")) {
+                out.add(new ImportRowResult(email, name, rolesLabel, "invalid", "agent_phone_required", null));
                 invalid++; continue;
             }
             String agency = row.agency() == null || row.agency().isBlank() ? null : row.agency().trim();
 
             // The same email twice in one file: keep the first, skip the rest.
             if (!seenInFile.add(email.toLowerCase())) {
-                out.add(new ImportRowResult(email, name, role.name(), "skipped", "duplicate_in_file", null));
+                out.add(new ImportRowResult(email, name, rolesLabel, "skipped", "duplicate_in_file", null));
                 skipped++; continue;
             }
 
             AppUser existing = users.findByEmailIgnoreCase(email).orElse(null);
             if (existing != null) {
                 if (!update) {
-                    out.add(new ImportRowResult(email, name, role.name(), "skipped", "email_exists", null));
+                    out.add(new ImportRowResult(email, name, rolesLabel, "skipped", "email_exists", null));
                     skipped++; continue;
                 }
                 existing.setName(name);
-                existing.setRole(role);
+                existing.assignRoles(roles);
                 existing.setAgency(agency);
                 existing.setPhone(phone.isBlank() ? null : phone);
                 users.save(existing);
-                out.add(new ImportRowResult(email, name, role.name(), "updated", null, null));
+                out.add(new ImportRowResult(email, name, rolesLabel, "updated", null, null));
                 updated++; continue;
             }
 
             String temp = genPassword();
-            users.save(AppUser.builder()
+            AppUser u = AppUser.builder()
                     .id("u-" + UUID.randomUUID().toString().substring(0, 8))
                     .name(name).email(email)
                     .passwordHash(encoder.encode(temp))
-                    .role(role).agency(agency)
+                    .role(roles.get(0)).agency(agency)
                     .phone(phone.isBlank() ? null : phone)
                     .mustChangePassword(true)   // forced change on first login
-                    .build());
+                    .build();
+            u.assignRoles(roles);
+            users.save(u);
             // Email the new user their login link + temporary password (best-effort; the temp
             // password is also returned below as a fallback for the admin).
             this.email.sendAccountCreated(email, name, temp);
-            out.add(new ImportRowResult(email, name, role.name(), "created", null, temp));
+            out.add(new ImportRowResult(email, name, rolesLabel, "created", null, temp));
             created++;
         }
         return new ImportUsersResult(created, updated, skipped, invalid, out);

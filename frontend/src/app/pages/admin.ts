@@ -1341,12 +1341,14 @@ export class AdminComponent implements OnInit, OnDestroy {
       const name = (r.name || '').trim();
       const email = (r.email || '').trim();
       const role = (r.role || '').trim().toUpperCase();
+      const roles = role.split('|').map((x) => x.trim()).filter(Boolean);
       const phone9 = (r.phone || '').replace(/\D/g, '').slice(-9);
+      const known = ['ADMIN', 'AGENT', 'PRINT_AGENT', 'CASHIER', 'COLLECTEUR', 'SUPERVISEUR'];
       let status: 'new' | 'duplicate' | 'invalid' = 'new';
       let reason = '';
       if (!name || !/\S+@\S+\.\S+/.test(email)) { status = 'invalid'; reason = 'name_email'; }
-      else if (role !== 'ADMIN' && role !== 'AGENT' && role !== 'PRINT_AGENT' && role !== 'CASHIER' && role !== 'COLLECTEUR' && role !== 'SUPERVISEUR') { status = 'invalid'; reason = 'role'; }
-      else if (role === 'AGENT' && !/^6\d{8}$/.test(phone9)) { status = 'invalid'; reason = 'phone'; }
+      else if (!roles.length || !roles.every((x) => known.includes(x))) { status = 'invalid'; reason = 'role'; }
+      else if (roles.includes('AGENT') && !/^6\d{8}$/.test(phone9)) { status = 'invalid'; reason = 'phone'; }
       else {
         const key = email.toLowerCase();
         if (existing.has(key) || seen.has(key)) status = 'duplicate';
@@ -1392,9 +1394,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
     const g = (row: string[], i: number) => (i >= 0 && i < row.length ? row[i] : '');
     return rows.map((row) => ({
-      name: g(row, idx.name), email: g(row, idx.email), role: this.normRole(g(row, idx.role)),
+      name: g(row, idx.name), email: g(row, idx.email), role: this.normRoles(g(row, idx.role)),
       phone: g(row, idx.phone), agency: g(row, idx.agency),
     }));
+  }
+  /** Normalise a role cell that may carry several roles (separators | / +) → canonical "A|B". */
+  private normRoles(cell: string): string {
+    const parts = (cell || '').split(/[|/+]/).map((p) => this.normRole(p)).filter((p) => p);
+    return [...new Set(parts)].join('|');
   }
   /** Map free-text / localized role labels to the enum code. */
   private normRole(r: string): string {
@@ -1440,7 +1447,10 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.downloadCsv('modele-utilisateurs.csv',
       '﻿nom,email,role,telephone,agence\r\n'
       + 'Yvan Ngameni,yvan.ngameni@afrilandfirstbank.com,AGENT,690112233,Akwa\r\n'
-      + 'Paul Mbarga,paul.mbarga@afrilandfirstbank.com,PRINT_AGENT,,\r\n');
+      + 'Paul Mbarga,paul.mbarga@afrilandfirstbank.com,PRINT_AGENT,,\r\n'
+      + 'Awa Fall,awa.fall@afrilandfirstbank.com,AGENT|COLLECTEUR,699001122,Bonanjo\r\n'
+      + 'Marie Eyenga,marie.eyenga@afrilandfirstbank.com,SUPERVISEUR|COLLECTEUR,,\r\n'
+      + 'Jean Tabi,jean.tabi@afrilandfirstbank.com,CASHIER,,\r\n');
   }
   downloadCredentials() {
     const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
