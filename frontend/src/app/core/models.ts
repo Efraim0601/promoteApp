@@ -47,8 +47,10 @@ export interface CardConfig {
   transport: number;
   rechargeMin: number;   // recharge free-entry lower bound (XAF)
   rechargeMax: number;   // recharge free-entry upper bound (XAF)
-  rechargeInitiale: number;  // Offre Promote — recharge initiale (XAF)
-  passPremium: number;       // Offre Promote — Pass Premium (XAF)
+  rechargeInitiale: number;  // Offre Promote — recharge initiale, carte prépayée (XAF)
+  passPremium: number;       // Offre Promote — Pass Premium, carte prépayée (XAF)
+  rechargeInitialeBancaire: number;  // recharge initiale, carte bancaire (XAF)
+  passPremiumBancaire: number;       // Pass Premium, carte bancaire (XAF)
 }
 
 export type PayStatus = 'pending' | 'paid' | 'cash' | 'sara_pending' | 'failed';
@@ -71,6 +73,7 @@ export interface Subscription {
   payPhone?: string | null;  // MoMo number used for payment (may differ from contact phone)
   delivery: string;   // promote | agence | home
   pickupAgencyName?: string | null;  // chosen pickup branch name (delivery == agence)
+  cardType?: string;  // bancaire | prepaid
   amount: number;
   transport: number;
   channel: string;    // agent | self
@@ -112,6 +115,7 @@ export interface CreateSubscriptionRequest {
   payPhone?: string | null;
   delivery: string;
   pickupAgencyId?: string | null;  // chosen pickup branch id when delivery == agence
+  cardType?: string;  // bancaire | prepaid (defaults to bancaire server-side)
   selfie: boolean;
   selfieKey?: string | null;
   cniRectoKey?: string | null;

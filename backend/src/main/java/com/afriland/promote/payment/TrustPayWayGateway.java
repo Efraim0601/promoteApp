@@ -67,7 +67,7 @@ public class TrustPayWayGateway implements PaymentGateway {
                 "amount", String.valueOf(sub.getAmount()),
                 "currency", "XAF",
                 "subscriberMsisdn", msisdn,
-                "description", "Carte Promote " + sub.getRef(),
+                "description", sub.getPaymentLabel(),
                 "orderId", orderId,
                 "notifUrl", props.getNotifUrl()
         );

@@ -143,7 +143,7 @@ const FR: Record<string, string> = {
   // ---- public services choice + card recharge ----
   services_title: 'Que souhaitez-vous faire ?',
   services_sub: 'Choisissez un service pour commencer.',
-  svc_buy_title: 'Souscrire gratuitement la carte', svc_buy_desc: 'Souscrivez à une nouvelle carte prépayée.',
+  svc_buy_title: 'Souscrire à une carte bancaire', svc_buy_desc: 'Profitez de l\'offre promotionnelle et choisissez votre carte.',
   svc_recharge_title: 'Recharger ma carte', svc_recharge_desc: 'Rechargez votre carte prépayée existante en quelques secondes.',
   recharge_welcome_title: 'Recharge de carte',
   recharge_welcome_desc: 'Rechargez votre carte prépayée Afriland en toute simplicité, sans compte.',
@@ -352,10 +352,16 @@ const FR: Record<string, string> = {
   cfg_recharge_title: 'Recharge — montants autorisés', cfg_recharge_min: 'Montant minimum', cfg_recharge_max: 'Montant maximum',
   // ---- Offre Promote (carte gratuite + cashback) ----
   cfg_offer_title: 'Offre Promote', cfg_offer_sub: 'Carte gratuite : le client règle la recharge initiale + le Pass Premium (= total de la souscription).',
-  offer_title: 'OFFRE PROMOTE', offer_card_label: 'Carte prépayée', offer_free: 'OFFERTE',
+  cfg_offer_prepaid_title: 'Carte prépayée', cfg_offer_bancaire_title: 'Carte bancaire',
+  offer_title: 'OFFRE PROMOTE', offer_card_label: 'Carte prépayée', offer_card_label_bancaire: 'Carte bancaire', offer_free: 'OFFERTE',
   offer_cashback: '1% de cashback sur tous vos paiements pendant Promote.',
   offer_conditions: 'Pour en profiter',
   offer_recharge_initiale: 'Recharge initiale', offer_pass_premium: 'Pass Premium (accès permanent à promote)',
+  // ---- Choix du type de carte (souscription) ----
+  cardtype_choose_label: 'Quelle carte souhaitez-vous payer ?',
+  cardtype_bancaire_title: 'Carte bancaire', cardtype_bancaire_desc: 'Payer une carte bancaire.',
+  cardtype_prepaid_title: 'Carte prépayée', cardtype_prepaid_desc: 'Payer une carte prépayée.',
+  cardtype_label: 'Type de carte',
   arrived_via: 'Arrivé via lien / QR',
   login_title: 'Espace professionnel',
   login_sub: 'Connectez-vous pour gérer les souscriptions Promote.',
@@ -587,7 +593,7 @@ const EN: Record<string, string> = {
   // ---- public services choice + card recharge ----
   services_title: 'What would you like to do?',
   services_sub: 'Choose a service to get started.',
-  svc_buy_title: 'Subscribe to the card for free', svc_buy_desc: 'Subscribe to a new prepaid card.',
+  svc_buy_title: 'Subscribe to a bank card', svc_buy_desc: 'Enjoy the promotional offer and choose your card.',
   svc_recharge_title: 'Recharge my card', svc_recharge_desc: 'Top up your existing prepaid card in seconds.',
   recharge_welcome_title: 'Card recharge',
   recharge_welcome_desc: 'Top up your Afriland prepaid card easily, no account needed.',
@@ -780,10 +786,16 @@ const EN: Record<string, string> = {
   cfg_recharge_title: 'Recharge — allowed amounts', cfg_recharge_min: 'Minimum amount', cfg_recharge_max: 'Maximum amount',
   // ---- Promote offer (free card + cashback) ----
   cfg_offer_title: 'Promote offer', cfg_offer_sub: 'Free card: the client pays the initial top-up + the Premium Pass (= subscription total).',
-  offer_title: 'PROMOTE OFFER', offer_card_label: 'Prepaid card', offer_free: 'FREE',
+  cfg_offer_prepaid_title: 'Prepaid card', cfg_offer_bancaire_title: 'Bank card',
+  offer_title: 'PROMOTE OFFER', offer_card_label: 'Prepaid card', offer_card_label_bancaire: 'Bank card', offer_free: 'FREE',
   offer_cashback: '1% cashback on all your payments during Promote.',
   offer_conditions: 'To qualify',
   offer_recharge_initiale: 'Initial top-up', offer_pass_premium: 'Premium Pass (permanent access to promote)',
+  // ---- Card type choice (subscription) ----
+  cardtype_choose_label: 'Which card would you like to pay for?',
+  cardtype_bancaire_title: 'Bank card', cardtype_bancaire_desc: 'Pay for a bank card.',
+  cardtype_prepaid_title: 'Prepaid card', cardtype_prepaid_desc: 'Pay for a prepaid card.',
+  cardtype_label: 'Card type',
   login_title: 'Staff area', login_sub: 'Sign in to manage Promote subscriptions.',
   login_email: 'Username', login_email_ph: 'first.last@afrilandfirstbank.com',
   login_pw: 'Password', login_btn: 'Sign in', login_err: 'Wrong username or password.',

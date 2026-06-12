@@ -54,6 +54,10 @@ public class Subscription implements Payable {
     private String payPhone;        // "+237 6XXXXXXXX" — MoMo number used for payment (may differ from phone)
     private String delivery;        // promote | agence | home
 
+    /** Type de carte souscrite : bancaire | prepaid. Détermine le couple de montants appliqués
+     *  (config) et le motif de paiement envoyé à l'agrégateur. Défaut : bancaire. */
+    private String cardType;        // bancaire | prepaid
+
     /** Chosen pickup branch when delivery == agence. The name is snapshotted so it survives the
      *  agency being renamed or removed later; the id links back to the {@code Agency} row. */
     private String pickupAgencyId;
@@ -150,5 +154,15 @@ public class Subscription implements Payable {
         if (payStatus == PayStatus.sara_pending) return "sara_pending";
         if (payStatus == PayStatus.pending) return "pending"; // en attente de paiement (PIN client non saisi)
         return "paid"; // payé, pas encore imprimé -> « à imprimer »
+    }
+
+    /** Motif de paiement envoyé à l'agrégateur — varie selon le type de carte choisi.
+     *  Carte bancaire → « Carte bancaire &lt;ref&gt; » ; carte prépayée → « Carte prépayée Promote &lt;ref&gt; ». */
+    @Override
+    @Transient
+    public String getPaymentLabel() {
+        return "prepaid".equals(cardType)
+                ? "Carte prépayée Promote " + getRef()
+                : "Carte bancaire " + getRef();
     }
 }

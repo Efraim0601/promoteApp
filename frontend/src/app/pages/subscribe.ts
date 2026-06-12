@@ -34,6 +34,7 @@ interface WizardForm {
   cniVersoData: string | null; cniVersoKey: string | null;
   saraReceiptData: string | null; saraReceiptKey: string | null; saraRef: string;
   pay: string; payPhone: string; delivery: string; pickupAgencyId: string; refPhone: string;
+  cardType: 'bancaire' | 'prepaid';
 }
 
 function parseExp(d: string): Date | null {
@@ -74,7 +75,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly STEP_COUNT = STEP_COUNT;
   readonly payById = payById;
 
-  config: CardConfig = { price: 10000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000, rechargeInitiale: 2500, passPremium: 2000 };
+  config: CardConfig = { price: 10000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000, rechargeInitiale: 2500, passPremium: 2000, rechargeInitialeBancaire: 2500, passPremiumBancaire: 2000 };
 
   /** Pickup branches (lieux de retrait) loaded from the server — shown when delivery == agence. */
   agencies = signal<Agency[]>([]);
@@ -116,7 +117,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
     saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-    pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '',
+    pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'bancaire',
   };
 
   ngOnInit() {
@@ -193,10 +194,24 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   // ---- derived ----
   get transport() { return this.form.delivery === 'home' ? (this.config.transport || 0) : 0; }
+  /** Carte bancaire (défaut) et carte prépayée ont chacune leur couple de montants configurables. */
+  get isBancaire() { return this.form.cardType !== 'prepaid'; }
   /** Offre Promote : carte gratuite — le client règle la recharge initiale + le Pass Premium. */
-  get rechargeInitiale() { return this.config.rechargeInitiale || 0; }
-  get passPremium() { return this.config.passPremium || 0; }
+  get rechargeInitiale() { return (this.isBancaire ? this.config.rechargeInitialeBancaire : this.config.rechargeInitiale) || 0; }
+  get passPremium() { return (this.isBancaire ? this.config.passPremiumBancaire : this.config.passPremium) || 0; }
   get total() { return this.rechargeInitiale + this.passPremium + this.transport; }
+  /** Libellé de la carte (offre + récap) selon le type choisi. */
+  get cardLabel() { return this.i18n.t(this.isBancaire ? 'offer_card_label_bancaire' : 'offer_card_label'); }
+
+  /** Choix du type de carte : carte bancaire ou carte prépayée. */
+  get cardTypeTiles(): TileOption[] {
+    return [
+      { id: 'bancaire', icon: '💳', bg: 'var(--primary)', color: '#fff',
+        title: this.i18n.t('cardtype_bancaire_title'), desc: this.i18n.t('cardtype_bancaire_desc') },
+      { id: 'prepaid', icon: '★', bg: 'var(--af-gold)', color: '#5a4200',
+        title: this.i18n.t('cardtype_prepaid_title'), desc: this.i18n.t('cardtype_prepaid_desc') },
+    ];
+  }
   get fullName() { return (this.form.prenom + ' ' + this.form.nom).trim(); }
   get pm() { return payById(this.form.pay); }
 
@@ -434,6 +449,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       email: this.form.email.trim(), quartier: this.form.quartier.trim(), ville: this.form.ville.trim(),
       pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
       pickupAgencyId: this.form.delivery === 'agence' ? (this.form.pickupAgencyId || undefined) : undefined,
+      cardType: this.form.cardType,
       selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
       cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
       saraReceiptKey: this.form.saraReceiptKey,
@@ -561,7 +577,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-      pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '',
+      pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'bancaire',
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
     this.waitLong.set(false); this.refreshing.set(false);

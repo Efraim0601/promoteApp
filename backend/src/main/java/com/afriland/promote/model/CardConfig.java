@@ -27,9 +27,16 @@ public class CardConfig {
 
     /** Offre Promote — la carte est gratuite ; le client règle la recharge initiale + le Pass
      *  Premium (ce qui forme le total de la souscription). Nullable pour s'ajouter proprement à une
-     *  ligne existante (ddl-auto: update) ; null retombe sur les valeurs par défaut. */
+     *  ligne existante (ddl-auto: update) ; null retombe sur les valeurs par défaut.
+     *  <p>Ces deux montants s'appliquent à la <b>carte prépayée</b>. La <b>carte bancaire</b> a son
+     *  propre couple de montants ({@code *Bancaire}) — le client choisit le type au moment de la
+     *  souscription et le total varie en conséquence. */
     private Integer rechargeInitiale;
     private Integer passPremium;
+
+    /** Mêmes deux postes, mais pour la carte bancaire (montants configurables séparément). */
+    private Integer rechargeInitialeBancaire;
+    private Integer passPremiumBancaire;
 
     public static final int DEFAULT_RECHARGE_INITIALE = 2500;
     public static final int DEFAULT_PASS_PREMIUM = 2000;
@@ -37,4 +44,8 @@ public class CardConfig {
     /** Effective values (config value, or the built-in default when unset). */
     public int rechargeInitialeOr() { return rechargeInitiale != null ? rechargeInitiale : DEFAULT_RECHARGE_INITIALE; }
     public int passPremiumOr() { return passPremium != null ? passPremium : DEFAULT_PASS_PREMIUM; }
+
+    /** Carte bancaire : montants effectifs (valeur configurée, ou le montant prépayée par défaut). */
+    public int rechargeInitialeBancaireOr() { return rechargeInitialeBancaire != null ? rechargeInitialeBancaire : rechargeInitialeOr(); }
+    public int passPremiumBancaireOr() { return passPremiumBancaire != null ? passPremiumBancaire : passPremiumOr(); }
 }

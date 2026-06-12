@@ -109,7 +109,8 @@ public final class Dtos {
 
     // ---- config ----
     public record ConfigDto(int price, int fees, int transport, int rechargeMin, int rechargeMax,
-                            int rechargeInitiale, int passPremium) {}
+                            int rechargeInitiale, int passPremium,
+                            int rechargeInitialeBancaire, int passPremiumBancaire) {}
 
     // ---- subscriptions ----
     /** Create payload — used by both assisted (agent) and self (client) flows. */
@@ -139,7 +140,8 @@ public final class Dtos {
             Double latitude,             // browser GPS captured at subscription time (optional — may be null)
             Double longitude,
             Double geoAccuracy,          // accuracy radius in metres (optional)
-            String pickupAgencyId) {     // chosen pickup branch id when delivery == agence (optional)
+            String pickupAgencyId,       // chosen pickup branch id when delivery == agence (optional)
+            String cardType) {           // bancaire | prepaid (defaults to bancaire server-side)
 
         /** Backward-compatible constructor (no geolocation) — keeps existing callers/tests valid. */
         public CreateSubscriptionRequest(String prenom, String nom, String sexe, String docType, String cni,
@@ -148,7 +150,7 @@ public final class Dtos {
                 String cniRectoKey, String cniVersoKey, String saraReceiptKey, String saraRef, String referrerPhone) {
             this(prenom, nom, sexe, docType, cni, niu, cniExp, phone, email, quartier, region, ville, pay,
                     payPhone, delivery, selfie, selfieKey, cniRectoKey, cniVersoKey, saraReceiptKey, saraRef,
-                    referrerPhone, null, null, null, null);
+                    referrerPhone, null, null, null, null, null);
         }
     }
 
@@ -156,6 +158,7 @@ public final class Dtos {
             String ref, String prenom, String nom, String fullName, String sexe, String email,
             String docType, String cni, String niu, String cniExp, String phone, String quartier, String region, String ville,
             String pay, String payPhone, String delivery, String pickupAgencyName, int amount, int transport,
+            String cardType,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
@@ -170,6 +173,7 @@ public final class Dtos {
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
                     s.getDocType(), s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
                     s.getPay(), s.getPayPhone(), s.getDelivery(), s.getPickupAgencyName(), s.getAmount(), s.getTransport(),
+                    s.getCardType(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,

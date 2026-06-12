@@ -33,7 +33,8 @@ public class ConfigController {
     public ConfigDto get() {
         CardConfig c = service.config();
         return new ConfigDto(c.getPrice(), c.getFees(), c.getTransport(), min(c), max(c),
-                c.rechargeInitialeOr(), c.passPremiumOr());
+                c.rechargeInitialeOr(), c.passPremiumOr(),
+                c.rechargeInitialeBancaireOr(), c.passPremiumBancaireOr());
     }
 
     /** Admin only (enforced in SecurityConfig). */
@@ -48,11 +49,14 @@ public class ConfigController {
         int rMax = Math.max(rMin, dto.rechargeMax());
         c.setRechargeMin(rMin);
         c.setRechargeMax(rMax);
-        // Offre Promote: recharge initiale + pass premium (≥ 0).
+        // Offre Promote: recharge initiale + pass premium (≥ 0) — carte prépayée puis carte bancaire.
         c.setRechargeInitiale(Math.max(0, dto.rechargeInitiale()));
         c.setPassPremium(Math.max(0, dto.passPremium()));
+        c.setRechargeInitialeBancaire(Math.max(0, dto.rechargeInitialeBancaire()));
+        c.setPassPremiumBancaire(Math.max(0, dto.passPremiumBancaire()));
         repo.save(c);
         return new ConfigDto(c.getPrice(), c.getFees(), c.getTransport(), min(c), max(c),
-                c.rechargeInitialeOr(), c.passPremiumOr());
+                c.rechargeInitialeOr(), c.passPremiumOr(),
+                c.rechargeInitialeBancaireOr(), c.passPremiumBancaireOr());
     }
 }

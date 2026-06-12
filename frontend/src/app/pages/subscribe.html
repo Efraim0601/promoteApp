@@ -19,7 +19,7 @@
           </div>
           <div style="padding:14px 16px;display:flex;flex-direction:column;gap:13px">
             <div style="display:flex;flex-direction:column;gap:2px">
-              <span style="font-size:12.5px;font-weight:600;color:var(--muted)">{{ i18n.t('offer_card_label') }}</span>
+              <span style="font-size:12.5px;font-weight:600;color:var(--muted)">{{ cardLabel }}</span>
               <div style="display:flex;align-items:baseline;gap:9px">
                 <span style="text-decoration:line-through;color:var(--muted);font-size:15px">{{ i18n.money(config.price) }}</span>
                 <span class="offer-free" style="font-size:21px;font-weight:800;color:var(--success);letter-spacing:.02em">{{ i18n.t('offer_free') }}</span>
@@ -36,6 +36,12 @@
               <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>
             </div>
           </div>
+        </div>
+
+        <!-- Choix du type de carte : carte bancaire ou carte prépayée (le motif de paiement et le total en dépendent). -->
+        <div>
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('cardtype_choose_label') }}</div>
+          <tile-choice [options]="cardTypeTiles" [value]="form.cardType" (valueChange)="set('cardType', $any($event))"></tile-choice>
         </div>
 
         <div class="card" style="padding:6px 14px">
@@ -280,6 +286,10 @@
 
       <!-- Step 3: payment -->
       @else if (step() === 3) {
+        <!-- Type de carte payée — détermine le total et le motif de paiement (carte bancaire / prépayée). -->
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('cardtype_choose_label') }}</div>
+        <tile-choice [options]="cardTypeTiles" [value]="form.cardType" (valueChange)="set('cardType', $any($event))"></tile-choice>
+        <div style="height:14px"></div>
         <!-- Retrait de la carte : stand Promote (par défaut) ou retrait en agence. -->
         @if (deliveryTiles.length > 1) {
           <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('delivery_choose_label') }}</div>
@@ -396,7 +406,8 @@
           @if (refAgent()) { <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ refAgent()!.name }}</span></div> }
         </div>
         <div class="card" style="padding:4px 16px">
-          <div class="srow"><span class="lbl">{{ i18n.t('offer_card_label') }}</span><span class="val" style="color:var(--success);font-weight:800">{{ i18n.t('offer_free') }}</span></div>
+          <div class="srow"><span class="lbl">{{ i18n.t('cardtype_label') }}</span><span class="val">{{ cardLabel }}</span></div>
+          <div class="srow"><span class="lbl">{{ cardLabel }}</span><span class="val" style="color:var(--success);font-weight:800">{{ i18n.t('offer_free') }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('offer_recharge_initiale') }}</span><span class="val">{{ i18n.money(rechargeInitiale) }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('offer_pass_premium') }}</span><span class="val">{{ i18n.money(passPremium) }}</span></div>
           <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>

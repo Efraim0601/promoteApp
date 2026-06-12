@@ -92,9 +92,12 @@ public class SubscriptionService {
 
     /** Offre Promote : la carte est gratuite — le client règle la recharge initiale + le Pass
      *  Premium (+ transport si livraison à domicile, option non proposée actuellement). */
-    private int total(CardConfig cfg, String delivery) {
+    private int total(CardConfig cfg, String delivery, String cardType) {
         int transport = "home".equals(delivery) ? cfg.getTransport() : 0;
-        return cfg.rechargeInitialeOr() + cfg.passPremiumOr() + transport;
+        // Carte bancaire (défaut) et carte prépayée ont chacune leur couple de montants configurables.
+        int rechargeInitiale = "prepaid".equals(cardType) ? cfg.rechargeInitialeOr() : cfg.rechargeInitialeBancaireOr();
+        int passPremium = "prepaid".equals(cardType) ? cfg.passPremiumOr() : cfg.passPremiumBancaireOr();
+        return rechargeInitiale + passPremium + transport;
     }
 
     /** Resolve a referrer (sales agent) by phone — ports app.jsx:findAgentByPhone. */
@@ -121,8 +124,10 @@ public class SubscriptionService {
     public Subscription create(CreateSubscriptionRequest req, String channel, String agentId) {
         CardConfig cfg = config();
         String delivery = (req.delivery() == null || req.delivery().isBlank()) ? "promote" : req.delivery();
+        // Type de carte : bancaire (défaut) ou prepaid — détermine les montants et le motif de paiement.
+        String cardType = "prepaid".equals(req.cardType()) ? "prepaid" : "bancaire";
         int transport = "home".equals(delivery) ? cfg.getTransport() : 0;
-        int amount = total(cfg, delivery);
+        int amount = total(cfg, delivery, cardType);
         boolean isSelf = "self".equals(channel);
 
         // Pickup branch: only meaningful when delivery == agence. Snapshot the name so it survives
@@ -182,6 +187,7 @@ public class SubscriptionService {
                 .pay(req.pay())
                 .payPhone(payPhone)
                 .delivery(delivery)
+                .cardType(cardType)
                 .pickupAgencyId(pickupAgencyId)
                 .pickupAgencyName(pickupAgencyName)
                 .amount(amount)

@@ -24,4 +24,10 @@ public interface Payable {
 
     /** Payment method / operator: om | mtn. */
     String getPay();
+
+    /** Description / motif sent to the aggregator (shown on reconciliation & the payer's prompt).
+     *  Default is "Carte Promote &lt;ref&gt;"; a {@code Subscription} overrides it per card type. */
+    default String getPaymentLabel() {
+        return "Carte Promote " + getRef();
+    }
 }
