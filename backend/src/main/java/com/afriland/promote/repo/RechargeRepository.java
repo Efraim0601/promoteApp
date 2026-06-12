@@ -18,4 +18,8 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
     /** Reconciliation sweep: oldest still-pending recharges created before a cutoff (batch-limited). */
     List<Recharge> findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
             PayStatus payStatus, Instant createdAt, Pageable pageable);
+
+    /** Cashier fulfillment queue: paid recharges not yet credited to the card (oldest first). Indexed
+     *  on pay_status — replaces a full-table scan + in-memory filter. */
+    List<Recharge> findByPayStatusAndFulfilledFalseOrderByCreatedAtAsc(PayStatus payStatus);
 }

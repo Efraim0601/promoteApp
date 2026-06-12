@@ -18,6 +18,8 @@ import java.time.Instant;
         @Index(name = "idx_sub_printed_by_id", columnList = "printed_by_id"),
         @Index(name = "idx_sub_cash_collected_by_id", columnList = "cash_collected_by_id"),
         @Index(name = "idx_sub_created_at", columnList = "created_at"),
+        // Indexed agent portfolio lookup (mine): owned sales by agent_id, referred sales by phone9.
+        @Index(name = "idx_sub_referrer_phone9", columnList = "referrer_phone9"),
 })
 @Getter
 @Setter
@@ -71,6 +73,14 @@ public class Subscription implements Payable {
     private String agentId;         // owning officer (nullable for unattributed self sales)
     private String referrerName;    // resolved referrer (self path)
     private String referrerPhone;
+
+    /** Last 9 digits of {@link #referrerPhone} (country-code-agnostic), denormalised at create time
+     *  so an agent's portfolio query ({@code mine}) is an indexed lookup instead of a full-table scan
+     *  + in-memory phone match. Null when there is no referrer. Backfilled for legacy rows at startup
+     *  ({@code SubscriptionService.backfillReferrerPhone9}). referrerPhone is write-once (create), so
+     *  this mirror never goes stale. */
+    @Column(length = 9)
+    private String referrerPhone9;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)

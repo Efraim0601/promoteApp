@@ -22,6 +22,18 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
             PayStatus payStatus, Instant createdAt, Pageable pageable);
 
+    /** Agent portfolio (mine): sales the agent owns (agent_id) OR sales referring the agent's phone
+     *  (referrer_phone9). Both columns are indexed — replaces a full-table scan + in-memory match. */
+    List<Subscription> findByAgentIdOrReferrerPhone9OrderByCreatedAtAsc(String agentId, String referrerPhone9);
+
+    /** Resume-window de-dup: narrow the candidate set in SQL (status + method + amount + recent) so the
+     *  last-9-digit phone match runs in memory over a handful of rows, not the whole table. */
+    List<Subscription> findByPayStatusAndPayAndAmountAndCreatedAtAfter(
+            PayStatus payStatus, String pay, int amount, Instant createdAt);
+
+    /** Backfill of {@link Subscription#getReferrerPhone9()} for legacy rows (batch-limited). */
+    List<Subscription> findByReferrerPhone9IsNullAndReferrerPhoneIsNotNull(Pageable pageable);
+
     // ---- aggregated KPIs (computed in SQL instead of loading the whole table into memory) ----
     long countByPayStatus(PayStatus payStatus);
     long countByPayStatusAndPrintedFalse(PayStatus payStatus);    // admin "pending" == cash, not yet printed

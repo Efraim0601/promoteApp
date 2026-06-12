@@ -336,10 +336,7 @@ public class RechargeService {
     /** Recharges awaiting fulfillment: paid by the client but not yet credited to the card by a
      *  cashier (oldest first — FIFO queue). */
     public List<Recharge> pendingFulfillment() {
-        return recharges.findAll().stream()
-                .filter(r -> r.getPayStatus() == PayStatus.paid && !r.isFulfilled())
-                .sorted(java.util.Comparator.comparing(Recharge::getCreatedAt))
-                .toList();
+        return recharges.findByPayStatusAndFulfilledFalseOrderByCreatedAtAsc(PayStatus.paid);
     }
 
     /** Cashier confirms the effective recharge (card credited). Idempotent: only acts on a paid,

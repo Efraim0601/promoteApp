@@ -90,11 +90,10 @@ public class SubscriptionService {
         String want = local9(payPhone);
         if (want.isEmpty()) return null;
         Instant cutoff = Instant.now().minusSeconds(RESUME_WINDOW_SECONDS);
-        return subs.findAll().stream()
-                .filter(s -> s.getPayStatus() == PayStatus.pending)
-                .filter(s -> pay.equals(s.getPay()) && s.getAmount() == amount)
+        // Narrow in SQL (status + method + amount + recent) so the last-9-digit phone match then runs
+        // over a handful of rows instead of the whole table.
+        return subs.findByPayStatusAndPayAndAmountAndCreatedAtAfter(PayStatus.pending, pay, amount, cutoff).stream()
                 .filter(s -> want.equals(local9(s.getPayPhone())))
-                .filter(s -> s.getCreatedAt() != null && s.getCreatedAt().isAfter(cutoff))
                 .max(java.util.Comparator.comparing(Subscription::getCreatedAt))
                 .orElse(null);
     }
@@ -206,6 +205,8 @@ public class SubscriptionService {
                 .referrerName(referrer != null ? referrer.getName() : null)
                 .referrerPhone(req.referrerPhone() != null && !req.referrerPhone().isBlank()
                         ? req.referrerPhone().trim() : null)
+                // Denormalised last-9 of the referrer phone for the indexed portfolio query (mine).
+                .referrerPhone9(blankToNull(local9(req.referrerPhone())))
                 .payStatus(cash ? PayStatus.cash : sara ? PayStatus.sara_pending : PayStatus.pending)
                 .printed(false)
                 .selfieVerified(req.selfie() || req.selfieKey() != null)
@@ -307,11 +308,29 @@ public class SubscriptionService {
     public List<Subscription> mine(String agentId) {
         AppUser me = users.findById(agentId).orElse(null);
         String myPhone9 = me != null ? local9(me.getPhone()) : "";
-        return subs.findAll().stream()
-                .filter(s -> agentId.equals(s.getAgentId())
-                        || (!myPhone9.isEmpty() && myPhone9.equals(local9(s.getReferrerPhone()))))
-                .sorted(java.util.Comparator.comparing(Subscription::getCreatedAt))
-                .toList();
+        // Indexed lookup: sales the agent owns (agent_id) UNION sales referring the agent's phone
+        // (referrer_phone9). When the agent has no phone on file, only the ownership half applies.
+        return myPhone9.isEmpty()
+                ? subs.findByAgentIdOrderByCreatedAtAsc(agentId)
+                : subs.findByAgentIdOrReferrerPhone9OrderByCreatedAtAsc(agentId, myPhone9);
+    }
+
+    /** One-time backfill of {@code referrerPhone9} for rows created before the column existed, so the
+     *  indexed {@link #mine} query also returns legacy referred sales. Batched to bound memory; each
+     *  processed row gets a non-null value (9 digits or "") so it drops out of the next page and the
+     *  loop terminates. Invoked once at startup by {@code ReferrerPhoneBackfill}. */
+    @Transactional
+    public int backfillReferrerPhone9() {
+        var page = org.springframework.data.domain.PageRequest.of(0, 500);
+        int total = 0;
+        List<Subscription> batch;
+        while (!(batch = subs.findByReferrerPhone9IsNullAndReferrerPhoneIsNotNull(page)).isEmpty()) {
+            for (Subscription s : batch) s.setReferrerPhone9(local9(s.getReferrerPhone()));
+            subs.saveAll(batch);
+            total += batch.size();
+        }
+        if (total > 0) log.info("Backfilled referrerPhone9 on {} legacy subscription(s)", total);
+        return total;
     }
 
     public Subscription byRef(String ref) {

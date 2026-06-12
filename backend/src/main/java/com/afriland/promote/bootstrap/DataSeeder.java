@@ -100,6 +100,9 @@ public class DataSeeder implements CommandLineRunner {
         service.initSequence();
         rechargeService.initSequence();
         collecteService.initSequence();
+        // One-time: fill referrer_phone9 on rows created before the column existed, so the indexed
+        // agent-portfolio query returns legacy referred sales. No-op once every row is backfilled.
+        service.backfillReferrerPhone9();
     }
 
     /**
