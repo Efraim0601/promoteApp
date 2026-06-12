@@ -195,7 +195,7 @@ interface RechargeForm {
 
         <field [label]="i18n.t('recharge_pan_label')" [hint]="i18n.t('recharge_pan_hint')" [err]="e('pan')">
           <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-            <input inputmode="numeric" [placeholder]="i18n.t('recharge_pan_ph')" [value]="form.pan" (input)="onPan($any($event.target).value)" style="letter-spacing:.06em" />
+            <input inputmode="numeric" maxlength="19" [placeholder]="i18n.t('recharge_pan_ph')" [value]="form.pan" (input)="onPan($any($event.target).value)" style="letter-spacing:.06em" />
           </div>
         </field>
 
@@ -328,7 +328,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
     // When a MoMo method is picked, default the payment number to the contact... (none here) — leave blank.
     this.persist();
   }
-  /** PAN: keep digits + spaces only, cap at 23 chars (19 digits + grouping). */
+  /** PAN: keep digits only, capped at 16 (grouped in blocks of 4 for display). */
   onPan(v: string) { this.form.pan = formatPan(v); this.persist(); }
   /** Amount: digits only. */
   onAmount(v: string) { this.form.amount = v.replace(/\D/g, '').slice(0, 7); this.persist(); }
