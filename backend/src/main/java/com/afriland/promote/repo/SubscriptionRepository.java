@@ -2,6 +2,7 @@ package com.afriland.promote.repo;
 
 import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,6 +16,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findByAgentIdOrderByCreatedAtAsc(String agentId);
     Optional<Subscription> findByRefIgnoreCase(String ref);
     Optional<Subscription> findByGatewayRef(String gatewayRef);
+
+    /** Reconciliation sweep: oldest still-pending orders created before a cutoff (batch-limited via
+     *  Pageable — never loads the whole table). Indexed on (pay_status, created_at). */
+    List<Subscription> findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
+            PayStatus payStatus, Instant createdAt, Pageable pageable);
 
     // ---- aggregated KPIs (computed in SQL instead of loading the whole table into memory) ----
     long countByPayStatus(PayStatus payStatus);

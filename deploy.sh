@@ -80,7 +80,15 @@ fi
 if [ "$BUILD" = 1 ]; then
   say "Building images…"; dc build
 fi
-say "Starting the stack…"; dc up -d
+# Optional horizontal scaling of the stateless backend (nginx load-balances across replicas).
+# Set BACKEND_SCALE in the environment or .env, e.g. BACKEND_SCALE=3 ./deploy.sh
+SCALE="${BACKEND_SCALE:-$(envval BACKEND_SCALE)}"
+SCALE_ARGS=()
+if [ -n "$SCALE" ] && [ "$SCALE" -gt 1 ] 2>/dev/null; then
+  say "Scaling backend to ${SCALE} replicas…"
+  SCALE_ARGS=(--scale "backend=${SCALE}")
+fi
+say "Starting the stack…"; dc up -d "${SCALE_ARGS[@]}"
 
 # ---- 6. health check ----
 WEB_PORT="$(envval WEB_PORT)"; WEB_PORT="${WEB_PORT:-8973}"; HOST_PORT="${WEB_PORT##*:}"

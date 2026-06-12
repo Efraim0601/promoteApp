@@ -5,6 +5,7 @@ import com.afriland.promote.model.Recharge;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.CardConfig;
 import com.afriland.promote.payment.PaymentGateway;
+import com.afriland.promote.payment.PaymentInitiationEvent;
 import com.afriland.promote.receipt.SaraReceipt;
 import com.afriland.promote.receipt.SaraReceiptExtractor;
 import com.afriland.promote.repo.AppUserRepository;
@@ -14,6 +15,8 @@ import com.afriland.promote.storage.ImageStorage;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,12 +48,18 @@ public class RechargeService {
     private final SaraReceiptExtractor receiptExtractor;
     private final CardConfigRepository configs;
     private final ReferenceSequence refs;     // shared PRM-#### sequence (same as subscriptions)
+    private final ApplicationEventPublisher events;
+
+    /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */
+    @Value("${app.payment.async:false}")
+    private boolean asyncPayments;
 
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
 
     public RechargeService(RechargeRepository recharges, AppUserRepository users, PaymentGateway gateway,
                            ImageStorage storage, SaraReceiptExtractor receiptExtractor,
-                           CardConfigRepository configs, ReferenceSequence refs) {
+                           CardConfigRepository configs, ReferenceSequence refs,
+                           ApplicationEventPublisher events) {
         this.recharges = recharges;
         this.users = users;
         this.gateway = gateway;
@@ -58,6 +67,7 @@ public class RechargeService {
         this.receiptExtractor = receiptExtractor;
         this.configs = configs;
         this.refs = refs;
+        this.events = events;
     }
 
     /** Effective recharge bounds (admin-configured value, or the built-in default when unset). */
@@ -134,24 +144,63 @@ public class RechargeService {
 
         r = recharges.save(r);
         if (momo) {
-            try {
-                r.setGatewayRef(newGatewayRef(r.getRef()));
-                PaymentGateway.PaymentRequest pr = gateway.requestPayment(r, req.pay());
-                r.setPaymentTxId(pr.externalRef());
-                r.setPaymentMessage(pr.message());
-                if (!pr.accepted()) r.setPayStatus(PayStatus.failed);
-            } catch (RuntimeException ex) {
-                log.warn("Recharge payment initiation failed for {} ({}): {}", r.getRef(), req.pay(), ex.getMessage());
-                r.setPayStatus(PayStatus.failed);
-                r.setPaymentMessage("Service de paiement indisponible");
-            }
+            r.setGatewayRef(newGatewayRef(r.getRef()));
             r = recharges.save(r);
+            if (asyncPayments) {
+                // Persist as `pending`; the USSD push happens OFF the request thread once this
+                // transaction commits (PaymentDispatcher). The client polls /status; the webhook
+                // and the reconciliation sweep settle the final outcome.
+                events.publishEvent(new PaymentInitiationEvent(PaymentInitiationEvent.Kind.RECHARGE, r.getRef()));
+            } else {
+                // Legacy synchronous push — the request waits for the aggregator's response.
+                applyGatewayPush(r);
+                r = recharges.save(r);
+            }
         } else if (sara) {
             applyReceiptExtraction(r);
             if (req.saraRef() != null && !req.saraRef().isBlank()) r.setSaraRef(req.saraRef().trim());
             r = recharges.save(r);
         }
         return r;
+    }
+
+    /** Push the USSD prompt to the active gateway and fold the outcome onto the recharge. Shared by the
+     *  synchronous create path and the async dispatcher. Never throws: a gateway error marks the
+     *  payment failed with a client-facing reason. */
+    private void applyGatewayPush(Recharge r) {
+        try {
+            PaymentGateway.PaymentRequest pr = gateway.requestPayment(r, r.getPay());
+            r.setPaymentTxId(pr.externalRef());
+            r.setPaymentMessage(pr.message());
+            if (!pr.accepted()) r.setPayStatus(PayStatus.failed);
+        } catch (RuntimeException ex) {
+            log.warn("Recharge payment initiation failed for {} ({}): {}", r.getRef(), r.getPay(), ex.getMessage());
+            r.setPayStatus(PayStatus.failed);
+            r.setPaymentMessage("Service de paiement indisponible");
+        }
+    }
+
+    /** Async entry point invoked by {@code PaymentDispatcher} after the create transaction commits.
+     *  Runs the gateway push in its own short transaction; idempotent — only acts while still pending. */
+    @Transactional
+    public void pushGateway(String ref) {
+        Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);
+        if (r == null || r.getPayStatus() != PayStatus.pending) return;
+        applyGatewayPush(r);
+        recharges.save(r);
+    }
+
+    /** Reconciliation: force a long-stuck pending recharge to failed (no webhook, USSD window elapsed).
+     *  Idempotent — only acts while still pending. */
+    @Transactional
+    public void expirePending(String ref) {
+        Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);
+        if (r == null || r.getPayStatus() != PayStatus.pending) return;
+        r.setPayStatus(PayStatus.failed);
+        if (r.getPaymentMessage() == null || r.getPaymentMessage().isBlank()) {
+            r.setPaymentMessage("Délai de paiement dépassé");
+        }
+        recharges.save(r);
     }
 
     /** Extract reference / payer / amount from the stored SARA receipt onto the recharge. */

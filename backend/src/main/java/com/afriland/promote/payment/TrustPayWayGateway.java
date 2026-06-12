@@ -6,12 +6,15 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.web.client.ClientHttpRequestFactories;
+import org.springframework.boot.web.client.ClientHttpRequestFactorySettings;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
@@ -47,7 +50,15 @@ public class TrustPayWayGateway implements PaymentGateway {
     public TrustPayWayGateway(TrustPayWayProperties props, ObjectMapper json) {
         this.props = props;
         this.json = json;
-        this.http = RestClient.builder().baseUrl(props.getBaseUrl() == null ? "" : props.getBaseUrl()).build();
+        // Bounded connect/read timeouts so a slow or hung aggregator never pins a worker thread
+        // indefinitely (the root cause of thread-pool exhaustion under load).
+        ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.DEFAULTS
+                .withConnectTimeout(Duration.ofMillis(props.getConnectTimeoutMs()))
+                .withReadTimeout(Duration.ofMillis(props.getReadTimeoutMs()));
+        this.http = RestClient.builder()
+                .baseUrl(props.getBaseUrl() == null ? "" : props.getBaseUrl())
+                .requestFactory(ClientHttpRequestFactories.get(settings))
+                .build();
     }
 
     @Override

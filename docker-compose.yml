@@ -44,6 +44,12 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    # Horizontally scalable: no container_name and no published host port, so it can run as N
+    # replicas — `docker compose up -d --scale backend=3` (or BACKEND_SCALE=3 ./deploy.sh). The
+    # frontend nginx load-balances across them via Docker DNS (see frontend/nginx.conf). The app is
+    # stateless (JWT), so no sticky sessions are needed. NOTE: enable the reconciliation sweep
+    # (PAYMENT_RECONCILE=true) carefully — it runs on every replica; that is idempotent but, for a
+    # single runner, prefer a distributed lock (ShedLock) in a future iteration.
     depends_on:
       db:
         condition: service_healthy

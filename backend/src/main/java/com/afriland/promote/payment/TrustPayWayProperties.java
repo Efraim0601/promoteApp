@@ -36,4 +36,10 @@ public class TrustPayWayProperties {
      * {@code X-Webhook-Secret} header, otherwise the call is rejected.
      */
     private String webhookSecret;
+
+    /** TCP connect timeout (ms) for every aggregator call. Guards against a hung/unreachable host. */
+    private int connectTimeoutMs = 5000;
+
+    /** Read timeout (ms) for every aggregator call — the hard ceiling a worker thread can block. */
+    private int readTimeoutMs = 15000;
 }

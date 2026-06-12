@@ -2,6 +2,7 @@ package com.afriland.promote.service;
 
 import com.afriland.promote.model.*;
 import com.afriland.promote.payment.PaymentGateway;
+import com.afriland.promote.payment.PaymentInitiationEvent;
 import com.afriland.promote.receipt.SaraReceipt;
 import com.afriland.promote.receipt.SaraReceiptExtractor;
 import com.afriland.promote.storage.ImageStorage;
@@ -12,6 +13,8 @@ import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,6 +37,11 @@ public class SubscriptionService {
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
     private final ReferenceSequence refs;     // shared PRM-#### sequence (subscriptions + recharges)
+    private final ApplicationEventPublisher events;
+
+    /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */
+    @Value("${app.payment.async:false}")
+    private boolean asyncPayments;
 
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
     /** A pending MoMo transaction older than this is no longer "resumable" (a fresh attempt is allowed). */
@@ -42,7 +50,7 @@ public class SubscriptionService {
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
                                AppUserRepository users, AgencyRepository agencies, PaymentGateway gateway,
                                ImageStorage storage, SaraReceiptExtractor receiptExtractor,
-                               ReferenceSequence refs) {
+                               ReferenceSequence refs, ApplicationEventPublisher events) {
         this.subs = subs;
         this.configs = configs;
         this.users = users;
@@ -51,6 +59,7 @@ public class SubscriptionService {
         this.storage = storage;
         this.receiptExtractor = receiptExtractor;
         this.refs = refs;
+        this.events = events;
     }
 
     /** Initialise the shared sequence above the highest existing reference (after seeding). */
@@ -210,22 +219,19 @@ public class SubscriptionService {
         s = subs.save(s);
         // cash and SARA are settled off-platform (in person / external app) — no gateway push.
         if (!cash && !sara) {
-            try {
-                // Globally-unique order id for the aggregator (survives DB resets — see Subscription.gatewayRef).
-                s.setGatewayRef(newGatewayRef(s.getRef()));
-                // Push the USSD prompt via the active gateway (simulated or real aggregator).
-                PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, req.pay());
-                s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
-                s.setPaymentMessage(pr.message());           // reason to surface on failure
-                if (!pr.accepted()) s.markFailed();
-            } catch (RuntimeException ex) {
-                // The aggregator was unreachable / login failed (e.g. an invalidated secret):
-                // keep the KYC file but mark the payment failed, and LOG why for diagnosis.
-                log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), req.pay(), ex.getMessage());
-                s.markFailed();
-                s.setPaymentMessage("Service de paiement indisponible");
-            }
+            // Globally-unique order id for the aggregator (survives DB resets — see Subscription.gatewayRef).
+            s.setGatewayRef(newGatewayRef(s.getRef()));
             s = subs.save(s);
+            if (asyncPayments) {
+                // Persist as `pending`; the USSD push happens OFF the request thread once this
+                // transaction commits (PaymentDispatcher). The client polls /status; the webhook
+                // and the reconciliation sweep settle the final outcome.
+                events.publishEvent(new PaymentInitiationEvent(PaymentInitiationEvent.Kind.SUBSCRIPTION, s.getRef()));
+            } else {
+                // Legacy synchronous push — the request waits for the aggregator's response.
+                applyGatewayPush(s);
+                s = subs.save(s);
+            }
         } else if (sara) {
             // Parse the uploaded receipt (PDF text / OCR) and prefill the reference, payer phone
             // and amount for the point-of-sale agent to confirm. Best-effort — never blocks.
@@ -235,6 +241,46 @@ public class SubscriptionService {
             s = subs.save(s);
         }
         return s;
+    }
+
+    /** Push the USSD prompt to the active gateway and fold the outcome onto the order. Shared by the
+     *  synchronous create path and the async dispatcher. Never throws: a gateway error (unreachable /
+     *  login failed / declined push) marks the payment failed with a client-facing reason. */
+    private void applyGatewayPush(Subscription s) {
+        try {
+            PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, s.getPay());
+            s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
+            s.setPaymentMessage(pr.message());           // reason to surface on failure
+            if (!pr.accepted()) s.markFailed();
+        } catch (RuntimeException ex) {
+            log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), s.getPay(), ex.getMessage());
+            s.markFailed();
+            s.setPaymentMessage("Service de paiement indisponible");
+        }
+    }
+
+    /** Async entry point invoked by {@code PaymentDispatcher} after the create transaction commits.
+     *  Runs the gateway push in its own short transaction; idempotent — only acts while still pending,
+     *  so a duplicate event (e.g. a retried dispatch) never sends a second prompt. */
+    @Transactional
+    public void pushGateway(String ref) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
+        if (s == null || s.getPayStatus() != PayStatus.pending) return;
+        applyGatewayPush(s);
+        subs.save(s);
+    }
+
+    /** Reconciliation: force a long-stuck pending order to failed (the webhook never arrived and the
+     *  USSD window has elapsed). Idempotent — only acts while still pending. */
+    @Transactional
+    public void expirePending(String ref) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
+        if (s == null || s.getPayStatus() != PayStatus.pending) return;
+        s.markFailed();
+        if (s.getPaymentMessage() == null || s.getPaymentMessage().isBlank()) {
+            s.setPaymentMessage("Délai de paiement dépassé");
+        }
+        subs.save(s);
     }
 
     /** Extract reference / payer / amount from the stored SARA receipt onto the subscription. */
