@@ -94,6 +94,7 @@ export interface Subscription {
   status: string;     // printed | failed | cash | sara_pending | awaiting
   createdAt: string;
   paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")
+  failureCategory?: string | null; // classified failure cause (only on a failed payment)
 }
 
 export interface CreateSubscriptionRequest {
@@ -184,10 +185,12 @@ export interface CreateUserRequest {
   phone?: string | null;
 }
 
-/** Result of a staff creation: the account + the auto-generated temporary password (also emailed). */
+/** Result of a staff creation: the account + the auto-generated temporary password (also emailed).
+ *  `pin` is the 4-digit collecteur login PIN, present only when a COLLECTEUR account was created. */
 export interface CreateUserResult {
   user: User;
   tempPassword: string;
+  pin?: string | null;
 }
 
 export interface Agent {
@@ -298,6 +301,15 @@ export interface PaymentStats {
   otherFailures: number;
   avgConfirmSeconds: number;    // mean PENDING → paid latency
   medianConfirmSeconds: number; // median PENDING → paid latency
+  orangeFailed: number;
+  mtnFailed: number;
+  failuresByCategory: FailureBucket[];  // detailed failure breakdown (most frequent first)
+}
+
+/** One failure-category bucket: a category code + how many failures fall into it. */
+export interface FailureBucket {
+  category: string;   // INSUFFICIENT_FUNDS | WRONG_PIN | CANCELLED | INVALID_SUBSCRIBER | TIMEOUT | NETWORK | API_ERROR | UNKNOWN
+  count: number;
 }
 
 export interface ClaimResult {

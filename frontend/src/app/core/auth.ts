@@ -28,12 +28,20 @@ export class Auth {
   }
 
   login(email: string, password: string) {
-    return this.api.login(email, password).pipe(tap((res) => {
-      localStorage.setItem(TOKEN_KEY, res.token);
-      localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-      this.user.set(res.user);
-      this.reportLocation();
-    }));
+    return this.api.login(email, password).pipe(tap((res) => this.establish(res)));
+  }
+
+  /** Simplified collecteur sign-in (phone number + 4-digit PIN). */
+  loginByPhone(phone: string, pin: string) {
+    return this.api.loginByPhone(phone, pin).pipe(tap((res) => this.establish(res)));
+  }
+
+  /** Persist a freshly authenticated session and capture the GPS fix (best-effort). */
+  private establish(res: { token: string; user: User }): void {
+    localStorage.setItem(TOKEN_KEY, res.token);
+    localStorage.setItem(USER_KEY, JSON.stringify(res.user));
+    this.user.set(res.user);
+    this.reportLocation();
   }
 
   /** Best-effort: capture the browser's GPS fix and store it as the user's last-known location

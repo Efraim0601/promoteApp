@@ -44,6 +44,28 @@ public class AuthController {
         return ResponseEntity.ok(new LoginResponse(jwt.generate(u), UserDto.of(u)));
     }
 
+    /** Simplified collecteur sign-in: phone number + 4-digit PIN. Resolves the enabled COLLECTEUR
+     *  account holding that phone and matching PIN. Kept deliberately light — the collecteur's only
+     *  job is field data collection. */
+    @PostMapping("/login-phone")
+    public ResponseEntity<?> loginPhone(@Valid @RequestBody PhoneLoginRequest req, HttpServletRequest request) {
+        String phone = req.phone().replaceAll("\\D", "");
+        if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
+        AppUser u = users.findAllByPhone(phone).stream()
+                .filter(x -> x.effectiveRoles().contains(com.afriland.promote.model.Role.COLLECTEUR))
+                .findFirst().orElse(null);
+        if (u == null || u.getLoginPin() == null || !encoder.matches(req.pin(), u.getLoginPin())) {
+            audit.record(phone, u, false, "invalid_credentials", request);
+            return ResponseEntity.status(401).body("invalid_credentials");
+        }
+        if (!u.isEnabled()) {
+            audit.record(phone, u, false, "account_disabled", request);
+            return ResponseEntity.status(403).body("account_disabled");
+        }
+        audit.record(phone, u, true, "ok", request);
+        return ResponseEntity.ok(new LoginResponse(jwt.generate(u), UserDto.of(u)));
+    }
+
     @GetMapping("/me")
     public ResponseEntity<UserDto> me(Authentication auth) {
         if (auth == null) return ResponseEntity.status(401).build();

@@ -11,7 +11,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-/** Staff account creation — a commercial's phone is mandatory, valid and stored normalized. */
+/** Staff account creation — every account's phone is now mandatory, valid and stored normalized
+ *  (the phone also keys the collecteur's phone+PIN sign-in). */
 @SpringBootTest
 @AutoConfigureMockMvc
 @WithMockUser(username = "admin", roles = {"ADMIN"})
@@ -29,7 +30,7 @@ class UserControllerTest {
         mvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content(user("No Phone", "nophone@test.cm", "AGENT", null)))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("agent_phone_required"));
+                .andExpect(jsonPath("$.error").value("phone_required"));
     }
 
     @Test
@@ -37,7 +38,7 @@ class UserControllerTest {
         mvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content(user("Bad Phone", "badphone@test.cm", "AGENT", "12345")))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.error").value("agent_phone_required"));
+                .andExpect(jsonPath("$.error").value("phone_required"));
     }
 
     @Test
@@ -51,10 +52,12 @@ class UserControllerTest {
     }
 
     @Test
-    void allowsANonAgentWithoutAPhone() throws Exception {
+    void rejectsAnyAccountWithoutAPhone() throws Exception {
+        // The phone is now mandatory for every account (it is the collecteur's login identifier).
         mvc.perform(post("/api/users").contentType(MediaType.APPLICATION_JSON)
                         .content(user("Some Admin", "admin2@test.cm", "ADMIN", null)))
-                .andExpect(status().isOk());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error").value("phone_required"));
     }
 
     @Test

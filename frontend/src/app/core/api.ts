@@ -18,6 +18,10 @@ export class Api {
   login(email: string, password: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.base}/auth/login`, { email, password });
   }
+  /** Simplified collecteur sign-in by phone number + 4-digit PIN. */
+  loginByPhone(phone: string, pin: string): Observable<LoginResponse> {
+    return this.http.post<LoginResponse>(`${this.base}/auth/login-phone`, { phone, pin });
+  }
   me(): Observable<User> {
     return this.http.get<User>(`${this.base}/auth/me`);
   }

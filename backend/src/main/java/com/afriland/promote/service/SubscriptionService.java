@@ -211,12 +211,12 @@ public class SubscriptionService {
                 PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, req.pay());
                 s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
                 s.setPaymentMessage(pr.message());           // reason to surface on failure
-                if (!pr.accepted()) s.setPayStatus(PayStatus.failed);
+                if (!pr.accepted()) s.markFailed();
             } catch (RuntimeException ex) {
                 // The aggregator was unreachable / login failed (e.g. an invalidated secret):
                 // keep the KYC file but mark the payment failed, and LOG why for diagnosis.
                 log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), req.pay(), ex.getMessage());
-                s.setPayStatus(PayStatus.failed);
+                s.markFailed();
                 s.setPaymentMessage("Service de paiement indisponible");
             }
             s = subs.save(s);
@@ -288,8 +288,7 @@ public class SubscriptionService {
     public Subscription applyPayment(String ref, String outcome, String reason) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         boolean ok = "validate".equalsIgnoreCase(outcome);
-        s.setPayStatus(ok ? PayStatus.paid : PayStatus.failed);
-        if (ok) s.setPaidAt(Instant.now());
+        if (ok) { s.setPayStatus(PayStatus.paid); s.setPaidAt(Instant.now()); } else s.markFailed();
         // Keep the decline reason (e.g. "Solde insuffisant") so the client UI can explain why; clear it on success.
         s.setPaymentMessage(ok ? null : (reason == null || reason.isBlank() ? null : reason.trim()));
         return subs.save(s);
@@ -314,7 +313,7 @@ public class SubscriptionService {
         Subscription s = findByOrderId(orderId);
         if (s == null) return null;
         if (s.getPayStatus() == PayStatus.pending) {
-            s.setPayStatus(newStatus);
+            if (newStatus == PayStatus.failed) s.markFailed(); else s.setPayStatus(newStatus);
             if (newStatus == PayStatus.paid) s.setPaidAt(Instant.now());
             // On a decline, keep the aggregator's reason (e.g. "Solde insuffisant") for the client UI.
             if (newStatus == PayStatus.failed && reason != null && !reason.isBlank()) {
@@ -346,7 +345,7 @@ public class SubscriptionService {
         if (s != null && s.getPayStatus() == PayStatus.pending) {
             PayStatus pulled = gateway.queryStatus(s).orElse(null);
             if (pulled != null && pulled != PayStatus.pending) {
-                s.setPayStatus(pulled);
+                if (pulled == PayStatus.failed) s.markFailed(); else s.setPayStatus(pulled);
                 if (pulled == PayStatus.paid) s.setPaidAt(Instant.now());
                 subs.save(s);
             }
@@ -408,7 +407,7 @@ public class SubscriptionService {
             s.setPaidAt(Instant.now());
             s.setPaymentMessage(null);
         } else {
-            s.setPayStatus(PayStatus.failed);
+            s.markFailed();
             String reason = req.reason();
             s.setPaymentMessage(reason == null || reason.isBlank() ? "Reçu SARA non conforme" : reason.trim());
         }
@@ -434,7 +433,7 @@ public class SubscriptionService {
             s.setCashCollectedById(cashierId);
             s.setCashCollectedAt(Instant.now());
         } else {
-            s.setPayStatus(PayStatus.failed);
+            s.markFailed();
             s.setPaymentMessage(reason == null || reason.isBlank() ? "Paiement espèces non perçu" : reason.trim());
         }
         return subs.save(s);

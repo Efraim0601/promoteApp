@@ -97,16 +97,26 @@ public class StatsService {
         List<Subscription> mtn = momo.stream().filter(s -> "mtn".equals(s.getPay())).toList();
         long orangePaid = orange.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
         long mtnPaid = mtn.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
+        long orangeFailed = orange.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
+        long mtnFailed = mtn.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
 
-        // Failure causes, classified from the aggregator's stored decline reason.
-        long insufficient = 0, expired = 0, other = 0;
+        // Failure causes — full categorisation (message + latency) for the failure-analysis view.
+        java.util.EnumMap<PaymentFailures.Category, Long> byCat = new java.util.EnumMap<>(PaymentFailures.Category.class);
+        for (PaymentFailures.Category c : PaymentFailures.Category.values()) byCat.put(c, 0L);
         for (Subscription s : momo) {
             if (s.getPayStatus() != PayStatus.failed) continue;
-            String m = s.getPaymentMessage() == null ? "" : s.getPaymentMessage().toLowerCase();
-            if (m.matches(".*(insuffisan|insufficient|solde|provision|fonds|funds).*")) insufficient++;
-            else if (m.matches(".*(expir|timeout|time out|délai|delai).*")) expired++;
-            else other++;
+            byCat.merge(PaymentFailures.classify(s), 1L, Long::sum);
         }
+        // Keep the three legacy buckets the overview already shows (derived from the categories).
+        long insufficient = byCat.get(PaymentFailures.Category.INSUFFICIENT_FUNDS);
+        long expired = byCat.get(PaymentFailures.Category.TIMEOUT);
+        long other = failed - insufficient - expired;
+        // Detailed breakdown (drop empty categories), most frequent first.
+        List<FailureBucket> failuresByCategory = byCat.entrySet().stream()
+                .filter(e -> e.getValue() > 0)
+                .sorted(java.util.Map.Entry.<PaymentFailures.Category, Long>comparingByValue().reversed())
+                .map(e -> new FailureBucket(e.getKey().name(), e.getValue()))
+                .toList();
 
         // Confirmation latency (PENDING → paid), in seconds, for MoMo payments we have a paidAt for.
         List<Long> secs = momo.stream()
@@ -119,7 +129,8 @@ public class StatsService {
         long median = secs.isEmpty() ? 0 : secs.get(secs.size() / 2);
 
         return new PaymentStats(momo.size(), paid, failed, pending, orange.size(), orangePaid,
-                mtn.size(), mtnPaid, insufficient, expired, other, avg, median);
+                mtn.size(), mtnPaid, insufficient, expired, other, avg, median,
+                orangeFailed, mtnFailed, failuresByCategory);
     }
 
     /** Cashier statistics for a given staff member (aggregated in SQL). */

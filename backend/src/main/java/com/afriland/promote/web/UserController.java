@@ -160,10 +160,20 @@ public class UserController {
         // matches what a client types as their referrer's number → auto-attributed to the agent.
         String phone = req.phone() == null ? "" : req.phone().replaceAll("\\D", "");
         if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
-        // A commercial (agent) MUST have a valid phone — it links client referrals to their sales stats.
-        if (roles.contains(Role.AGENT) && !phone.matches("6\\d{8}")) {
-            return ResponseEntity.badRequest().body(new ErrorResponse("agent_phone_required"));
+        // The phone is now mandatory for every account (and is the collecteur's login identifier),
+        // so it must be a valid local Cameroon mobile number.
+        if (!phone.matches("6\\d{8}")) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
         }
+        // Unique — a phone identifies a person and (for collecteurs) keys the phone+PIN sign-in.
+        if (!users.findAllByPhone(phone).isEmpty()) {
+            return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
+        }
+        // Collecteurs sign in with their phone + a generated 4-digit PIN (simple field flow).
+        String pin = roles.contains(Role.COLLECTEUR) ? genPin() : null;
+        // A collecteur-only account never uses a password, so it's not forced through the
+        // change-password screen — the phone+PIN sign-in goes straight to the collecte console.
+        boolean collecteurOnly = roles.size() == 1 && roles.get(0) == Role.COLLECTEUR;
         AppUser u = AppUser.builder()
                 .id("u-" + UUID.randomUUID().toString().substring(0, 8))
                 .name(req.name().trim())
@@ -171,15 +181,16 @@ public class UserController {
                 .passwordHash(encoder.encode(temp))
                 .role(role)
                 .agency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim())
-                .phone(phone.isBlank() ? null : phone)
-                .mustChangePassword(true)   // forced change on first login (all new accounts)
+                .phone(phone)
+                .loginPin(pin == null ? null : encoder.encode(pin))
+                .mustChangePassword(!collecteurOnly)   // forced change on first login (except phone+PIN collecteurs)
                 .build();
         u.assignRoles(roles);
         AppUser saved = users.save(u);
         // Welcome email: login link + identifier + the generated temporary password (best-effort —
         // an SMTP failure never breaks creation; the password is also returned below as a fallback).
         email.sendAccountCreated(saved.getEmail(), saved.getName(), temp);
-        return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), temp));
+        return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), temp, pin));
     }
 
     /**
@@ -276,6 +287,11 @@ public class UserController {
     // Guarantees the policy (>= 1 letter and >= 1 digit) on a 10-char password.
     private static final char[] LETTERS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ".toCharArray();
     private static final char[] DIGITS = "23456789".toCharArray();
+
+    /** 4-digit login PIN for collecteur phone sign-in (e.g. "0427"). */
+    private static String genPin() {
+        return String.format("%04d", RAND.nextInt(10000));
+    }
 
     private static String genPassword() {
         char[] out = new char[10];

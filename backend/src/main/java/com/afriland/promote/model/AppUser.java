@@ -64,6 +64,10 @@ public class AppUser {
 
     private String phone;         // used to resolve a referrer ("recommandé par")
 
+    /** Hashed 4-digit login PIN for collecteurs who sign in by phone number (simple field-collection
+     *  flow). Null for accounts that authenticate by email + password. */
+    private String loginPin;
+
     /** True until the user has set their own password (forced change on first login). */
     @Builder.Default
     @Column(nullable = false)

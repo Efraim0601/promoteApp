@@ -13,6 +13,8 @@ public final class Dtos {
 
     // ---- auth ----
     public record LoginRequest(@NotBlank String email, @NotBlank String password) {}
+    /** Simplified collecteur sign-in: phone number + 4-digit PIN (field data-collection flow). */
+    public record PhoneLoginRequest(@NotBlank String phone, @NotBlank String pin) {}
 
     // ---- pickup agencies (lieux de retrait) ----
     /** A pickup point shown to the client when delivery == agence. */
@@ -101,8 +103,9 @@ public final class Dtos {
     }
 
     /** Result of a staff creation: the account + the auto-generated temporary password (emailed to
-     *  the user; also returned so the admin can hand it out if mail delivery fails). */
-    public record CreateUserResult(UserDto user, String tempPassword) {}
+     *  the user; also returned so the admin can hand it out if mail delivery fails). {@code pin} is
+     *  the 4-digit collecteur login PIN, present only when a COLLECTEUR account was created. */
+    public record CreateUserResult(UserDto user, String tempPassword, String pin) {}
 
     // ---- config ----
     public record ConfigDto(int price, int fees, int transport, int rechargeMin, int rechargeMax,
@@ -158,8 +161,11 @@ public final class Dtos {
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
             String saraRef, String saraPayerPhone, Integer saraAmount, String cardNumber, String pan,
             String cashCollectedBy, String cashCollectedAt,
-            String status, String createdAt, String paymentMessage) {
+            String status, String createdAt, String paymentMessage, String failureCategory) {
         public static SubscriptionDto of(Subscription s) {
+            // Failure category (for the failure-analysis view) — only meaningful on a failed payment.
+            String failCat = s.getPayStatus() == com.afriland.promote.model.PayStatus.failed
+                    ? com.afriland.promote.service.PaymentFailures.classify(s).name() : null;
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
                     s.getDocType(), s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
@@ -170,7 +176,7 @@ public final class Dtos {
                     s.getSaraReceiptKey() != null,
                     s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(), s.getCardNumber(), s.getPan(),
                     s.getCashCollectedBy(), s.getCashCollectedAt() == null ? null : s.getCashCollectedAt().toString(),
-                    s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage());
+                    s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage(), failCat);
         }
     }
 
@@ -253,11 +259,15 @@ public final class Dtos {
 
     /** Mobile Money payment funnel (admin): volumes & success per network, failure causes, and the
      *  confirmation latency (PENDING → paid). Lets the bank monitor the aggregator's health. */
+    /** One failure-category bucket for the failure-analysis breakdown. */
+    public record FailureBucket(String category, long count) {}
+
     public record PaymentStats(
             long momoTotal, long momoPaid, long momoFailed, long momoPending,
             long orangeTotal, long orangePaid, long mtnTotal, long mtnPaid,
             long insufficientFunds, long expired, long otherFailures,
-            long avgConfirmSeconds, long medianConfirmSeconds) {}
+            long avgConfirmSeconds, long medianConfirmSeconds,
+            long orangeFailed, long mtnFailed, List<FailureBucket> failuresByCategory) {}
 
     // ---- geolocation ----
     /** Browser-reported position; posted by a logged-in user right after login. */

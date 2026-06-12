@@ -84,6 +84,17 @@ public class Subscription implements Payable {
     /** When the payment was confirmed paid (used for the MoMo confirmation-latency KPI). */
     private Instant paidAt;
 
+    /** When the payment was marked failed — lets us measure failure latency: a long wait points to
+     *  an expired prompt (PIN never entered), an immediate failure to a network/operator/API rejection. */
+    private Instant failedAt;
+
+    /** Set payStatus to failed and stamp failedAt (once). Centralises the failure transition so the
+     *  latency signal is always captured wherever a payment is declined. */
+    public void markFailed() {
+        this.payStatus = PayStatus.failed;
+        if (this.failedAt == null) this.failedAt = Instant.now();
+    }
+
     /** Last aggregator message — the reason shown to the client on failure (e.g. "Solde insuffisant"). */
     @Column(length = 500)
     private String paymentMessage;

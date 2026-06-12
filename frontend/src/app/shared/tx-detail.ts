@@ -67,6 +67,9 @@ import { ReceiptService } from './receipt';
         @if (t.quartier || t.ville || t.region) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('quartier') }} / {{ i18n.t('ville_label') }} / {{ i18n.t('region_label') }}</span><span class="val">{{ t.quartier }}{{ t.quartier && (t.ville || t.region) ? ' · ' : '' }}{{ t.ville }}{{ t.ville && t.region ? ' · ' : '' }}{{ t.region }}</span></div> }
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val">{{ t.pay === 'cash' ? i18n.t('pay_cash_name') : payName(t.pay) }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_pay_phone') }}</span><span class="val">{{ t.payPhone || '—' }}</span></div>
+        @if (t.payStatus === 'failed') {
+          <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_fail_cause') }}</span><span class="val" style="color:var(--accent)">{{ failLabel(t.failureCategory) }}@if (t.paymentMessage) { · {{ t.paymentMessage }} }</span></div>
+        }
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ t.referrerName || '—' }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_referrer_phone') }}</span><span class="val">{{ t.referrerPhone || '—' }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ t.delivery === 'agence' && t.pickupAgencyName ? t.pickupAgencyName : i18n.t('del_' + t.delivery + '_title') }}</span></div>
@@ -136,6 +139,13 @@ export class TxDetailComponent implements OnInit, OnDestroy {
   sexeLabel(s: string) { return s === 'M' ? this.i18n.t('sexe_m') : s === 'F' ? this.i18n.t('sexe_f') : (s || '—'); }
   payName(pay: string) { return payById(pay).name; }
   fmtPan(v: string) { return formatPan(v); }
+  /** Localised label for a failure category code (falls back to a generic label). */
+  failLabel(cat?: string | null) {
+    if (!cat) return this.i18n.t('fail_cat_UNKNOWN');
+    const key = 'fail_cat_' + cat;
+    const t = this.i18n.t(key);
+    return t === key ? cat : t;
+  }
 
   /** Download a PNG receipt for this record (re-printable from any list). */
   async downloadReceipt() {

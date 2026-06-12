@@ -106,11 +106,24 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
             <div class="srow" style="padding:6px 0"><span class="lbl">MTN MoMo</span><span class="val">{{ p.mtnPaid }}/{{ p.mtnTotal }} · {{ rate(p.mtnPaid, p.mtnTotal) }}%</span></div>
           </div>
           @if (p.momoFailed) {
-            <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px">
-              <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_failures') }}</div>
-              <div class="srow" style="padding:5px 0"><span class="lbl">{{ i18n.t('fail_insufficient') }}</span><span class="val">{{ p.insufficientFunds }}</span></div>
-              <div class="srow" style="padding:5px 0"><span class="lbl">{{ i18n.t('fail_expired') }}</span><span class="val">{{ p.expired }}</span></div>
-              <div class="srow" style="padding:5px 0"><span class="lbl">{{ i18n.t('fail_other') }}</span><span class="val">{{ p.otherFailures }}</span></div>
+            <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <span class="muted" style="font-size:11.5px;font-weight:700">{{ i18n.t('pay_funnel_failures') }} · {{ p.momoFailed }}</span>
+                <button class="btn btn-ghost" (click)="exportFailures()" style="margin-left:auto;padding:4px 9px;font-size:11px"><ic name="copy" [size]="13"></ic> {{ i18n.t('tx_export') }}</button>
+              </div>
+              @for (b of p.failuresByCategory; track b.category) {
+                <div style="margin-bottom:8px">
+                  <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:2px">
+                    <span style="min-width:0;flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ failLabel(b.category) }}</span>
+                    <span style="font-weight:800">{{ b.count }}</span>
+                    <span class="muted" style="font-size:10.5px;width:38px;text-align:right">{{ rate(b.count, p.momoFailed) }}%</span>
+                  </div>
+                  <div style="height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden">
+                    <div [style.width.%]="rate(b.count, p.momoFailed)" style="height:100%;background:var(--accent);border-radius:99px;transition:width .4s"></div>
+                  </div>
+                </div>
+              }
+              <p class="muted" style="font-size:10.5px;line-height:1.4;margin-top:4px">{{ i18n.t('pay_funnel_failures_note') }}</p>
             </div>
           }
         </div>
@@ -224,6 +237,15 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         <div style="display:flex;flex-direction:column;gap:10px">
           <field [label]="i18n.t('user_name')"><input class="input" [value]="nu().name" (input)="onNu('name', $event)" /></field>
           <field [label]="i18n.t('user_email')"><input class="input" type="email" [value]="nu().email" (input)="onNu('email', $event)" /></field>
+          <!-- Phone is mandatory for every account and serves as the collecteur's login identifier. -->
+          <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
+                 [err]="(nu().phone || '') && !phoneOk() ? i18n.t('user_phone_invalid') : null">
+            <input class="input" inputmode="numeric" maxlength="9" [value]="nu().phone || ''" (input)="onNu('phone', $event)" />
+          </field>
+          @if (nuHasRole('AGENT')) {
+            <field [label]="i18n.t('user_agency')"><input class="input" [value]="nu().agency || ''" (input)="onNu('agency', $event)" /></field>
+          }
+          <!-- Role selection comes last, per the data-collection onboarding flow. -->
           <field [label]="i18n.t('user_roles')" [hint]="i18n.t(isSupervisor() ? 'sup_collecteur_only' : 'user_roles_hint')">
             @if (isSupervisor()) {
               <span class="badge" style="background:var(--surface-2);color:var(--text);font-size:12px;padding:6px 11px">{{ roleLabel('COLLECTEUR') }}</span>
@@ -237,12 +259,8 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
               </div>
             }
           </field>
-          @if (nuHasRole('AGENT')) {
-            <field [label]="i18n.t('user_agency')"><input class="input" [value]="nu().agency || ''" (input)="onNu('agency', $event)" /></field>
-            <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
-                   [err]="(nu().phone || '') && !agentPhoneOk() ? i18n.t('user_phone_invalid') : null">
-              <input class="input" inputmode="numeric" maxlength="9" [value]="nu().phone || ''" (input)="onNu('phone', $event)" />
-            </field>
+          @if (nuHasRole('COLLECTEUR')) {
+            <p class="muted" style="font-size:11.5px;line-height:1.4;margin:-2px 0 2px">{{ i18n.t('collecteur_pin_note') }}</p>
           }
           <p class="muted" style="font-size:11.5px;line-height:1.4;margin:-2px 0 2px">{{ i18n.t('user_pw_note') }}</p>
           <button class="btn btn-primary" [disabled]="!userValid() || userBusy()" (click)="createUser()" style="padding:12px">
@@ -259,7 +277,19 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
               </div>
             </div>
           }
+          @if (userMsg() === 'created' && createdPin()) {
+            <div class="feedback" style="flex-direction:column;align-items:stretch;gap:6px;background:var(--surface-2);border-radius:10px;padding:10px 12px">
+              <span style="font-size:12px;color:var(--success);font-weight:700">{{ i18n.t('user_created_pin') }}</span>
+              <div style="display:flex;align-items:center;gap:8px">
+                <code style="font-size:18px;font-weight:800;letter-spacing:3px;flex:1">{{ createdPin() }}</code>
+                <button class="btn btn-outline" style="padding:6px 10px;font-size:12px" (click)="copyPin()">
+                  <ic name="copy" [size]="15"></ic> {{ pinCopied() ? i18n.t('copied') : i18n.t('copy_btn') }}
+                </button>
+              </div>
+            </div>
+          }
           @if (userMsg() === 'exists') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_exists') }}</p> }
+          @if (userMsg() === 'phone_exists') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_phone_exists') }}</p> }
           @if (userMsg() === 'invalid') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_invalid') }}</p> }
         </div>
 
@@ -979,23 +1009,26 @@ export class AdminComponent implements OnInit, OnDestroy {
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
   /** Roles selected on the create form (multi-role). */
   nuRoles = signal<Role[]>(['AGENT']);
-  userMsg = signal<'' | 'created' | 'exists' | 'invalid'>('');
+  userMsg = signal<'' | 'created' | 'exists' | 'phone_exists' | 'invalid'>('');
   userBusy = signal(false);
   /** Temporary password returned on the last successful creation (also emailed to the user). */
   createdPw = signal('');
   pwCopied = signal(false);
+  /** 4-digit login PIN returned when a collecteur account was just created (phone+PIN sign-in). */
+  createdPin = signal('');
+  pinCopied = signal(false);
   nuHasRole(r: Role) { return this.nuRoles().includes(r); }
   toggleNuRole(r: Role) {
     this.nuRoles.update((list) => list.includes(r) ? list.filter((x) => x !== r) : [...list, r]);
   }
   /** The full role set of an account (for the user list badges). */
   userRoles(u: User): Role[] { return u.roles && u.roles.length ? u.roles : [u.role]; }
-  /** A commercial's phone must be a valid local 9-digit number (links client referrals to their stats). */
-  agentPhoneOk = computed(() => /^6\d{8}$/.test((this.nu().phone ?? '').replace(/\D/g, '')));
+  /** Phone is mandatory for every account: a valid local 9-digit Cameroon mobile (also the
+   *  collecteur's login id, and what links a client's referral to an agent's stats). */
+  phoneOk = computed(() => /^6\d{8}$/.test((this.nu().phone ?? '').replace(/\D/g, '')));
   userValid = computed(() => {
     const u = this.nu();
-    const base = !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && this.nuRoles().length > 0;
-    return base && (!this.nuRoles().includes('AGENT') || this.agentPhoneOk());
+    return !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && this.nuRoles().length > 0 && this.phoneOk();
   });
 
   // --- inline role editing (existing accounts) ---
@@ -1283,6 +1316,24 @@ export class AdminComponent implements OnInit, OnDestroy {
   /** Success rate (%) guarded against division by zero. */
   rate(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
 
+  /** Localised label for a failure category code (falls back to the raw code). */
+  failLabel(cat: string) {
+    const key = 'fail_cat_' + cat;
+    const t = this.i18n.t(key);
+    return t === key ? cat : t;
+  }
+  /** Export the failed Mobile Money transactions with their classified cause + raw message. */
+  exportFailures() {
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['Reference', 'Nom', 'Telephone', 'Operateur', 'Categorie', 'Motif brut', 'Date'];
+    const failed = this.txs().filter((t) => (t.pay === 'om' || t.pay === 'mtn') && (t.payStatus === 'failed' || t.status === 'failed'));
+    const rows = failed.map((t) => [
+      t.ref, t.fullName, t.phone ?? '', t.pay === 'om' ? 'Orange Money' : 'MTN MoMo',
+      this.failLabel(t.failureCategory || 'UNKNOWN'), t.paymentMessage ?? '', this.fmtDateTime(t.createdAt),
+    ].map((v) => esc(String(v))).join(','));
+    this.downloadCsv('echecs-paiement.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
+  }
+
   ngOnInit() {
     // Supervisor: restricted to collecteur user management — load only users, no admin-only data/poll.
     if (this.isSupervisor()) {
@@ -1331,18 +1382,26 @@ export class AdminComponent implements OnInit, OnDestroy {
       next: (res) => {
         this.userBusy.set(false); this.userMsg.set('created');
         this.createdPw.set(res.tempPassword); this.pwCopied.set(false);
-        this.nu.set({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
-        this.nuRoles.set(['AGENT']);
+        this.createdPin.set(res.pin || ''); this.pinCopied.set(false);
+        const fallbackRole: Role = this.isSupervisor() ? 'COLLECTEUR' : 'AGENT';
+        this.nu.set({ name: '', email: '', role: fallbackRole, agency: '', phone: '' });
+        this.nuRoles.set([fallbackRole]);
         this.loadUsers();
       },
       error: (err) => {
         this.userBusy.set(false);
-        this.userMsg.set(err?.status === 409 ? 'exists' : 'invalid');
+        // 409 distinguishes a duplicate email from a duplicate phone (both are now unique keys).
+        this.userMsg.set(err?.status === 409
+          ? (err?.error?.error === 'phone_exists' ? 'phone_exists' : 'exists')
+          : 'invalid');
       },
     });
   }
   copyPw() {
     navigator.clipboard?.writeText(this.createdPw()).then(() => this.pwCopied.set(true));
+  }
+  copyPin() {
+    navigator.clipboard?.writeText(this.createdPin()).then(() => this.pinCopied.set(true));
   }
   roleLabel(role: Role) {
     return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print'

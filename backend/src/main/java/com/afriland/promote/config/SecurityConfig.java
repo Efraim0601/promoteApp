@@ -40,6 +40,7 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // ---- public: client (QR / self) path, no account ----
                 .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers("/api/auth/login-phone").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/config").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/agencies").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/agents/resolve").permitAll()
