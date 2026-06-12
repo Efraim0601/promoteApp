@@ -50,7 +50,7 @@ export const CARD_TYPES = [
 ];
 
 /** PAN length — fixed at 16 digits everywhere (digits only, no separators). */
-export const PAN_DIGITS = 16;
+export const PAN_DIGITS = 16;               // "numéro à 16 chiffres présent sur la carte"
 export const PAN_MAX_DIGITS = PAN_DIGITS;   // kept for existing callers; same value
 /** PAN digits only, capped at 16 (drops any spaces/separators). */
 export const panDigits = (v: string): string => (v || '').replace(/\D/g, '').slice(0, PAN_DIGITS);
