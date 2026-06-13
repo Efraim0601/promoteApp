@@ -275,6 +275,54 @@ public class RechargeService {
         return r;
     }
 
+    /**
+     * Pull a live aggregator status and persist it when terminal (manual reconciliation).
+     * Also recovers {@code failed} → {@code paid} when TrustPayWay confirms success.
+     */
+    @Transactional
+    public ReconcilePullResult reconcileFromGateway(String ref) {
+        Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);
+        if (r == null) {
+            return new ReconcilePullResult(ref, null, null, false, "not_found");
+        }
+        PayStatus before = r.getPayStatus();
+        if (before != PayStatus.pending && before != PayStatus.failed) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+        }
+        if (blank(r.getGatewayRef()) && blank(r.getPaymentTxId())) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, "no_gateway_id");
+        }
+        PayStatus pulled;
+        try {
+            pulled = gateway.queryStatus(r).orElse(null);
+        } catch (RuntimeException ex) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, ex.getMessage());
+        }
+        if (pulled == null || pulled == PayStatus.pending) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+        }
+        if (pulled == PayStatus.paid) {
+            if (before == PayStatus.failed) {
+                log.info("Manual reconciliation recovered recharge {} from failed to paid", ref);
+            }
+            r.setPayStatus(PayStatus.paid);
+            r.setPaidAt(Instant.now());
+            r.setPaymentMessage(null);
+            recharges.save(r);
+            return new ReconcilePullResult(ref, before.name(), PayStatus.paid.name(), true, null);
+        }
+        if (pulled == PayStatus.failed && before == PayStatus.pending) {
+            r.setPayStatus(PayStatus.failed);
+            recharges.save(r);
+            return new ReconcilePullResult(ref, before.name(), PayStatus.failed.name(), true, null);
+        }
+        return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+    }
+
+    private static boolean blank(String v) {
+        return v == null || v.isBlank();
+    }
+
     /** Public polling: refresh from the gateway's get-status while still pending. */
     @Transactional
     public Recharge refreshStatus(String ref) {

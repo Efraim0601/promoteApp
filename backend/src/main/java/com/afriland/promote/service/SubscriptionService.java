@@ -423,6 +423,54 @@ public class SubscriptionService {
     }
 
     /**
+     * Pull a live aggregator status and persist it when terminal. Used by manual reconciliation;
+     * also recovers {@code failed} → {@code paid} when TrustPayWay confirms success.
+     */
+    @Transactional
+    public ReconcilePullResult reconcileFromGateway(String ref) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
+        if (s == null) {
+            return new ReconcilePullResult(ref, null, null, false, "not_found");
+        }
+        PayStatus before = s.getPayStatus();
+        if (before != PayStatus.pending && before != PayStatus.failed) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+        }
+        if (blank(s.getGatewayRef()) && blank(s.getPaymentTxId())) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, "no_gateway_id");
+        }
+        PayStatus pulled;
+        try {
+            pulled = gateway.queryStatus(s).orElse(null);
+        } catch (RuntimeException ex) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, ex.getMessage());
+        }
+        if (pulled == null || pulled == PayStatus.pending) {
+            return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+        }
+        if (pulled == PayStatus.paid) {
+            if (before == PayStatus.failed) {
+                log.info("Manual reconciliation recovered subscription {} from failed to paid", ref);
+            }
+            s.setPayStatus(PayStatus.paid);
+            s.setPaidAt(Instant.now());
+            s.setPaymentMessage(null);
+            subs.save(s);
+            return new ReconcilePullResult(ref, before.name(), PayStatus.paid.name(), true, null);
+        }
+        if (pulled == PayStatus.failed && before == PayStatus.pending) {
+            s.markFailed();
+            subs.save(s);
+            return new ReconcilePullResult(ref, before.name(), PayStatus.failed.name(), true, null);
+        }
+        return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+    }
+
+    private static boolean blank(String v) {
+        return v == null || v.isBlank();
+    }
+
+    /**
      * Current payment status for the public polling endpoint. If still pending and the
      * active gateway can pull a live status (get-status), use it as a fallback for when
      * the webhook hasn't arrived (e.g. no public URL in dev).

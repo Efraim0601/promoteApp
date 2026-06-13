@@ -57,6 +57,7 @@ public class SecurityConfig {
                 // ---- payment aggregator: webhook (push) + which provider is live ----
                 .requestMatchers(HttpMethod.POST, "/api/payment/webhook/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/payment/provider").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/payment/reconcile").hasRole("ADMIN")
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
                 // Validation errors on public endpoints re-dispatch to /error — permit it so the real
                 // 4xx status reaches the client instead of being masked as 403 for anonymous callers.

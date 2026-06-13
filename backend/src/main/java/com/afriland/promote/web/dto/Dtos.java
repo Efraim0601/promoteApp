@@ -226,6 +226,23 @@ public final class Dtos {
     /** Tells the frontend which gateway is live, so the UI can adapt (e.g. demo buttons). */
     public record PaymentProviderDto(String provider) {}
 
+    /** Result of pulling a live TrustPayWay status for one order (manual reconciliation). */
+    public record ReconcilePullResult(
+            String ref,
+            String statusBefore,
+            String statusAfter,
+            boolean changed,
+            String note) {}
+
+    /** Summary of a manual reconciliation run (admin script / API). */
+    public record ReconcileReport(
+            int hours,
+            int scanned,
+            int updated,
+            int unchanged,
+            int errors,
+            java.util.List<ReconcilePullResult> details) {}
+
     /**
      * Incoming TrustPayWay webhook (see API doc §5). Field names match the JSON sent by
      * the aggregator; {@code orderId} is the reference we passed in process-payment.

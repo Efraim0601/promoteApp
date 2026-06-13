@@ -31,6 +31,14 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findByPayStatusAndPayAndAmountAndCreatedAtAfter(
             PayStatus payStatus, String pay, int amount, Instant createdAt);
 
+    /** Manual reconciliation: MoMo orders still pending/failed with a gateway id, since a cutoff. */
+    @Query("select s from Subscription s where s.createdAt >= :since "
+            + "and s.payStatus in (com.afriland.promote.model.PayStatus.pending, com.afriland.promote.model.PayStatus.failed) "
+            + "and s.gatewayRef is not null "
+            + "and lower(s.pay) in ('om', 'mtn') "
+            + "order by s.createdAt asc")
+    List<Subscription> findMoMoReconcilableSince(@Param("since") Instant since);
+
     /** Backfill of {@link Subscription#getReferrerPhone9()} for legacy rows (batch-limited). */
     List<Subscription> findByReferrerPhone9IsNullAndReferrerPhoneIsNotNull(Pageable pageable);
 

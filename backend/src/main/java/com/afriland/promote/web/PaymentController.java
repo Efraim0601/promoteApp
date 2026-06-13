@@ -7,6 +7,7 @@ import com.afriland.promote.payment.TrustPayWayGateway;
 import com.afriland.promote.payment.TrustPayWayProperties;
 import com.afriland.promote.service.RechargeService;
 import com.afriland.promote.service.SubscriptionService;
+import com.afriland.promote.service.PaymentReconciliationService;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,13 +23,16 @@ public class PaymentController {
 
     private final SubscriptionService service;
     private final RechargeService rechargeService;
+    private final PaymentReconciliationService reconciliationService;
     private final PaymentGateway gateway;            // the active (@Primary) gateway
     private final TrustPayWayProperties trustPayWay;
 
-    public PaymentController(SubscriptionService service, RechargeService rechargeService, PaymentGateway gateway,
-                            TrustPayWayProperties trustPayWay) {
+    public PaymentController(SubscriptionService service, RechargeService rechargeService,
+                             PaymentReconciliationService reconciliationService,
+                             PaymentGateway gateway, TrustPayWayProperties trustPayWay) {
         this.service = service;
         this.rechargeService = rechargeService;
+        this.reconciliationService = reconciliationService;
         this.gateway = gateway;
         this.trustPayWay = trustPayWay;
     }
@@ -37,6 +41,19 @@ public class PaymentController {
     @GetMapping("/provider")
     public PaymentProviderDto provider() {
         return new PaymentProviderDto(gateway.provider());
+    }
+
+    /**
+     * Admin-only manual reconciliation: pull TrustPayWay get-status for MoMo orders in the last
+     * {@code hours} (default 24, max 168) that are still {@code pending} or {@code failed}.
+     */
+    @PostMapping("/reconcile")
+    public ReconcileReport reconcile(@RequestParam(defaultValue = "24") int hours) {
+        if (!"trustpayway".equalsIgnoreCase(gateway.provider())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.CONFLICT, "reconcile_requires_trustpayway");
+        }
+        return reconciliationService.reconcileSince(hours);
     }
 
     /**
