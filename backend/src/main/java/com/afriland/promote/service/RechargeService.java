@@ -176,8 +176,8 @@ public class RechargeService {
             if (!pr.accepted()) r.setPayStatus(PayStatus.failed);
         } catch (RuntimeException ex) {
             log.warn("Recharge payment initiation failed for {} ({}): {}", r.getRef(), r.getPay(), ex.getMessage());
-            r.setPayStatus(PayStatus.failed);
             r.setPaymentMessage(GatewayClientMessages.from(ex));
+            if (!GatewayClientMessages.isTransient(ex)) r.setPayStatus(PayStatus.failed);
         }
     }
 
@@ -248,18 +248,28 @@ public class RechargeService {
         return recharges.findByGatewayRef(orderId).or(() -> recharges.findByRefIgnoreCase(orderId)).orElse(null);
     }
 
-    /** Apply an aggregator webhook (push) — only moves a still-{@code pending} recharge. */
+    /** Apply an aggregator webhook — pending → terminal; also recovers failed → paid on late COMPLETED. */
     @Transactional
     public Recharge applyWebhook(String orderId, PayStatus newStatus, String reason) {
         if (orderId == null || newStatus == null) return null;
         Recharge r = findByOrderId(orderId);
         if (r == null) return null;
-        if (r.getPayStatus() == PayStatus.pending) {
-            r.setPayStatus(newStatus);
-            if (newStatus == PayStatus.paid) r.setPaidAt(Instant.now());
-            if (newStatus == PayStatus.failed && reason != null && !reason.isBlank()) {
-                r.setPaymentMessage(reason.trim());
+        PayStatus cur = r.getPayStatus();
+        if (newStatus == PayStatus.paid) {
+            if (cur != PayStatus.paid) {
+                if (cur == PayStatus.failed) {
+                    log.info("TrustPayWay webhook recovered recharge {} orderId={} from failed to paid", r.getRef(), orderId);
+                }
+                r.setPayStatus(PayStatus.paid);
+                r.setPaidAt(Instant.now());
+                r.setPaymentMessage(null);
+                recharges.save(r);
             }
+            return r;
+        }
+        if (newStatus == PayStatus.failed && cur == PayStatus.pending) {
+            r.setPayStatus(PayStatus.failed);
+            if (reason != null && !reason.isBlank()) r.setPaymentMessage(reason.trim());
             recharges.save(r);
         }
         return r;

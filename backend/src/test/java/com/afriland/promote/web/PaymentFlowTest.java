@@ -90,6 +90,18 @@ class PaymentFlowTest {
     }
 
     @Test
+    void webhookSuccessRecoversPreviouslyFailedPayment() throws Exception {
+        String ref = createPendingMomo("PAYRC0001", "+237690006666");
+        service.applyPayment(ref, "fail", "Service de paiement indisponible");
+        mvc.perform(post("/api/payment/webhook/trustpayway").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"orderId\":\"" + ref + "\",\"status\":\"COMPLETED\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/subscriptions/{ref}/status", ref))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.payStatus").value("paid"));
+    }
+
+    @Test
     void webhookSuccessMarksPaid() throws Exception {
         String ref = createPendingMomo("PAYWH0002", "+237690004444");
         mvc.perform(post("/api/payment/webhook/trustpayway").contentType(MediaType.APPLICATION_JSON)

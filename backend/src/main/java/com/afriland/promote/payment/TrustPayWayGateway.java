@@ -117,6 +117,14 @@ public class TrustPayWayGateway implements PaymentGateway {
         // Surface the aggregator's reason only on rejection; fall back to {"error": "..."} / raw body.
         String message = accepted ? null
                 : (resp != null && resp.message() != null ? resp.message() : errorField(raw));
+        // Orange often answers 500 on the first push (order registered) then 400 Duplicate on our
+        // retry — the USSD was already sent; treat as accepted and wait for the webhook.
+        if (!accepted && isDuplicateOrder(raw)) {
+            log.info("TrustPayWay process-payment DUPLICATE ref={} network={} http={} — treating as accepted (push likely already sent)",
+                    sub.getRef(), network, entity.getStatusCode().value());
+            accepted = true;
+            message = null;
+        }
         if (accepted) {
             log.info("TrustPayWay process-payment ACCEPTED ref={} network={} http={} status={} txId={}",
                     sub.getRef(), network, entity.getStatusCode().value(), dataStatus, txId);
@@ -162,6 +170,13 @@ public class TrustPayWayGateway implements PaymentGateway {
             log.warn("TrustPayWay: unparseable process-payment body: {}", raw);
             return null;
         }
+    }
+
+    /** TrustPayWay returns 400 when our 5xx-retry re-sends an orderId that the first attempt registered. */
+    static boolean isDuplicateOrder(String raw) {
+        if (raw == null || raw.isBlank()) return false;
+        String l = raw.toLowerCase();
+        return l.contains("duplicate") && l.contains("already exists");
     }
 
     /** Extract a top-level {@code {"error": "..."}} message, when the API returns that shape. */

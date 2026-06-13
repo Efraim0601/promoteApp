@@ -139,6 +139,12 @@
           @if (result()?.message) {
             <p style="font-size:13px;line-height:1.45;max-width:290px;margin-top:10px;color:var(--accent);font-weight:600">{{ result()!.message }}</p>
           }
+          @if (result()?.ref) {
+            <div style="margin-top:14px;padding:10px 14px;border-radius:10px;background:var(--surface-2);max-width:290px">
+              <div class="kicker" style="margin-bottom:4px">{{ i18n.t('failed_keep_ref') }}</div>
+              <div style="font-family:var(--font-head);font-weight:800;font-size:17px;letter-spacing:.04em">{{ result()!.ref }}</div>
+            </div>
+          }
         </div>
       </div>
     </div>

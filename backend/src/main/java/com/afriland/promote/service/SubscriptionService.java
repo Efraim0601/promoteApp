@@ -85,15 +85,24 @@ public class SubscriptionService {
         return (ref + "-" + suffix).toUpperCase();
     }
 
-    /** Find a still-pending MoMo transaction for the same payment number, amount and method, created
-     *  within the resume window — so a rapid re-submission resumes it instead of duplicating it. */
-    private Subscription findResumablePending(String payPhone, int amount, String pay) {
+    /** Find a recent MoMo attempt for the same phone/amount/method to resume instead of creating a
+     *  duplicate subscription. Includes {@code pending} and technically-failed orders (timeout,
+     *  duplicate, infra) but not business declines (insufficient balance, blocked user). */
+    private Subscription findResumableMomo(String payPhone, int amount, String pay) {
         String want = local9(payPhone);
         if (want.isEmpty()) return null;
         Instant cutoff = Instant.now().minusSeconds(RESUME_WINDOW_SECONDS);
-        // Narrow in SQL (status + method + amount + recent) so the last-9-digit phone match then runs
-        // over a handful of rows instead of the whole table.
-        return subs.findByPayStatusAndPayAndAmountAndCreatedAtAfter(PayStatus.pending, pay, amount, cutoff).stream()
+        Subscription pending = matchMomo(subs.findByPayStatusAndPayAndAmountAndCreatedAtAfter(
+                PayStatus.pending, pay, amount, cutoff), want);
+        if (pending != null) return pending;
+        return matchMomo(subs.findByPayStatusAndPayAndAmountAndCreatedAtAfter(
+                PayStatus.failed, pay, amount, cutoff).stream()
+                .filter(s -> !GatewayClientMessages.isBusinessDecline(s.getPaymentMessage()))
+                .toList(), want);
+    }
+
+    private static Subscription matchMomo(java.util.Collection<Subscription> candidates, String want) {
+        return candidates.stream()
                 .filter(s -> want.equals(local9(s.getPayPhone())))
                 .max(java.util.Comparator.comparing(Subscription::getCreatedAt))
                 .orElse(null);
@@ -167,8 +176,14 @@ public class SubscriptionService {
         // transaction created in the last few minutes), resume it instead of creating a duplicate
         // subscription + a second gateway push. This is what users' rapid "Payer" re-taps produced.
         if (momo) {
-            Subscription resumable = findResumablePending(payPhone, amount, req.pay());
+            Subscription resumable = findResumableMomo(payPhone, amount, req.pay());
             if (resumable != null) {
+                if (resumable.getPayStatus() == PayStatus.failed) {
+                    resumable.setPayStatus(PayStatus.pending);
+                    resumable.setPaymentMessage(null);
+                    resumable.setFailedAt(null);
+                    subs.save(resumable);
+                }
                 log.info("Reprise du paiement en attente {} (tel={} {} {} XAF) au lieu d'un doublon",
                         resumable.getRef(), payPhone, req.pay(), amount);
                 return resumable;
@@ -256,8 +271,9 @@ public class SubscriptionService {
             if (!pr.accepted()) s.markFailed();
         } catch (RuntimeException ex) {
             log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), s.getPay(), ex.getMessage());
-            s.markFailed();
             s.setPaymentMessage(GatewayClientMessages.from(ex));
+            // Timeouts / 502: the operator may still have initiated the USSD — stay pending for webhook.
+            if (!GatewayClientMessages.isTransient(ex)) s.markFailed();
         }
     }
 
@@ -376,21 +392,31 @@ public class SubscriptionService {
     /**
      * Apply an aggregator webhook (push). {@code orderId} is the unique gateway order id we sent
      * ({@code sub.gatewayRef}, fallback {@code sub.ref}); {@code newStatus} is the resolved
-     * {@link PayStatus} (or null if not terminal). Only moves a transaction that is still
-     * {@code pending}, so a late/duplicate webhook can't overturn a final state.
+     * {@link PayStatus} (or null if not terminal). Moves {@code pending} rows to a terminal state;
+     * also recovers {@code failed} → {@code paid} when a late COMPLETED arrives after a false
+     * technical failure (timeout / duplicate / 502).
      */
     @Transactional
     public Subscription applyWebhook(String orderId, PayStatus newStatus, String reason) {
         if (orderId == null || newStatus == null) return null;
         Subscription s = findByOrderId(orderId);
         if (s == null) return null;
-        if (s.getPayStatus() == PayStatus.pending) {
-            if (newStatus == PayStatus.failed) s.markFailed(); else s.setPayStatus(newStatus);
-            if (newStatus == PayStatus.paid) s.setPaidAt(Instant.now());
-            // On a decline, keep the aggregator's reason (e.g. "Solde insuffisant") for the client UI.
-            if (newStatus == PayStatus.failed && reason != null && !reason.isBlank()) {
-                s.setPaymentMessage(reason.trim());
+        PayStatus cur = s.getPayStatus();
+        if (newStatus == PayStatus.paid) {
+            if (cur != PayStatus.paid) {
+                if (cur == PayStatus.failed) {
+                    log.info("TrustPayWay webhook recovered {} orderId={} from failed to paid", s.getRef(), orderId);
+                }
+                s.setPayStatus(PayStatus.paid);
+                s.setPaidAt(Instant.now());
+                s.setPaymentMessage(null);
+                subs.save(s);
             }
+            return s;
+        }
+        if (newStatus == PayStatus.failed && cur == PayStatus.pending) {
+            s.markFailed();
+            if (reason != null && !reason.isBlank()) s.setPaymentMessage(reason.trim());
             subs.save(s);
         }
         return s;
