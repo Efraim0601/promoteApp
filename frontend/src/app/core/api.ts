@@ -18,6 +18,10 @@ export class Api {
   login(email: string, password: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.base}/auth/login`, { email, password });
   }
+  /** Request a password reset email (always succeeds from the client's perspective). */
+  forgotPassword(email: string): Observable<void> {
+    return this.http.post<void>(`${this.base}/auth/forgot-password`, { email });
+  }
   /** Simplified collecteur sign-in by phone number + 4-digit PIN. */
   loginByPhone(phone: string, pin: string): Observable<LoginResponse> {
     return this.http.post<LoginResponse>(`${this.base}/auth/login-phone`, { phone, pin });

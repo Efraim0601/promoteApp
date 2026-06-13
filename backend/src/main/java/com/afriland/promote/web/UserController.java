@@ -4,6 +4,7 @@ import com.afriland.promote.email.EmailService;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
+import com.afriland.promote.security.TempPasswordGenerator;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -12,7 +13,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -155,7 +155,7 @@ public class UserController {
         }
         // The admin no longer sets the password: a temporary one is generated and emailed to the
         // user, who must change it on first login.
-        String temp = genPassword();
+        String temp = TempPasswordGenerator.password();
         // Phone stored as the local 9-digit Cameroon number (country code stripped) so it always
         // matches what a client types as their referrer's number → auto-attributed to the agent.
         String phone = req.phone() == null ? "" : req.phone().replaceAll("\\D", "");
@@ -170,7 +170,7 @@ public class UserController {
             return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
         }
         // Collecteurs sign in with their phone + a generated 4-digit PIN (simple field flow).
-        String pin = roles.contains(Role.COLLECTEUR) ? genPin() : null;
+        String pin = roles.contains(Role.COLLECTEUR) ? TempPasswordGenerator.pin() : null;
         // A collecteur-only account never uses a password, so it's not forced through the
         // change-password screen — the phone+PIN sign-in goes straight to the collecte console.
         boolean collecteurOnly = roles.size() == 1 && roles.get(0) == Role.COLLECTEUR;
@@ -259,7 +259,7 @@ public class UserController {
                 updated++; continue;
             }
 
-            String temp = genPassword();
+            String temp = TempPasswordGenerator.password();
             AppUser u = AppUser.builder()
                     .id("u-" + UUID.randomUUID().toString().substring(0, 8))
                     .name(name).email(email)
@@ -280,29 +280,4 @@ public class UserController {
     }
 
     private static final Pattern EMAIL = Pattern.compile("^\\S+@\\S+\\.\\S+$");
-    // Unambiguous alphabet (no O/0, I/l/1) for readable temporary passwords.
-    private static final char[] PW = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789".toCharArray();
-    private static final SecureRandom RAND = new SecureRandom();
-
-    // Guarantees the policy (>= 1 letter and >= 1 digit) on a 10-char password.
-    private static final char[] LETTERS = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ".toCharArray();
-    private static final char[] DIGITS = "23456789".toCharArray();
-
-    /** 4-digit login PIN for collecteur phone sign-in (e.g. "0427"). */
-    private static String genPin() {
-        return String.format("%04d", RAND.nextInt(10000));
-    }
-
-    private static String genPassword() {
-        char[] out = new char[10];
-        out[0] = LETTERS[RAND.nextInt(LETTERS.length)];   // at least one letter
-        out[1] = DIGITS[RAND.nextInt(DIGITS.length)];     // at least one digit
-        for (int i = 2; i < out.length; i++) out[i] = PW[RAND.nextInt(PW.length)];
-        // Shuffle so the guaranteed letter/digit aren't always first (Fisher–Yates).
-        for (int i = out.length - 1; i > 0; i--) {
-            int j = RAND.nextInt(i + 1);
-            char t = out[i]; out[i] = out[j]; out[j] = t;
-        }
-        return new String(out);
-    }
 }

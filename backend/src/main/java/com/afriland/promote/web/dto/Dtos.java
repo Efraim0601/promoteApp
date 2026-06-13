@@ -83,6 +83,10 @@ public final class Dtos {
     /** A logged-in user changes their own password. */
     public record ChangePasswordRequest(@NotBlank String currentPassword, @NotBlank String newPassword) {}
 
+    /** Self-service password reset request (unauthenticated). Always returns the same outcome to
+     *  avoid leaking whether an email is registered. */
+    public record ForgotPasswordRequest(@NotBlank String email) {}
+
     /** Generic error body: {@code {"error": "code"}}. */
     public record ErrorResponse(String error) {}
 

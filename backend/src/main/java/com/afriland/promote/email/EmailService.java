@@ -33,6 +33,27 @@ public class EmailService {
         this.publicUrl = publicUrl;
     }
 
+    /** Password reset: new temporary password (the user must change it on next login). */
+    public void sendPasswordReset(String to, String name, String tempPassword) {
+        String subject = "Réinitialisation de mot de passe — Afriland Carte Promote";
+        String body = """
+                Bonjour %s,
+
+                Vous avez demandé la réinitialisation de votre mot de passe sur la plateforme Afriland — Carte Promote.
+
+                Lien de connexion : %s
+                Identifiant       : %s
+                Mot de passe temporaire : %s
+
+                Pour votre sécurité, vous devrez définir un nouveau mot de passe lors de votre prochaine connexion.
+
+                Si vous n'êtes pas à l'origine de cette demande, contactez un administrateur.
+
+                — Afriland First Bank
+                """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword);
+        send(to, subject, body);
+    }
+
     /** Welcome email: login link + identifier + temporary password (the user must change it on first login). */
     public void sendAccountCreated(String to, String name, String tempPassword) {
         String subject = "Votre compte — Afriland Carte Promote";

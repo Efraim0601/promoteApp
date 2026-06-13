@@ -1,9 +1,12 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.email.EmailService;
 import com.afriland.promote.model.AppUser;
+import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.security.JwtService;
 import com.afriland.promote.security.PasswordPolicy;
+import com.afriland.promote.security.TempPasswordGenerator;
 import com.afriland.promote.service.LoginAuditService;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,12 +24,15 @@ public class AuthController {
     private final PasswordEncoder encoder;
     private final JwtService jwt;
     private final LoginAuditService audit;
+    private final EmailService email;
 
-    public AuthController(AppUserRepository users, PasswordEncoder encoder, JwtService jwt, LoginAuditService audit) {
+    public AuthController(AppUserRepository users, PasswordEncoder encoder, JwtService jwt,
+                          LoginAuditService audit, EmailService email) {
         this.users = users;
         this.encoder = encoder;
         this.jwt = jwt;
         this.audit = audit;
+        this.email = email;
     }
 
     @PostMapping("/login")
@@ -87,6 +93,28 @@ public class AuthController {
         u.setLastLocatedAt(java.time.Instant.now());
         users.save(u);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Self-service password reset: generates a temporary password and emails it. Always 204 so
+     *  callers cannot probe whether an email is registered. Skips disabled accounts and
+     *  collecteur-only accounts (they sign in with phone + PIN, not email + password). */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
+        AppUser u = users.findByEmailIgnoreCase(req.email().trim()).orElse(null);
+        if (u != null && u.isEnabled() && usesEmailPassword(u)) {
+            String temp = TempPasswordGenerator.password();
+            u.setPasswordHash(encoder.encode(temp));
+            u.setMustChangePassword(true);
+            users.save(u);
+            email.sendPasswordReset(u.getEmail(), u.getName(), temp);
+        }
+        return ResponseEntity.noContent().build();
+    }
+
+    /** True when the account may sign in with email + password (not collecteur-only). */
+    private static boolean usesEmailPassword(AppUser u) {
+        var roles = u.effectiveRoles();
+        return !(roles.size() == 1 && roles.contains(Role.COLLECTEUR));
     }
 
     /** Any logged-in user changes their own password. Clears the forced-change flag on success. */
