@@ -224,9 +224,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     const expDate = parseExp(f.cniExp);
     const phoneOk = isValidPhoneNumber(f.phone);
     const emailOk = /^\S+@\S+\.\S+$/.test(f.email);
-    // CNI = hexadécimal (0-9 A-F) ; passeport / récépissé = alphanumérique (lettres, chiffres, tiret).
+    // CNI = alphanumérique ; passeport / récépissé = alphanumérique (lettres, chiffres, tiret).
     const docOk = f.docType === 'cni'
-      ? /^[0-9A-F]{6,}$/.test(f.cni)
+      ? /^[0-9A-Z]{6,}$/.test(f.cni.trim().toUpperCase())
       : /^[0-9A-Z-]{5,}$/.test(f.cni.trim().toUpperCase());
     return {
       prenom: !f.prenom.trim() ? this.i18n.t('required') : null,
@@ -493,7 +493,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       error: (err) => {
         this.busy.set(false);
         const code = err?.error?.error;
-        this.submitError.set(code === 'cni_exists' ? 'cni_exists' : 'submit_failed');
+        this.submitError.set(code === 'cni_exists' ? 'cni_exists' : code === 'cni_invalid' ? 'cni_invalid' : 'submit_failed');
       },
     });
   }

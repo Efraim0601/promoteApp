@@ -194,6 +194,9 @@ public class SubscriptionService {
 
         // One Promote card per CNI: block a second subscription while any earlier one is still
         // active (pending / paid / cash / SARA). A failed attempt may be retried with the same CNI.
+        if (isCniDocument(req.docType()) && !isValidCniFormat(req.cni())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cni_invalid");
+        }
         if (isCniDocument(req.docType()) && !normCniMatch(req.cni()).isEmpty()
                 && subs.existsByCniNormAndPayStatusNot(normCniMatch(req.cni()), PayStatus.failed)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "cni_exists");
@@ -689,6 +692,12 @@ public class SubscriptionService {
     /** Normalise an ID-document number for matching: keep only alphanumerics, upper-cased. */
     private static String normCniMatch(String cni) {
         return cni == null ? "" : cni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
+    }
+
+    /** CNI = alphanumeric, min 6 chars (after stripping separators). */
+    private static boolean isValidCniFormat(String cni) {
+        String n = normCniMatch(cni);
+        return n.length() >= 6 && n.matches("[0-9A-Z]+");
     }
 
     private static boolean isCniDocument(String docType) {

@@ -157,8 +157,8 @@ export class CniFieldComponent {
   @Input() value = '';
   @Output() valueChange = new EventEmitter<string>();
   onInput(e: Event) {
-    // CNI number is hexadecimal: keep only 0-9 / A-F, upper-cased.
-    const v = (e.target as HTMLInputElement).value.replace(/[^0-9a-fA-F]/g, '').toUpperCase().slice(0, 12);
+    // CNI: alphanumeric (letters + digits), upper-cased.
+    const v = (e.target as HTMLInputElement).value.replace(/[^0-9A-Za-z]/g, '').toUpperCase().slice(0, 20);
     this.value = v;
     this.valueChange.emit(v);
   }
