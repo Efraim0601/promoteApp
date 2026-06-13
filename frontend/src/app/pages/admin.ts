@@ -241,18 +241,130 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       <!-- ========== USERS ========== -->
       @if (section() === 'users') {
       <h1 style="font-size:21px">{{ i18n.t('nav_users') }}</h1>
-      <div class="card" style="padding:16px">
-        <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:14px">
-          <ic name="user" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
-          <div style="min-width:0">
-            <h3 style="font-size:15px;line-height:1.2">{{ i18n.t('users_title') }}</h3>
-            <p class="muted" style="font-size:11.5px;line-height:1.4;margin-top:3px">{{ i18n.t('users_sub') }}</p>
+      <p class="muted" style="font-size:13px;line-height:1.45;margin-top:-8px;margin-bottom:12px">{{ i18n.t('users_sub') }}</p>
+
+      <!-- Toolbar: search + actions -->
+      <div class="card" style="padding:14px 16px;margin-bottom:12px">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
+          <div class="input-prefix" style="flex:1;min-width:200px">
+            <span class="pfx"><ic name="search" [size]="16"></ic></span>
+            <input [placeholder]="i18n.t('user_search_ph')" [value]="userSearch()" (input)="userSearch.set($any($event.target).value)" />
           </div>
+          <button class="btn btn-primary" (click)="openUserCreate()" style="padding:10px 14px;font-size:13px;white-space:nowrap">
+            <ic name="plus" [size]="16"></ic> {{ i18n.t('user_new') }}
+          </button>
+          @if (!isSupervisor()) {
+            <button class="btn btn-outline" (click)="openUserImport()" style="padding:10px 14px;font-size:13px;white-space:nowrap">
+              <ic name="download" [size]="16"></ic> {{ i18n.t('user_import_btn') }}
+            </button>
+          }
+        </div>
+      </div>
+
+      <!-- Main accounts list -->
+      <div class="card" style="padding:16px">
+        <div class="kicker" style="margin-bottom:10px">
+          {{ i18n.t('users_list') }} · {{ filteredUsers().length }}@if (userSearch().trim()) { / {{ usersList().length }} }
+        </div>
+        @if (usersLoading()) {
+        <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (!filteredUsers().length) {
+        <p class="muted" style="font-size:13px;text-align:center;padding:24px 8px">{{ i18n.t('users_no_match') }}</p>
+        } @else {
+        <div style="display:flex;flex-direction:column">
+          @for (u of pagedUsers(); track u.id) {
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border);flex-wrap:wrap" [style.opacity]="u.enabled === false ? '.5' : '1'">
+              <avatar [name]="u.name" [size]="30"></avatar>
+              <div style="min-width:120px;flex:1">
+                <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.name }}</div>
+                <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.email }}</div>
+                @if (u.phone) {
+                  <div class="muted" style="font-size:10.5px;margin-top:1px">{{ u.phone }}@if (u.agency) { · {{ u.agency }} }</div>
+                }
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;flex-shrink:0">
+                @if (u.enabled === false) {
+                  <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px">{{ i18n.t('user_disabled') }}</span>
+                }
+                @for (r of userRoles(u); track r) {
+                  <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(r) }}</span>
+                }
+                @if (!isSupervisor()) {
+                  <button class="icon-btn" (click)="startEditUser(u)" [title]="i18n.t('user_edit_info')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
+                  <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
+                }
+                @if (u.id !== auth.user()?.id && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
+                  <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
+                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
+                    {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
+                  </button>
+                }
+              </div>
+              @if (editUserId() === u.id) {
+                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
+                  <field [label]="i18n.t('user_name')"><input class="input" [value]="editUser().name" (input)="onEditUser('name', $event)" /></field>
+                  <field [label]="i18n.t('user_email')"><input class="input" type="email" [value]="editUser().email" (input)="onEditUser('email', $event)" /></field>
+                  <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
+                         [err]="(editUser().phone || '') && !editUserPhoneOk() ? i18n.t('user_phone_invalid') : null">
+                    <input class="input" inputmode="numeric" maxlength="9" [value]="editUser().phone || ''" (input)="onEditUser('phone', $event)" />
+                  </field>
+                  @if (userRoles(u).includes('AGENT')) {
+                    <field [label]="i18n.t('user_agency')"><input class="input" [value]="editUser().agency || ''" (input)="onEditUser('agency', $event)" /></field>
+                  }
+                  @if (editUserErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(editUserErr()) }}</span> }
+                  @if (editUserMsg() === 'updated') { <span style="font-size:11.5px;color:var(--success);font-weight:700">{{ i18n.t('user_updated') }}</span> }
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" (click)="saveUser(u)" [disabled]="!editUserValid() || editUserSaving()" style="padding:7px 12px;font-size:12.5px">
+                      @if (editUserSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
+                    </button>
+                    <button class="btn btn-ghost" (click)="cancelEditUser()" [disabled]="editUserSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
+                  </div>
+                </div>
+              }
+              @if (editRolesId() === u.id) {
+                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
+                  <div style="display:flex;flex-wrap:wrap;gap:7px">
+                    @for (r of allRoles; track r) {
+                      <button type="button" (click)="toggleEditRole(r)"
+                              [class.btn-primary]="editRoles().includes(r)" [class.btn-outline]="!editRoles().includes(r)"
+                              class="btn" style="padding:5px 10px;font-size:11.5px">{{ roleLabel(r) }}</button>
+                    }
+                  </div>
+                  @if (editRolesErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(editRolesErr()) }}</span> }
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" (click)="saveRoles(u)" [disabled]="!editRoles().length || editRolesSaving()" style="padding:7px 12px;font-size:12.5px">
+                      @if (editRolesSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
+                    </button>
+                    <button class="btn btn-ghost" (click)="editRolesId.set(null)" [disabled]="editRolesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
+                  </div>
+                </div>
+              }
+            </div>
+          }
+        </div>
+        @if (userToggleErr()) { <p class="err" style="font-size:12px;text-align:center;margin-top:6px">{{ i18n.t(userToggleErr()) }}</p> }
+        @if (userPageCount() > 1) {
+          <div class="tx-pager">
+            <span class="muted" style="font-size:11.5px">{{ i18n.t('step') }} {{ userPage() + 1 }} {{ i18n.t('of') }} {{ userPageCount() }}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" (click)="userPrev()" [disabled]="userPage() === 0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
+              <button class="btn btn-outline" (click)="userNext()" [disabled]="userPage() >= userPageCount() - 1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
+            </div>
+          </div>
+        }
+        }
+      </div>
+
+      <!-- Create user panel -->
+      @if (userPanel() === 'create') {
+      <div class="card" style="padding:16px;margin-top:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px">
+          <h3 style="font-size:15px;margin:0">{{ i18n.t('user_new') }}</h3>
+          <button type="button" class="icon-btn" (click)="closeUserPanel()" [title]="i18n.t('cancel_short')"><ic name="x" [size]="18"></ic></button>
         </div>
         <div style="display:flex;flex-direction:column;gap:10px">
           <field [label]="i18n.t('user_name')"><input class="input" [value]="nu().name" (input)="onNu('name', $event)" /></field>
           <field [label]="i18n.t('user_email')"><input class="input" type="email" [value]="nu().email" (input)="onNu('email', $event)" /></field>
-          <!-- Phone is mandatory for every account and serves as the collecteur's login identifier. -->
           <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
                  [err]="(nu().phone || '') && !phoneOk() ? i18n.t('user_phone_invalid') : null">
             <input class="input" inputmode="numeric" maxlength="9" [value]="nu().phone || ''" (input)="onNu('phone', $event)" />
@@ -260,7 +372,6 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           @if (nuHasRole('AGENT')) {
             <field [label]="i18n.t('user_agency')"><input class="input" [value]="nu().agency || ''" (input)="onNu('agency', $event)" /></field>
           }
-          <!-- Role selection comes last, per the data-collection onboarding flow. -->
           <field [label]="i18n.t('user_roles')" [hint]="i18n.t(isSupervisor() ? 'sup_collecteur_only' : 'user_roles_hint')">
             @if (isSupervisor()) {
               <span class="badge" style="background:var(--surface-2);color:var(--text);font-size:12px;padding:6px 11px">{{ roleLabel('COLLECTEUR') }}</span>
@@ -307,105 +418,21 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           @if (userMsg() === 'phone_exists') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_phone_exists') }}</p> }
           @if (userMsg() === 'invalid') { <p class="err" style="font-size:12px;text-align:center">{{ i18n.t('user_invalid') }}</p> }
         </div>
-
-        <div class="kicker" style="margin-top:16px;margin-bottom:6px">{{ i18n.t('users_list') }} · {{ usersList().length }}</div>
-        @if (usersLoading()) {
-        <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
-        } @else {
-        <div style="display:flex;flex-direction:column">
-          @for (u of pagedUsers(); track u.id) {
-            <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border);flex-wrap:wrap" [style.opacity]="u.enabled === false ? '.5' : '1'">
-              <avatar [name]="u.name" [size]="30"></avatar>
-              <div style="min-width:120px;flex:1">
-                <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.name }}</div>
-                <div class="muted" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.email }}</div>
-              </div>
-              <!-- Badges + action grouped so they wrap together and never overflow the card on a narrow column. -->
-              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-left:auto;flex-shrink:0">
-                @if (u.enabled === false) {
-                  <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px">{{ i18n.t('user_disabled') }}</span>
-                }
-                @for (r of userRoles(u); track r) {
-                  <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(r) }}</span>
-                }
-                @if (!isSupervisor()) {
-                  <button class="icon-btn" (click)="startEditUser(u)" [title]="i18n.t('user_edit_info')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
-                  <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
-                }
-                <!-- Supervisor may only enable/disable collecteurs (not supervisors/admins). -->
-                @if (u.id !== auth.user()?.id && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
-                  <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
-                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
-                    {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
-                  </button>
-                }
-              </div>
-              <!-- Inline profile editor (name, email, phone, agency). -->
-              @if (editUserId() === u.id) {
-                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
-                  <field [label]="i18n.t('user_name')"><input class="input" [value]="editUser().name" (input)="onEditUser('name', $event)" /></field>
-                  <field [label]="i18n.t('user_email')"><input class="input" type="email" [value]="editUser().email" (input)="onEditUser('email', $event)" /></field>
-                  <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
-                         [err]="(editUser().phone || '') && !editUserPhoneOk() ? i18n.t('user_phone_invalid') : null">
-                    <input class="input" inputmode="numeric" maxlength="9" [value]="editUser().phone || ''" (input)="onEditUser('phone', $event)" />
-                  </field>
-                  @if (userRoles(u).includes('AGENT')) {
-                    <field [label]="i18n.t('user_agency')"><input class="input" [value]="editUser().agency || ''" (input)="onEditUser('agency', $event)" /></field>
-                  }
-                  @if (editUserErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(editUserErr()) }}</span> }
-                  @if (editUserMsg() === 'updated') { <span style="font-size:11.5px;color:var(--success);font-weight:700">{{ i18n.t('user_updated') }}</span> }
-                  <div style="display:flex;gap:8px">
-                    <button class="btn btn-primary" (click)="saveUser(u)" [disabled]="!editUserValid() || editUserSaving()" style="padding:7px 12px;font-size:12.5px">
-                      @if (editUserSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
-                    </button>
-                    <button class="btn btn-ghost" (click)="cancelEditUser()" [disabled]="editUserSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
-                  </div>
-                </div>
-              }
-              <!-- Inline role editor (multi-role). -->
-              @if (editRolesId() === u.id) {
-                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
-                  <div style="display:flex;flex-wrap:wrap;gap:7px">
-                    @for (r of allRoles; track r) {
-                      <button type="button" (click)="toggleEditRole(r)"
-                              [class.btn-primary]="editRoles().includes(r)" [class.btn-outline]="!editRoles().includes(r)"
-                              class="btn" style="padding:5px 10px;font-size:11.5px">{{ roleLabel(r) }}</button>
-                    }
-                  </div>
-                  @if (editRolesErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(editRolesErr()) }}</span> }
-                  <div style="display:flex;gap:8px">
-                    <button class="btn btn-primary" (click)="saveRoles(u)" [disabled]="!editRoles().length || editRolesSaving()" style="padding:7px 12px;font-size:12.5px">
-                      @if (editRolesSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
-                    </button>
-                    <button class="btn btn-ghost" (click)="editRolesId.set(null)" [disabled]="editRolesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
-                  </div>
-                </div>
-              }
-            </div>
-          }
-        </div>
-        @if (userToggleErr()) { <p class="err" style="font-size:12px;text-align:center;margin-top:6px">{{ i18n.t(userToggleErr()) }}</p> }
-        @if (userPageCount() > 1) {
-          <div class="tx-pager">
-            <span class="muted" style="font-size:11.5px">{{ i18n.t('step') }} {{ userPage() + 1 }} {{ i18n.t('of') }} {{ userPageCount() }}</span>
-            <div style="display:flex;gap:6px">
-              <button class="btn btn-outline" (click)="userPrev()" [disabled]="userPage() === 0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
-              <button class="btn btn-outline" (click)="userNext()" [disabled]="userPage() >= userPageCount() - 1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
-            </div>
-          </div>
-        }
-        }
       </div>
+      }
 
-      <!-- Bulk import users — admin only (a supervisor only creates collecteurs one by one). -->
-      @if (!isSupervisor()) {
+      <!-- Bulk import users — admin only -->
+      @if (userPanel() === 'import' && !isSupervisor()) {
       <div class="card" style="padding:16px;margin-top:12px">
-        <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
-          <ic name="download" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
-          <div style="min-width:0">
-            <h3 style="font-size:15px;line-height:1.2">{{ i18n.t('import_title') }}</h3>
-            <p class="muted" style="font-size:11.5px;line-height:1.4;margin-top:3px">{{ i18n.t('import_sub') }}</p>
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px">
+          <div style="display:flex;align-items:flex-start;gap:9px;min-width:0">
+            <ic name="download" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
+            <div style="min-width:0">
+              <h3 style="font-size:15px;line-height:1.2;margin:0">{{ i18n.t('import_title') }}</h3>
+              <p class="muted" style="font-size:11.5px;line-height:1.4;margin-top:3px">{{ i18n.t('import_sub') }}</p>
+            </div>
           </div>
+          <button type="button" class="icon-btn" (click)="closeUserPanel()" [title]="i18n.t('cancel_short')"><ic name="x" [size]="18"></ic></button>
         </div>
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
@@ -1010,20 +1037,40 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   // --- user management ---
   usersList = signal<User[]>([]);
-  // Client-side pagination of the staff accounts list.
+  userSearch = signal('');
+  /** Secondary panel: create form or bulk import (main view stays the searchable list). */
+  userPanel = signal<'none' | 'create' | 'import'>('none');
+  filteredUsers = computed(() => {
+    const q = this.userSearch().trim().toLowerCase();
+    const digits = this.userSearch().replace(/\D/g, '');
+    return this.usersList().filter((u) => {
+      if (!q && !digits) return true;
+      const roles = this.userRoles(u).map((r) => this.roleLabel(r)).join(' ');
+      const hay = `${u.name} ${u.email} ${u.phone ?? ''} ${u.agency ?? ''} ${roles}`.toLowerCase();
+      const phone = (u.phone ?? '').replace(/\D/g, '');
+      return hay.includes(q) || (!!digits && phone.includes(digits));
+    });
+  });
+  // Client-side pagination of the filtered staff accounts list.
   userPage = signal(0);
   readonly userPageSize = 8;
-  userPageCount = computed(() => Math.max(1, Math.ceil(this.usersList().length / this.userPageSize)));
+  userPageCount = computed(() => Math.max(1, Math.ceil(this.filteredUsers().length / this.userPageSize)));
   pagedUsers = computed(() => {
+    const all = this.filteredUsers();
     const p = Math.min(this.userPage(), this.userPageCount() - 1);
-    return this.usersList().slice(p * this.userPageSize, p * this.userPageSize + this.userPageSize);
+    return all.slice(p * this.userPageSize, p * this.userPageSize + this.userPageSize);
   });
-  // Back to the first page only when the number of accounts changes (reload / create / import),
-  // not on an in-place edit like enabling/disabling a user. A computed emits only on value change.
-  private readonly userCount = computed(() => this.usersList().length);
-  private readonly _userPageReset = effect(() => { this.userCount(); this.userPage.set(0); });
+  private readonly _userPageReset = effect(() => { this.filteredUsers().length; this.userPage.set(0); });
   userPrev() { this.userPage.update((p) => Math.max(0, p - 1)); }
   userNext() { this.userPage.update((p) => Math.min(this.userPageCount() - 1, p + 1)); }
+  openUserCreate() {
+    this.userPanel.set('create');
+    this.userMsg.set('');
+    this.createdPw.set('');
+    this.createdPin.set('');
+  }
+  openUserImport() { this.userPanel.set('import'); }
+  closeUserPanel() { this.userPanel.set('none'); }
   // Enable/disable a staff account (admin only). userToggling holds the id being updated.
   userToggling = signal('');
   userToggleErr = signal('');
