@@ -19,16 +19,16 @@ class PaymentPushReconcileTest {
 
     @Autowired SubscriptionService service;
 
-    private CreateSubscriptionRequest req() {
+    private CreateSubscriptionRequest req(String cni, String phone) {
         return new CreateSubscriptionRequest(
-                "Push", "Client", "M", "cni", "8888YYYY", null, "12/04/2030", "677004488",
+                "Push", "Client", "M", "cni", cni, null, "12/04/2030", phone,
                 "push@example.com", "Bonamoussadi", "Littoral", "Douala",
-                "om", "677004488", "promote", false, null, null, null, null, null, null);
+                "om", phone, "promote", false, null, null, null, null, null, null);
     }
 
     @Test
     void pushGatewayAppliesTheResultThenIsIdempotentOnceSettled() {
-        Subscription s = service.create(req(), "self", null);
+        Subscription s = service.create(req("8888YYYY", "677004488"), "self", null);
         service.pushGateway(s.getRef());
         Subscription pushed = service.byRef(s.getRef());
         assertEquals(PayStatus.pending, pushed.getPayStatus(), "an accepted push stays pending until confirmation");
@@ -42,14 +42,14 @@ class PaymentPushReconcileTest {
 
     @Test
     void expirePendingFailsOnlyAStillPendingOrder() {
-        Subscription s = service.create(req(), "self", null);
+        Subscription s = service.create(req("8888ZZZZ", "677004489"), "self", null);
         service.expirePending(s.getRef());
         Subscription expired = service.byRef(s.getRef());
         assertEquals(PayStatus.failed, expired.getPayStatus());
         assertEquals("Délai de paiement dépassé", expired.getPaymentMessage());
 
         // A settled order is never overturned by the reconciliation sweep.
-        Subscription paidOne = service.create(req(), "self", null);
+        Subscription paidOne = service.create(req("8888WWWW", "677004490"), "self", null);
         service.applyPayment(paidOne.getRef(), "validate", null);
         service.expirePending(paidOne.getRef());
         assertEquals(PayStatus.paid, service.byRef(paidOne.getRef()).getPayStatus());

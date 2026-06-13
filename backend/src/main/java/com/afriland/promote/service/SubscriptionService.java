@@ -2,6 +2,7 @@ package com.afriland.promote.service;
 
 import com.afriland.promote.model.*;
 import com.afriland.promote.payment.GatewayClientMessages;
+import com.afriland.promote.payment.MomoDebitGuard;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.PaymentInitiationEvent;
 import com.afriland.promote.receipt.SaraReceipt;
@@ -43,10 +44,10 @@ public class SubscriptionService {
     /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */
     @Value("${app.payment.async:false}")
     private boolean asyncPayments;
+    @Value("${app.payment.debit-guard-seconds:300}")
+    private long debitGuardSeconds;
 
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
-    /** A pending MoMo transaction older than this is no longer "resumable" (a fresh attempt is allowed). */
-    private static final long RESUME_WINDOW_SECONDS = 300; // 5 min
 
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
                                AppUserRepository users, AgencyRepository agencies, PaymentGateway gateway,
@@ -86,26 +87,27 @@ public class SubscriptionService {
     }
 
     /** Find a recent MoMo attempt for the same phone/amount/method to resume instead of creating a
-     *  duplicate subscription. Includes {@code pending} and technically-failed orders (timeout,
-     *  duplicate, infra) but not business declines (insufficient balance, blocked user). */
+     *  duplicate subscription or sending a second TrustPayWay debit. */
     private Subscription findResumableMomo(String payPhone, int amount, String pay) {
-        String want = local9(payPhone);
+        String want = MomoDebitGuard.payPhone9(payPhone);
         if (want.isEmpty()) return null;
-        Instant cutoff = Instant.now().minusSeconds(RESUME_WINDOW_SECONDS);
-        Subscription pending = matchMomo(subs.findByPayStatusAndPayAndAmountAndCreatedAtAfter(
-                PayStatus.pending, pay, amount, cutoff), want);
-        if (pending != null) return pending;
-        return matchMomo(subs.findByPayStatusAndPayAndAmountAndCreatedAtAfter(
-                PayStatus.failed, pay, amount, cutoff).stream()
-                .filter(s -> !GatewayClientMessages.isBusinessDecline(s.getPaymentMessage()))
-                .toList(), want);
+        Instant cutoff = Instant.now().minusSeconds(debitGuardSeconds);
+        return subs.findRecentMomoAttempts(pay, amount, cutoff).stream()
+                .filter(s -> want.equals(MomoDebitGuard.payPhone9(s.getPayPhone())))
+                .filter(s -> MomoDebitGuard.shouldResumeSubscription(s, debitGuardSeconds))
+                .findFirst()
+                .orElse(null);
     }
 
-    private static Subscription matchMomo(java.util.Collection<Subscription> candidates, String want) {
-        return candidates.stream()
-                .filter(s -> want.equals(local9(s.getPayPhone())))
-                .max(java.util.Comparator.comparing(Subscription::getCreatedAt))
-                .orElse(null);
+    /** Another recent order already triggered (or completed) a TrustPayWay debit for this line. */
+    private boolean hasConflictingMomoDebit(String payPhone, int amount, String pay, String excludeRef) {
+        String want = MomoDebitGuard.payPhone9(payPhone);
+        if (want.isEmpty()) return false;
+        Instant cutoff = Instant.now().minusSeconds(debitGuardSeconds);
+        return subs.findRecentMomoAttempts(pay, amount, cutoff).stream()
+                .filter(s -> excludeRef == null || !excludeRef.equals(s.getRef()))
+                .filter(s -> want.equals(MomoDebitGuard.payPhone9(s.getPayPhone())))
+                .anyMatch(s -> MomoDebitGuard.blocksDuplicatePush(s, debitGuardSeconds));
     }
 
     /** Offre Promote : la carte est gratuite — le client règle la recharge initiale + le Pass
@@ -184,8 +186,8 @@ public class SubscriptionService {
                     resumable.setFailedAt(null);
                     subs.save(resumable);
                 }
-                log.info("Reprise du paiement en attente {} (tel={} {} {} XAF) au lieu d'un doublon",
-                        resumable.getRef(), payPhone, req.pay(), amount);
+                log.info("Reprise du paiement {} (tel={} {} {} XAF, status={}) — pas de second débit",
+                        resumable.getRef(), payPhone, req.pay(), amount, resumable.getPayStatus());
                 return resumable;
             }
         }
@@ -274,10 +276,16 @@ public class SubscriptionService {
      *  synchronous create path and the async dispatcher. Never throws: a gateway error (unreachable /
      *  login failed / declined push) marks the payment failed with a client-facing reason. */
     private void applyGatewayPush(Subscription s) {
+        if (hasConflictingMomoDebit(s.getPayPhone(), s.getAmount(), s.getPay(), s.getRef())) {
+            log.info("MoMo push ignoré pour {} — même tel/montant déjà débité ou en cours (< {} s)",
+                    s.getRef(), debitGuardSeconds);
+            return;
+        }
         try {
             PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, s.getPay());
             s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
             s.setPaymentMessage(pr.message());           // reason to surface on failure
+            if (pr.accepted()) s.setGatewayPushAccepted(true);
             if (!pr.accepted()) s.markFailed();
         } catch (RuntimeException ex) {
             log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), s.getPay(), ex.getMessage());
@@ -375,6 +383,22 @@ public class SubscriptionService {
         }
         if (total > 0) log.info("Backfilled cniNorm on {} legacy subscription(s)", total);
         return total;
+    }
+
+    /** Legacy rows: a non-null gatewayRef means TrustPayWay was already called. */
+    @Transactional
+    public int backfillGatewayPushAccepted() {
+        int n = 0;
+        for (Subscription s : subs.findAll()) {
+            if (!s.isGatewayPushAccepted() && s.getGatewayRef() != null && !s.getGatewayRef().isBlank()
+                    && ("om".equalsIgnoreCase(s.getPay()) || "mtn".equalsIgnoreCase(s.getPay()))) {
+                s.setGatewayPushAccepted(true);
+                subs.save(s);
+                n++;
+            }
+        }
+        if (n > 0) log.info("Backfilled gatewayPushAccepted on {} legacy subscription(s)", n);
+        return n;
     }
 
     public Subscription byRef(String ref) {

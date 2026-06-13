@@ -31,6 +31,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findByPayStatusAndPayAndAmountAndCreatedAtAfter(
             PayStatus payStatus, String pay, int amount, Instant createdAt);
 
+    /** Recent MoMo attempts (any status) for duplicate-debit guard and resume. */
+    @Query("select s from Subscription s where lower(s.pay) = lower(:pay) and s.amount = :amount "
+            + "and s.createdAt >= :since and lower(s.pay) in ('om', 'mtn') order by s.createdAt desc")
+    List<Subscription> findRecentMomoAttempts(
+            @Param("pay") String pay, @Param("amount") int amount, @Param("since") Instant since);
+
     /** Manual reconciliation: MoMo orders still pending/failed with a gateway id, since a cutoff. */
     @Query("select s from Subscription s where s.createdAt >= :since "
             + "and s.payStatus in (com.afriland.promote.model.PayStatus.pending, com.afriland.promote.model.PayStatus.failed) "

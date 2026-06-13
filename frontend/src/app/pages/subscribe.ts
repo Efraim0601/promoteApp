@@ -480,6 +480,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
           fullName: s.fullName, pay: s.pay, payPhone: s.payPhone, createdAt: s.createdAt });
         // cash and SARA money are settled off-platform → straight to the reference screen, no polling.
         if (this.form.pay === 'cash' || this.form.pay === 'sara') { this.proc.set('reference'); }
+        else if (s.payStatus === 'paid') { this.proc.set('reference'); }
         else if (s.payStatus === 'failed') { this.proc.set('failed'); } // gateway rejected the push
         else {
           this.proc.set('paying');

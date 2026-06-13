@@ -5,6 +5,7 @@ import com.afriland.promote.model.Recharge;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.CardConfig;
 import com.afriland.promote.payment.GatewayClientMessages;
+import com.afriland.promote.payment.MomoDebitGuard;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.PaymentInitiationEvent;
 import com.afriland.promote.receipt.SaraReceipt;
@@ -54,6 +55,8 @@ public class RechargeService {
     /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */
     @Value("${app.payment.async:false}")
     private boolean asyncPayments;
+    @Value("${app.payment.debit-guard-seconds:300}")
+    private long debitGuardSeconds;
 
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
 
@@ -97,6 +100,27 @@ public class RechargeService {
         return (ref + "-" + suffix).toUpperCase();
     }
 
+    private Recharge findResumableMomo(String payPhone, int amount, String pay) {
+        String want = MomoDebitGuard.payPhone9(payPhone);
+        if (want.isEmpty()) return null;
+        Instant cutoff = Instant.now().minusSeconds(debitGuardSeconds);
+        return recharges.findRecentMomoAttempts(pay, amount, cutoff).stream()
+                .filter(r -> want.equals(MomoDebitGuard.payPhone9(r.getPayPhone())))
+                .filter(r -> MomoDebitGuard.shouldResumeRecharge(r, debitGuardSeconds))
+                .findFirst()
+                .orElse(null);
+    }
+
+    private boolean hasConflictingMomoDebit(String payPhone, int amount, String pay, String excludeRef) {
+        String want = MomoDebitGuard.payPhone9(payPhone);
+        if (want.isEmpty()) return false;
+        Instant cutoff = Instant.now().minusSeconds(debitGuardSeconds);
+        return recharges.findRecentMomoAttempts(pay, amount, cutoff).stream()
+                .filter(r -> excludeRef == null || !excludeRef.equals(r.getRef()))
+                .filter(r -> want.equals(MomoDebitGuard.payPhone9(r.getPayPhone())))
+                .anyMatch(r -> MomoDebitGuard.blocksDuplicatePush(r, debitGuardSeconds));
+    }
+
     @Transactional
     public Recharge create(CreateRechargeRequest req) {
         int amount = req.amount();
@@ -123,6 +147,20 @@ public class RechargeService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pay_phone_required");
             }
             payPhone = req.payPhone().trim();
+        }
+
+        if (momo) {
+            Recharge resumable = findResumableMomo(payPhone, amount, req.pay());
+            if (resumable != null) {
+                if (resumable.getPayStatus() == PayStatus.failed) {
+                    resumable.setPayStatus(PayStatus.pending);
+                    resumable.setPaymentMessage(null);
+                    recharges.save(resumable);
+                }
+                log.info("Reprise recharge {} (tel={} {} {} XAF, status={}) — pas de second débit",
+                        resumable.getRef(), payPhone, req.pay(), amount, resumable.getPayStatus());
+                return resumable;
+            }
         }
 
         Recharge r = Recharge.builder()
@@ -169,10 +207,16 @@ public class RechargeService {
      *  synchronous create path and the async dispatcher. Never throws: a gateway error marks the
      *  payment failed with a client-facing reason. */
     private void applyGatewayPush(Recharge r) {
+        if (hasConflictingMomoDebit(r.getPayPhone(), r.getAmount(), r.getPay(), r.getRef())) {
+            log.info("MoMo push ignoré pour recharge {} — même tel/montant déjà débité ou en cours (< {} s)",
+                    r.getRef(), debitGuardSeconds);
+            return;
+        }
         try {
             PaymentGateway.PaymentRequest pr = gateway.requestPayment(r, r.getPay());
             r.setPaymentTxId(pr.externalRef());
             r.setPaymentMessage(pr.message());
+            if (pr.accepted()) r.setGatewayPushAccepted(true);
             if (!pr.accepted()) r.setPayStatus(PayStatus.failed);
         } catch (RuntimeException ex) {
             log.warn("Recharge payment initiation failed for {} ({}): {}", r.getRef(), r.getPay(), ex.getMessage());
@@ -189,6 +233,22 @@ public class RechargeService {
         if (r == null || r.getPayStatus() != PayStatus.pending) return;
         applyGatewayPush(r);
         recharges.save(r);
+    }
+
+    /** Legacy rows: a non-null gatewayRef means TrustPayWay was already called. */
+    @Transactional
+    public int backfillGatewayPushAccepted() {
+        int n = 0;
+        for (Recharge r : recharges.findAll()) {
+            if (!r.isGatewayPushAccepted() && r.getGatewayRef() != null && !r.getGatewayRef().isBlank()
+                    && ("om".equalsIgnoreCase(r.getPay()) || "mtn".equalsIgnoreCase(r.getPay()))) {
+                r.setGatewayPushAccepted(true);
+                recharges.save(r);
+                n++;
+            }
+        }
+        if (n > 0) log.info("Backfilled gatewayPushAccepted on {} legacy recharge(s)", n);
+        return n;
     }
 
     /** Reconciliation: force a long-stuck pending recharge to failed (no webhook, USSD window elapsed).

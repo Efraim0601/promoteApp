@@ -104,6 +104,8 @@ public class DataSeeder implements CommandLineRunner {
         // agent-portfolio query returns legacy referred sales. No-op once every row is backfilled.
         service.backfillReferrerPhone9();
         service.backfillCniNorm();
+        service.backfillGatewayPushAccepted();
+        rechargeService.backfillGatewayPushAccepted();
     }
 
     /**

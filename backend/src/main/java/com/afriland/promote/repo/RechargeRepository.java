@@ -21,6 +21,12 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
     List<Recharge> findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
             PayStatus payStatus, Instant createdAt, Pageable pageable);
 
+    /** Recent MoMo recharges (any status) for duplicate-debit guard and resume. */
+    @Query("select r from Recharge r where lower(r.pay) = lower(:pay) and r.amount = :amount "
+            + "and r.createdAt >= :since and lower(r.pay) in ('om', 'mtn') order by r.createdAt desc")
+    List<Recharge> findRecentMomoAttempts(
+            @Param("pay") String pay, @Param("amount") int amount, @Param("since") Instant since);
+
     /** Cashier fulfillment queue: paid recharges not yet credited to the card (oldest first). Indexed
      *  on pay_status — replaces a full-table scan + in-memory filter. */
     List<Recharge> findByPayStatusAndFulfilledFalseOrderByCreatedAtAsc(PayStatus payStatus);

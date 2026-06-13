@@ -57,6 +57,11 @@ public class Recharge implements Payable {
     private String gatewayRef;
     /** Aggregator-side transaction id; null for cash / SARA / simulated. */
     private String paymentTxId;
+
+    /** True once TrustPayWay accepted process-payment (2xx or duplicate 400). */
+    @Column(nullable = false)
+    private boolean gatewayPushAccepted = false;
+
     private Instant paidAt;
 
     @Column(length = 500)

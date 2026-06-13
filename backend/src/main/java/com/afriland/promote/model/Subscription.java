@@ -98,6 +98,10 @@ public class Subscription implements Payable {
     /** Aggregator-side transaction id (e.g. TrustPayWay "transaction_id"); null for cash/simulated. */
     private String paymentTxId;
 
+    /** True once TrustPayWay accepted process-payment (2xx or duplicate 400) — USSD already sent. */
+    @Column(nullable = false)
+    private boolean gatewayPushAccepted = false;
+
     /** When the payment was confirmed paid (used for the MoMo confirmation-latency KPI). */
     private Instant paidAt;
 
