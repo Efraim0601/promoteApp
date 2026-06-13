@@ -1,6 +1,7 @@
 package com.afriland.promote.service;
 
 import com.afriland.promote.model.*;
+import com.afriland.promote.payment.GatewayClientMessages;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.PaymentInitiationEvent;
 import com.afriland.promote.receipt.SaraReceipt;
@@ -256,7 +257,7 @@ public class SubscriptionService {
         } catch (RuntimeException ex) {
             log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), s.getPay(), ex.getMessage());
             s.markFailed();
-            s.setPaymentMessage("Service de paiement indisponible");
+            s.setPaymentMessage(GatewayClientMessages.from(ex));
         }
     }
 

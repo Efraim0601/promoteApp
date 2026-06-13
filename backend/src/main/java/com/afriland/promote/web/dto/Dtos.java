@@ -108,8 +108,14 @@ public final class Dtos {
 
     /** Result of a staff creation: the account + the auto-generated temporary password (emailed to
      *  the user; also returned so the admin can hand it out if mail delivery fails). {@code pin} is
-     *  the 4-digit collecteur login PIN, present only when a COLLECTEUR account was created. */
-    public record CreateUserResult(UserDto user, String tempPassword, String pin) {}
+     *  the 4-digit collecteur login PIN, present only when a COLLECTEUR account was created.
+     *  {@code reactivated} is true when a previously disabled account was re-provisioned. */
+    public record CreateUserResult(UserDto user, String tempPassword, String pin, boolean reactivated) {
+        /** Backward-compatible ctor for call sites that omit {@code reactivated}. */
+        public CreateUserResult(UserDto user, String tempPassword, String pin) {
+            this(user, tempPassword, pin, false);
+        }
+    }
 
     /** Admin updates an existing staff account (name, email, phone, agency). */
     public record UpdateUserRequest(

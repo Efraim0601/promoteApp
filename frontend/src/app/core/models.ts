@@ -204,6 +204,7 @@ export interface CreateUserResult {
   user: User;
   tempPassword: string;
   pin?: string | null;
+  reactivated?: boolean;
 }
 
 export interface Agent {

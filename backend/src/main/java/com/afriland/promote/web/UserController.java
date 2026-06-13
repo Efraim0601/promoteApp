@@ -98,7 +98,7 @@ public class UserController {
             return ResponseEntity.badRequest().body(new ErrorResponse("invalid_name_or_email"));
         }
         AppUser emailOwner = users.findByEmailIgnoreCase(email).orElse(null);
-        if (emailOwner != null && !emailOwner.getId().equals(id)) {
+        if (emailOwner != null && !emailOwner.getId().equals(id) && emailOwner.isEnabled()) {
             return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
         }
 
@@ -106,7 +106,7 @@ public class UserController {
         if (!phone.matches("6\\d{8}")) {
             return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
         }
-        if (users.findAllByPhone(phone).stream().anyMatch(other -> !other.getId().equals(id))) {
+        if (users.findAllByPhone(phone).stream().anyMatch(other -> !other.getId().equals(id) && other.isEnabled())) {
             return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
         }
         if (u.effectiveRoles().contains(Role.AGENT) && !phone.matches("6\\d{8}")) {
@@ -169,8 +169,32 @@ public class UserController {
                 .findAny().isEmpty();
     }
 
+    /** Re-provision a disabled account: new temporary password (and collecteur PIN if applicable),
+     *  re-enable login, optionally refresh profile fields. Used by {@link #create} when the email
+     *  belongs to a disabled account, and by {@link #recreate} for a one-click admin action. */
+    @PostMapping("/{id}/recreate")
+    public ResponseEntity<?> recreate(@PathVariable String id, Authentication auth) {
+        AppUser u = users.findById(id).orElse(null);
+        if (u == null) return ResponseEntity.notFound().build();
+        if (u.isEnabled()) {
+            return ResponseEntity.status(409).body(new ErrorResponse("account_active"));
+        }
+        if (isSupervisorOnly(auth)) {
+            Set<Role> tr = u.effectiveRoles();
+            if (tr.size() != 1 || tr.iterator().next() != Role.COLLECTEUR) {
+                return ResponseEntity.status(403).body(new ErrorResponse("forbidden_target"));
+            }
+        }
+        if (u.getPhone() == null || !u.getPhone().matches("6\\d{8}")) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
+        }
+        return provisionAccount(u, u.getName(), u.getEmail(), u.getAgency(), u.getPhone(),
+                new ArrayList<>(u.effectiveRoles()), true);
+    }
+
     /** Create a staff account. Rejects a duplicate email or an unknown role. A supervisor may only
-     *  create COLLECTEUR accounts. */
+     *  create COLLECTEUR accounts. A disabled account with the same email is re-provisioned instead
+     *  of rejected (new password, profile refreshed, account re-enabled). */
     @PostMapping
     public ResponseEntity<?> create(@Valid @RequestBody CreateUserRequest req, Authentication auth) {
         List<Role> roles;
@@ -184,48 +208,65 @@ public class UserController {
         if (isSupervisorOnly(auth) && (roles.size() != 1 || roles.get(0) != Role.COLLECTEUR)) {
             return ResponseEntity.status(403).body(new ErrorResponse("forbidden_role"));
         }
-        Role role = roles.get(0);   // primary
-        if (users.findByEmailIgnoreCase(req.email().trim()).isPresent()) {
-            return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
-        }
-        // The admin no longer sets the password: a temporary one is generated and emailed to the
-        // user, who must change it on first login.
-        String temp = TempPasswordGenerator.password();
-        // Phone stored as the local 9-digit Cameroon number (country code stripped) so it always
-        // matches what a client types as their referrer's number → auto-attributed to the agent.
-        String phone = req.phone() == null ? "" : req.phone().replaceAll("\\D", "");
-        if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
-        // The phone is now mandatory for every account (and is the collecteur's login identifier),
-        // so it must be a valid local Cameroon mobile number.
+        String email = req.email().trim();
+        String phone = normalizePhone(req.phone());
         if (!phone.matches("6\\d{8}")) {
             return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
         }
-        // Unique — a phone identifies a person and (for collecteurs) keys the phone+PIN sign-in.
-        if (!users.findAllByPhone(phone).isEmpty()) {
+        AppUser byEmail = users.findByEmailIgnoreCase(email).orElse(null);
+        if (byEmail != null) {
+            if (byEmail.isEnabled()) {
+                return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
+            }
+            // Re-provision the disabled account with the data entered in the create form.
+            if (users.findAllByPhone(phone).stream().anyMatch(o -> !o.getId().equals(byEmail.getId()))) {
+                return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
+            }
+            String agency = req.agency() == null || req.agency().isBlank() ? null : req.agency().trim();
+            return provisionAccount(byEmail, req.name().trim(), email, agency, phone, roles, true);
+        }
+        if (users.findAllByPhone(phone).stream().anyMatch(AppUser::isEnabled)) {
             return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
         }
-        // Collecteurs sign in with their phone + a generated 4-digit PIN (simple field flow).
+        Role role = roles.get(0);   // primary
+        String temp = TempPasswordGenerator.password();
         String pin = roles.contains(Role.COLLECTEUR) ? TempPasswordGenerator.pin() : null;
-        // A collecteur-only account never uses a password, so it's not forced through the
-        // change-password screen — the phone+PIN sign-in goes straight to the collecte console.
         boolean collecteurOnly = roles.size() == 1 && roles.get(0) == Role.COLLECTEUR;
         AppUser u = AppUser.builder()
                 .id("u-" + UUID.randomUUID().toString().substring(0, 8))
                 .name(req.name().trim())
-                .email(req.email().trim())
+                .email(email)
                 .passwordHash(encoder.encode(temp))
                 .role(role)
                 .agency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim())
                 .phone(phone)
                 .loginPin(pin == null ? null : encoder.encode(pin))
-                .mustChangePassword(!collecteurOnly)   // forced change on first login (except phone+PIN collecteurs)
+                .mustChangePassword(!collecteurOnly)
                 .build();
         u.assignRoles(roles);
         AppUser saved = users.save(u);
-        // Welcome email: login link + identifier + the generated temporary password (best-effort —
-        // an SMTP failure never breaks creation; the password is also returned below as a fallback).
-        email.sendAccountCreated(saved.getEmail(), saved.getName(), temp);
+        this.email.sendAccountCreated(saved.getEmail(), saved.getName(), temp);
         return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), temp, pin));
+    }
+
+    /** Shared path for creating a fresh account or re-provisioning a disabled one. */
+    private ResponseEntity<?> provisionAccount(AppUser u, String name, String emailAddress, String agency,
+                                               String phone, List<Role> roles, boolean reactivated) {
+        String temp = TempPasswordGenerator.password();
+        String pin = roles.contains(Role.COLLECTEUR) ? TempPasswordGenerator.pin() : null;
+        boolean collecteurOnly = roles.size() == 1 && roles.get(0) == Role.COLLECTEUR;
+        u.setName(name);
+        u.setEmail(emailAddress);
+        u.setAgency(agency);
+        u.setPhone(phone);
+        u.setPasswordHash(encoder.encode(temp));
+        u.setLoginPin(pin == null ? null : encoder.encode(pin));
+        u.setMustChangePassword(!collecteurOnly);
+        u.setEnabled(true);
+        u.assignRoles(roles);
+        AppUser saved = users.save(u);
+        this.email.sendAccountCreated(saved.getEmail(), saved.getName(), temp);
+        return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), temp, pin, reactivated));
     }
 
     /**
@@ -281,17 +322,43 @@ public class UserController {
 
             AppUser existing = users.findByEmailIgnoreCase(email).orElse(null);
             if (existing != null) {
-                if (!update) {
+                if (existing.isEnabled() && !update) {
                     out.add(new ImportRowResult(email, name, rolesLabel, "skipped", "email_exists", null));
                     skipped++; continue;
                 }
-                existing.setName(name);
-                existing.assignRoles(roles);
-                existing.setAgency(agency);
-                existing.setPhone(phone.isBlank() ? null : phone);
-                users.save(existing);
-                out.add(new ImportRowResult(email, name, rolesLabel, "updated", null, null));
-                updated++; continue;
+                if (!existing.isEnabled() || update) {
+                    if (!phone.isBlank() && users.findAllByPhone(phone).stream()
+                            .anyMatch(o -> o.isEnabled() && !o.getId().equals(existing.getId()))) {
+                        out.add(new ImportRowResult(email, name, rolesLabel, "invalid", "phone_exists", null));
+                        invalid++; continue;
+                    }
+                    boolean wasDisabled = !existing.isEnabled();
+                    String temp = wasDisabled ? TempPasswordGenerator.password() : null;
+                    existing.setName(name);
+                    existing.assignRoles(roles);
+                    existing.setAgency(agency);
+                    existing.setPhone(phone.isBlank() ? null : phone);
+                    if (wasDisabled) {
+                        existing.setPasswordHash(encoder.encode(temp));
+                        existing.setMustChangePassword(true);
+                        existing.setEnabled(true);
+                        this.email.sendAccountCreated(email, name, temp);
+                    }
+                    users.save(existing);
+                    if (wasDisabled) {
+                        out.add(new ImportRowResult(email, name, rolesLabel, "created", null, temp));
+                        created++;
+                    } else {
+                        out.add(new ImportRowResult(email, name, rolesLabel, "updated", null, null));
+                        updated++;
+                    }
+                    continue;
+                }
+            }
+
+            if (!phone.isBlank() && users.findAllByPhone(phone).stream().anyMatch(AppUser::isEnabled)) {
+                out.add(new ImportRowResult(email, name, rolesLabel, "invalid", "phone_exists", null));
+                invalid++; continue;
             }
 
             String temp = TempPasswordGenerator.password();

@@ -261,6 +261,27 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         </div>
       </div>
 
+      @if (createdPw() && (userMsg() === 'created' || userMsg() === 'recreated')) {
+      <div class="card" style="padding:14px 16px;margin-bottom:12px;background:var(--surface-2)">
+        <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:8px">{{ i18n.t(userMsg() === 'recreated' ? 'user_recreated' : 'user_created_pw') }}</div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <code style="font-size:14px;font-weight:700;letter-spacing:.5px">{{ createdPw() }}</code>
+          <button class="btn btn-outline" style="padding:6px 10px;font-size:12px" (click)="copyPw()">
+            <ic name="copy" [size]="15"></ic> {{ pwCopied() ? i18n.t('copied') : i18n.t('copy_btn') }}
+          </button>
+        </div>
+        @if (createdPin()) {
+          <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+            <span class="muted" style="font-size:11.5px">{{ i18n.t('user_created_pin') }}</span>
+            <code style="font-size:18px;font-weight:800;letter-spacing:3px">{{ createdPin() }}</code>
+            <button class="btn btn-outline" style="padding:6px 10px;font-size:12px" (click)="copyPin()">
+              <ic name="copy" [size]="15"></ic> {{ pinCopied() ? i18n.t('copied') : i18n.t('copy_btn') }}
+            </button>
+          </div>
+        }
+      </div>
+      }
+
       <!-- Main accounts list -->
       <div class="card" style="padding:16px">
         <div class="kicker" style="margin-bottom:10px">
@@ -292,6 +313,12 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                 @if (!isSupervisor()) {
                   <button class="icon-btn" (click)="startEditUser(u)" [title]="i18n.t('user_edit_info')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
                   <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
+                }
+                @if (u.enabled === false && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
+                  <button class="btn btn-primary" (click)="recreateUser(u)" [disabled]="userRecreating() === u.id"
+                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
+                    @if (userRecreating() === u.id) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_recreate') }} }
+                  </button>
                 }
                 @if (u.id !== auth.user()?.id && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
                   <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
@@ -1071,8 +1098,33 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
   openUserImport() { this.userPanel.set('import'); }
   closeUserPanel() { this.userPanel.set('none'); }
+
+  recreateUser(u: User) {
+    if (this.userRecreating() || u.enabled !== false) return;
+    if (!confirm(this.i18n.t('user_recreate_confirm'))) return;
+    this.userRecreating.set(u.id);
+    this.userMsg.set('');
+    this.createdPw.set('');
+    this.createdPin.set('');
+    this.api.recreateUser(u.id).subscribe({
+      next: (res) => {
+        this.userRecreating.set('');
+        this.userMsg.set('recreated');
+        this.createdPw.set(res.tempPassword);
+        this.pwCopied.set(false);
+        this.createdPin.set(res.pin || '');
+        this.pinCopied.set(false);
+        this.loadUsers();
+      },
+      error: (err) => {
+        this.userRecreating.set('');
+        this.userMsg.set(err?.status === 409 && err?.error?.error === 'account_active' ? 'user_active' : 'invalid');
+      },
+    });
+  }
   // Enable/disable a staff account (admin only). userToggling holds the id being updated.
   userToggling = signal('');
+  userRecreating = signal('');
   userToggleErr = signal('');
   toggleUser(u: User) {
     const next = u.enabled === false;   // currently disabled → re-enable; else disable
@@ -1096,7 +1148,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
   /** Roles selected on the create form (multi-role). */
   nuRoles = signal<Role[]>(['AGENT']);
-  userMsg = signal<'' | 'created' | 'exists' | 'phone_exists' | 'invalid'>('');
+  userMsg = signal<'' | 'created' | 'recreated' | 'exists' | 'phone_exists' | 'invalid' | 'user_active'>('');
   userBusy = signal(false);
   /** Temporary password returned on the last successful creation (also emailed to the user). */
   createdPw = signal('');
@@ -1523,7 +1575,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     const roles = this.nuRoles();
     this.api.createUser({ ...u, name: u.name.trim(), email: u.email.trim(), role: roles[0], roles }).subscribe({
       next: (res) => {
-        this.userBusy.set(false); this.userMsg.set('created');
+        this.userBusy.set(false);
+        this.userMsg.set(res.reactivated ? 'recreated' : 'created');
         this.createdPw.set(res.tempPassword); this.pwCopied.set(false);
         this.createdPin.set(res.pin || ''); this.pinCopied.set(false);
         const fallbackRole: Role = this.isSupervisor() ? 'COLLECTEUR' : 'AGENT';

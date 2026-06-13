@@ -4,6 +4,7 @@ import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Recharge;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.CardConfig;
+import com.afriland.promote.payment.GatewayClientMessages;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.PaymentInitiationEvent;
 import com.afriland.promote.receipt.SaraReceipt;
@@ -176,7 +177,7 @@ public class RechargeService {
         } catch (RuntimeException ex) {
             log.warn("Recharge payment initiation failed for {} ({}): {}", r.getRef(), r.getPay(), ex.getMessage());
             r.setPayStatus(PayStatus.failed);
-            r.setPaymentMessage("Service de paiement indisponible");
+            r.setPaymentMessage(GatewayClientMessages.from(ex));
         }
     }
 

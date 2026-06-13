@@ -40,6 +40,6 @@ public class TrustPayWayProperties {
     /** TCP connect timeout (ms) for every aggregator call. Guards against a hung/unreachable host. */
     private int connectTimeoutMs = 5000;
 
-    /** Read timeout (ms) for every aggregator call — the hard ceiling a worker thread can block. */
-    private int readTimeoutMs = 15000;
+    /** Read timeout (ms) for every aggregator call — Orange MoMo is often slower than MTN. */
+    private int readTimeoutMs = 45000;
 }

@@ -219,6 +219,10 @@ export class Api {
   createUser(req: CreateUserRequest): Observable<CreateUserResult> {
     return this.http.post<CreateUserResult>(`${this.base}/users`, req);
   }
+  /** Admin — re-provision a disabled account (new temporary password, account re-enabled). */
+  recreateUser(id: string): Observable<CreateUserResult> {
+    return this.http.post<CreateUserResult>(`${this.base}/users/${id}/recreate`, {});
+  }
   /** Admin — update an existing staff account (name, email, phone, agency). */
   updateUser(id: string, req: UpdateUserRequest): Observable<User> {
     return this.http.put<User>(`${this.base}/users/${id}`, req);
