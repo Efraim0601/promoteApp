@@ -39,6 +39,14 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
             + "order by s.createdAt asc")
     List<Subscription> findMoMoReconcilableSince(@Param("since") Instant since);
 
+    /** True when this CNI already has a non-failed subscription (one card per CNI). */
+    boolean existsByCniNormAndPayStatusNot(String cniNorm, PayStatus payStatus);
+
+    /** Backfill {@link Subscription#getCniNorm()} for legacy CNI rows (batch-limited). */
+    @Query("select s from Subscription s where s.cniNorm is null and s.cni is not null and s.cni <> '' "
+            + "and (s.docType is null or lower(s.docType) = 'cni')")
+    List<Subscription> findCniNormBackfillBatch(Pageable pageable);
+
     /** Backfill of {@link Subscription#getReferrerPhone9()} for legacy rows (batch-limited). */
     List<Subscription> findByReferrerPhone9IsNullAndReferrerPhoneIsNotNull(Pageable pageable);
 

@@ -434,6 +434,9 @@
     </div>
 
     <div class="scr-foot">
+      @if (submitError()) {
+        <p class="err" style="text-align:center;font-weight:700;margin-bottom:10px">{{ i18n.t(submitError()) }}</p>
+      }
       @if (step() < lastStep) {
         <button class="btn btn-primary" (click)="next()">{{ i18n.t('continue') }} <ic name="arrowR" [size]="19"></ic></button>
       } @else {

@@ -97,6 +97,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   receiptBusy = signal(false);
   copied = signal(false);
   busy = signal(false);
+  submitError = signal('');
   /** True when the backend runs the simulated MoMo gateway (demo validate/decline buttons). */
   simulated = signal(false);
   // SARA receipt: extraction in flight + the auto-extracted payer/amount shown alongside the reference.
@@ -468,10 +469,12 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     // incomplete step instead of submitting an invalid file.
     if (!this.formComplete) { this.touched.set(true); this.step.set(this.firstInvalidStep()); return; }
     this.busy.set(true);
+    this.submitError.set('');
     const obs = this.isSelf ? this.api.createSelf(this.payload()) : this.api.createAssisted(this.payload());
     obs.subscribe({
       next: (s: Subscription) => {
         this.busy.set(false);
+        this.submitError.set('');
         this.clearPersist();   // record created server-side — drop the local draft
         this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage,
           fullName: s.fullName, pay: s.pay, payPhone: s.payPhone, createdAt: s.createdAt });
@@ -486,7 +489,11 @@ export class SubscribeComponent implements OnInit, OnDestroy {
           this.startStatusPolling(s.ref);
         }
       },
-      error: () => this.busy.set(false),
+      error: (err) => {
+        this.busy.set(false);
+        const code = err?.error?.error;
+        this.submitError.set(code === 'cni_exists' ? 'cni_exists' : 'submit_failed');
+      },
     });
   }
 

@@ -20,6 +20,7 @@ import java.time.Instant;
         @Index(name = "idx_sub_created_at", columnList = "created_at"),
         // Indexed agent portfolio lookup (mine): owned sales by agent_id, referred sales by phone9.
         @Index(name = "idx_sub_referrer_phone9", columnList = "referrer_phone9"),
+        @Index(name = "idx_sub_cni_norm", columnList = "cni_norm"),
 })
 @Getter
 @Setter
@@ -39,6 +40,8 @@ public class Subscription implements Payable {
 
     private String docType;         // type de pièce : cni | passport | recepisse (défaut cni)
     private String cni;             // ID document number (CNI / passport / récépissé)
+    /** Normalised CNI digits/letters (uppercase, no separators) — indexed for the one-card-per-CNI rule. */
+    private String cniNorm;
     private String niu;             // Numéro d'Identification Unique (taxpayer id) — optional
     private String cniExp;          // expiry, displayed dd/MM/yyyy
     private String phone;           // "+237 6XXXXXXXX"

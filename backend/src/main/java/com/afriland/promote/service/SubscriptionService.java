@@ -190,6 +190,15 @@ public class SubscriptionService {
             }
         }
 
+        // One Promote card per CNI: block a second subscription while any earlier one is still
+        // active (pending / paid / cash / SARA). A failed attempt may be retried with the same CNI.
+        if (isCniDocument(req.docType()) && !normCniMatch(req.cni()).isEmpty()
+                && subs.existsByCniNormAndPayStatusNot(normCniMatch(req.cni()), PayStatus.failed)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "cni_exists");
+        }
+
+        String cniNorm = isCniDocument(req.docType()) ? normCniMatch(req.cni()) : null;
+
         Subscription s = Subscription.builder()
                 .ref(newRef())
                 .prenom(req.prenom().trim())
@@ -199,6 +208,7 @@ public class SubscriptionService {
                 .email(req.email() == null ? null : req.email().trim())
                 .docType(req.docType() == null || req.docType().isBlank() ? "cni" : req.docType().trim())
                 .cni(req.cni())
+                .cniNorm(cniNorm)
                 .niu(normNiu(req.niu()))
                 .cniExp(req.cniExp())
                 .phone(req.phone().trim())
@@ -347,6 +357,23 @@ public class SubscriptionService {
             total += batch.size();
         }
         if (total > 0) log.info("Backfilled referrerPhone9 on {} legacy subscription(s)", total);
+        return total;
+    }
+
+    /** One-time backfill of {@code cniNorm} so the one-card-per-CNI rule applies to legacy rows. */
+    @Transactional
+    public int backfillCniNorm() {
+        int total = 0;
+        while (true) {
+            var batch = subs.findCniNormBackfillBatch(org.springframework.data.domain.PageRequest.of(0, 200));
+            if (batch.isEmpty()) break;
+            for (Subscription s : batch) {
+                s.setCniNorm(normCniMatch(s.getCni()));
+                subs.save(s);
+            }
+            total += batch.size();
+        }
+        if (total > 0) log.info("Backfilled cniNorm on {} legacy subscription(s)", total);
         return total;
     }
 
@@ -638,6 +665,10 @@ public class SubscriptionService {
     /** Normalise an ID-document number for matching: keep only alphanumerics, upper-cased. */
     private static String normCniMatch(String cni) {
         return cni == null ? "" : cni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
+    }
+
+    private static boolean isCniDocument(String docType) {
+        return docType == null || docType.isBlank() || "cni".equalsIgnoreCase(docType.trim());
     }
 
     /**
