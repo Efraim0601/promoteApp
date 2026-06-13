@@ -75,6 +75,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")
                 .requestMatchers(HttpMethod.POST, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")
                 .requestMatchers(HttpMethod.POST, "/api/users/*/recreate").hasAnyRole("ADMIN", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.POST, "/api/users/*/reset-credentials").hasAnyRole("ADMIN", "SUPERVISEUR")
                 .requestMatchers(HttpMethod.PATCH, "/api/users/*/enabled").hasAnyRole("ADMIN", "SUPERVISEUR")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/stats/admin").hasRole("ADMIN")

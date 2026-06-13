@@ -261,15 +261,17 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         </div>
       </div>
 
-      @if (createdPw() && (userMsg() === 'created' || userMsg() === 'recreated')) {
+      @if ((createdPw() || createdPin()) && (userMsg() === 'created' || userMsg() === 'recreated' || userMsg() === 'reset')) {
       <div class="card" style="padding:14px 16px;margin-bottom:12px;background:var(--surface-2)">
-        <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:8px">{{ i18n.t(userMsg() === 'recreated' ? 'user_recreated' : 'user_created_pw') }}</div>
+        <div style="font-size:12px;color:var(--success);font-weight:700;margin-bottom:8px">{{ i18n.t(userMsg() === 'recreated' ? 'user_recreated' : userMsg() === 'reset' ? 'user_reset_done' : 'user_created_pw') }}</div>
+        @if (createdPw()) {
         <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <code style="font-size:14px;font-weight:700;letter-spacing:.5px">{{ createdPw() }}</code>
           <button class="btn btn-outline" style="padding:6px 10px;font-size:12px" (click)="copyPw()">
             <ic name="copy" [size]="15"></ic> {{ pwCopied() ? i18n.t('copied') : i18n.t('copy_btn') }}
           </button>
         </div>
+        }
         @if (createdPin()) {
           <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
             <span class="muted" style="font-size:11.5px">{{ i18n.t('user_created_pin') }}</span>
@@ -318,6 +320,12 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                   <button class="btn btn-primary" (click)="recreateUser(u)" [disabled]="userRecreating() === u.id"
                           style="padding:5px 9px;font-size:11px;white-space:nowrap">
                     @if (userRecreating() === u.id) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_recreate') }} }
+                  </button>
+                }
+                @if (u.enabled !== false && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
+                  <button class="btn btn-outline" (click)="resetUserCredentials(u)" [disabled]="userResetting() === u.id"
+                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
+                    @if (userResetting() === u.id) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_reset_credentials') }} }
                   </button>
                 }
                 @if (u.id !== auth.user()?.id && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
@@ -1122,9 +1130,32 @@ export class AdminComponent implements OnInit, OnDestroy {
       },
     });
   }
+  resetUserCredentials(u: User) {
+    if (this.userResetting() || u.enabled === false) return;
+    if (!confirm(this.i18n.t('user_reset_confirm'))) return;
+    this.userResetting.set(u.id);
+    this.userMsg.set('');
+    this.createdPw.set('');
+    this.createdPin.set('');
+    this.api.resetUserCredentials(u.id).subscribe({
+      next: (res) => {
+        this.userResetting.set('');
+        this.userMsg.set('reset');
+        this.createdPw.set(res.tempPassword || '');
+        this.pwCopied.set(false);
+        this.createdPin.set(res.pin || '');
+        this.pinCopied.set(false);
+      },
+      error: (err) => {
+        this.userResetting.set('');
+        this.userMsg.set(err?.status === 409 && err?.error?.error === 'account_disabled' ? 'user_disabled' : 'invalid');
+      },
+    });
+  }
   // Enable/disable a staff account (admin only). userToggling holds the id being updated.
   userToggling = signal('');
   userRecreating = signal('');
+  userResetting = signal('');
   userToggleErr = signal('');
   toggleUser(u: User) {
     const next = u.enabled === false;   // currently disabled → re-enable; else disable

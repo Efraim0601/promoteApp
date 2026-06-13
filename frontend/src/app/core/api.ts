@@ -223,6 +223,10 @@ export class Api {
   recreateUser(id: string): Observable<CreateUserResult> {
     return this.http.post<CreateUserResult>(`${this.base}/users/${id}/recreate`, {});
   }
+  /** Admin — reset login credentials for an active account (new password and/or collecteur PIN). */
+  resetUserCredentials(id: string): Observable<CreateUserResult> {
+    return this.http.post<CreateUserResult>(`${this.base}/users/${id}/reset-credentials`, {});
+  }
   /** Admin — update an existing staff account (name, email, phone, agency). */
   updateUser(id: string, req: UpdateUserRequest): Observable<User> {
     return this.http.put<User>(`${this.base}/users/${id}`, req);

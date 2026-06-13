@@ -33,6 +33,76 @@ public class EmailService {
         this.publicUrl = publicUrl;
     }
 
+    /**
+     * Admin-initiated credential reset for an existing active account. {@code tempPassword} and/or
+     * {@code pin} may be set depending on the user's roles (collecteur-only accounts get phone + PIN).
+     */
+    public void sendCredentialsReset(String to, String name, String tempPassword, String pin, String phone) {
+        boolean hasPw = tempPassword != null && !tempPassword.isBlank();
+        boolean hasPin = pin != null && !pin.isBlank();
+        if (hasPin && !hasPw) {
+            String subject = "Réinitialisation de vos identifiants — Afriland Carte Promote";
+            String body = """
+                    Bonjour %s,
+
+                    Un administrateur a réinitialisé vos identifiants de connexion sur la plateforme Afriland — Carte Promote.
+
+                    Lien de connexion : %s
+                    Identifiant (téléphone) : %s
+                    Code PIN temporaire     : %s
+
+                    Utilisez votre numéro de téléphone et ce code PIN pour vous connecter.
+
+                    Si vous n'êtes pas à l'origine de cette demande, contactez un administrateur.
+
+                    — Afriland First Bank
+                    """.formatted(name == null ? "" : name, loginUrl(), phone == null ? "" : phone, pin);
+            send(to, subject, body);
+            return;
+        }
+        if (hasPw && hasPin) {
+            String subject = "Réinitialisation de vos identifiants — Afriland Carte Promote";
+            String body = """
+                    Bonjour %s,
+
+                    Un administrateur a réinitialisé vos identifiants de connexion sur la plateforme Afriland — Carte Promote.
+
+                    Lien de connexion : %s
+                    Identifiant (email) : %s
+                    Mot de passe temporaire : %s
+                    Code PIN collecteur     : %s
+
+                    Pour votre sécurité, vous devrez définir un nouveau mot de passe lors de votre prochaine connexion par email.
+                    Le code PIN sert à la connexion collecteur avec votre numéro de téléphone.
+
+                    Si vous n'êtes pas à l'origine de cette demande, contactez un administrateur.
+
+                    — Afriland First Bank
+                    """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword, pin);
+            send(to, subject, body);
+            return;
+        }
+        if (hasPw) {
+            String subject = "Réinitialisation de vos identifiants — Afriland Carte Promote";
+            String body = """
+                    Bonjour %s,
+
+                    Un administrateur a réinitialisé vos identifiants de connexion sur la plateforme Afriland — Carte Promote.
+
+                    Lien de connexion : %s
+                    Identifiant       : %s
+                    Mot de passe temporaire : %s
+
+                    Pour votre sécurité, vous devrez définir un nouveau mot de passe lors de votre prochaine connexion.
+
+                    Si vous n'êtes pas à l'origine de cette demande, contactez un administrateur.
+
+                    — Afriland First Bank
+                    """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword);
+            send(to, subject, body);
+        }
+    }
+
     /** Password reset: new temporary password (the user must change it on next login). */
     public void sendPasswordReset(String to, String name, String tempPassword) {
         String subject = "Réinitialisation de mot de passe — Afriland Carte Promote";

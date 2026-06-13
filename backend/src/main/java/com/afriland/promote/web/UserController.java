@@ -192,6 +192,38 @@ public class UserController {
                 new ArrayList<>(u.effectiveRoles()), true);
     }
 
+    /** Reset login credentials for an active account: new temporary password (and collecteur PIN if
+     *  applicable). The account stays enabled; the user keeps their data and can sign in again. */
+    @PostMapping("/{id}/reset-credentials")
+    public ResponseEntity<?> resetCredentials(@PathVariable String id, Authentication auth) {
+        AppUser u = users.findById(id).orElse(null);
+        if (u == null) return ResponseEntity.notFound().build();
+        if (!u.isEnabled()) {
+            return ResponseEntity.status(409).body(new ErrorResponse("account_disabled"));
+        }
+        if (isSupervisorOnly(auth)) {
+            Set<Role> tr = u.effectiveRoles();
+            if (tr.size() != 1 || tr.iterator().next() != Role.COLLECTEUR) {
+                return ResponseEntity.status(403).body(new ErrorResponse("forbidden_target"));
+            }
+        }
+        Set<Role> roles = u.effectiveRoles();
+        boolean hasCollecteur = roles.contains(Role.COLLECTEUR);
+        if (hasCollecteur && (u.getPhone() == null || !u.getPhone().matches("6\\d{8}"))) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
+        }
+        boolean collecteurOnly = roles.size() == 1 && roles.contains(Role.COLLECTEUR);
+        String temp = TempPasswordGenerator.password();
+        String pin = hasCollecteur ? TempPasswordGenerator.pin() : null;
+        u.setPasswordHash(encoder.encode(temp));
+        u.setLoginPin(pin == null ? null : encoder.encode(pin));
+        u.setMustChangePassword(!collecteurOnly);
+        AppUser saved = users.save(u);
+        this.email.sendCredentialsReset(saved.getEmail(), saved.getName(), collecteurOnly ? null : temp, pin,
+                saved.getPhone());
+        return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), collecteurOnly ? "" : temp, pin));
+    }
+
     /** Create a staff account. Rejects a duplicate email or an unknown role. A supervisor may only
      *  create COLLECTEUR accounts. A disabled account with the same email is re-provisioned instead
      *  of rejected (new password, profile refreshed, account re-enabled). */
