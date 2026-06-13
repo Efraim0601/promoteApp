@@ -70,6 +70,7 @@ public class SecurityConfig {
                 // User management: role changes + import are ADMIN-only; listing, creation and
                 // enable/disable are also open to the SUPERVISEUR (restricted to collecteurs in the controller).
                 .requestMatchers(HttpMethod.PUT, "/api/users/*/roles").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/users/*").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/users/import").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")
                 .requestMatchers(HttpMethod.POST, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")

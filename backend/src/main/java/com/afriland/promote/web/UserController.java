@@ -85,6 +85,41 @@ public class UserController {
         return ResponseEntity.ok(UserDto.of(users.save(u)));
     }
 
+    /** Admin updates an existing account's profile (name, email, phone, agency). Roles and password
+     *  are unchanged — use {@code PUT /{id}/roles} and the password-reset flow respectively. */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> update(@PathVariable String id, @Valid @RequestBody UpdateUserRequest req) {
+        AppUser u = users.findById(id).orElse(null);
+        if (u == null) return ResponseEntity.notFound().build();
+
+        String name = req.name() == null ? "" : req.name().trim();
+        String email = req.email() == null ? "" : req.email().trim();
+        if (name.isBlank() || !EMAIL.matcher(email).matches()) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("invalid_name_or_email"));
+        }
+        AppUser emailOwner = users.findByEmailIgnoreCase(email).orElse(null);
+        if (emailOwner != null && !emailOwner.getId().equals(id)) {
+            return ResponseEntity.status(409).body(new ErrorResponse("email_exists"));
+        }
+
+        String phone = normalizePhone(req.phone());
+        if (!phone.matches("6\\d{8}")) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
+        }
+        if (users.findAllByPhone(phone).stream().anyMatch(other -> !other.getId().equals(id))) {
+            return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
+        }
+        if (u.effectiveRoles().contains(Role.AGENT) && !phone.matches("6\\d{8}")) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("agent_phone_required"));
+        }
+
+        u.setName(name);
+        u.setEmail(email);
+        u.setAgency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim());
+        u.setPhone(phone);
+        return ResponseEntity.ok(UserDto.of(users.save(u)));
+    }
+
     /** Admin sets the full role set of an existing account (multi-role). At least one valid role;
      *  removing ADMIN from the last remaining admin is refused. */
     @PutMapping("/{id}/roles")
@@ -280,4 +315,11 @@ public class UserController {
     }
 
     private static final Pattern EMAIL = Pattern.compile("^\\S+@\\S+\\.\\S+$");
+
+    /** Local 9-digit Cameroon mobile (country code stripped). */
+    private static String normalizePhone(String raw) {
+        String phone = raw == null ? "" : raw.replaceAll("\\D", "");
+        if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
+        return phone;
+    }
 }

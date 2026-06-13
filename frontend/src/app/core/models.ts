@@ -191,6 +191,13 @@ export interface CreateUserRequest {
   phone?: string | null;
 }
 
+export interface UpdateUserRequest {
+  name: string;
+  email: string;
+  agency?: string | null;
+  phone?: string | null;
+}
+
 /** Result of a staff creation: the account + the auto-generated temporary password (also emailed).
  *  `pin` is the 4-digit collecteur login PIN, present only when a COLLECTEUR account was created. */
 export interface CreateUserResult {

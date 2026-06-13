@@ -6,7 +6,7 @@ import {
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ImportUserRow, ImportUsersResult, LoginAudit, Role,
-  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Recharge, Subscription, User,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Recharge, Subscription, UpdateUserRequest, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -81,6 +81,14 @@ export class Api {
   paymentStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus; message?: string | null }> {
     return this.http.get<{ ref: string; payStatus: PayStatus; message?: string | null }>(`${this.base}/subscriptions/${ref}/status`);
   }
+  /** Active Mobile Money gateway (simulated | trustpayway) — drives demo UI on the client. */
+  paymentProvider(): Observable<{ provider: string }> {
+    return this.http.get<{ provider: string }>(`${this.base}/payment/provider`);
+  }
+  /** Simulated gateway — confirm or decline a MoMo payment (public, mirrors the USSD prompt). */
+  simulateSubscriptionPay(ref: string, outcome: 'validate' | 'fail', reason?: string): Observable<Subscription> {
+    return this.http.patch<Subscription>(`${this.base}/subscriptions/${ref}/pay`, { outcome, reason });
+  }
 
   /** Upload a captured KYC image (data URL); kind = selfie | cni-recto | cni-verso. */
   uploadImage(image: string, kind: string): Observable<{ key: string }> {
@@ -132,6 +140,10 @@ export class Api {
   /** Public — poll the live payment status of a recharge. */
   rechargeStatus(ref: string): Observable<{ ref: string; payStatus: PayStatus; message?: string | null }> {
     return this.http.get<{ ref: string; payStatus: PayStatus; message?: string | null }>(`${this.base}/recharges/${ref}/status`);
+  }
+  /** Simulated gateway — confirm or decline a recharge MoMo payment. */
+  simulateRechargePay(ref: string, outcome: 'validate' | 'fail', reason?: string): Observable<Recharge> {
+    return this.http.patch<Recharge>(`${this.base}/recharges/${ref}/pay`, { outcome, reason });
   }
   /** Staff — search recharges by reference, holder name, or PAN. */
   searchRecharges(q: string): Observable<Recharge[]> {
@@ -206,6 +218,10 @@ export class Api {
   /** Admin — create a staff account; the backend generates and emails a temporary password. */
   createUser(req: CreateUserRequest): Observable<CreateUserResult> {
     return this.http.post<CreateUserResult>(`${this.base}/users`, req);
+  }
+  /** Admin — update an existing staff account (name, email, phone, agency). */
+  updateUser(id: string, req: UpdateUserRequest): Observable<User> {
+    return this.http.put<User>(`${this.base}/users/${id}`, req);
   }
   /** Admin — enable or disable a staff account (a disabled account can no longer log in). */
   setUserEnabled(id: string, enabled: boolean): Observable<User> {

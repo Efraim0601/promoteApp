@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, Recharge, Role, Subscription, User } from '../core/models';
+import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -329,6 +329,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                   <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(r) }}</span>
                 }
                 @if (!isSupervisor()) {
+                  <button class="icon-btn" (click)="startEditUser(u)" [title]="i18n.t('user_edit_info')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
                   <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
                 }
                 <!-- Supervisor may only enable/disable collecteurs (not supervisors/admins). -->
@@ -339,6 +340,28 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                   </button>
                 }
               </div>
+              <!-- Inline profile editor (name, email, phone, agency). -->
+              @if (editUserId() === u.id) {
+                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
+                  <field [label]="i18n.t('user_name')"><input class="input" [value]="editUser().name" (input)="onEditUser('name', $event)" /></field>
+                  <field [label]="i18n.t('user_email')"><input class="input" type="email" [value]="editUser().email" (input)="onEditUser('email', $event)" /></field>
+                  <field [label]="i18n.t('user_phone')" [hint]="i18n.t('user_phone_hint')"
+                         [err]="(editUser().phone || '') && !editUserPhoneOk() ? i18n.t('user_phone_invalid') : null">
+                    <input class="input" inputmode="numeric" maxlength="9" [value]="editUser().phone || ''" (input)="onEditUser('phone', $event)" />
+                  </field>
+                  @if (userRoles(u).includes('AGENT')) {
+                    <field [label]="i18n.t('user_agency')"><input class="input" [value]="editUser().agency || ''" (input)="onEditUser('agency', $event)" /></field>
+                  }
+                  @if (editUserErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(editUserErr()) }}</span> }
+                  @if (editUserMsg() === 'updated') { <span style="font-size:11.5px;color:var(--success);font-weight:700">{{ i18n.t('user_updated') }}</span> }
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" (click)="saveUser(u)" [disabled]="!editUserValid() || editUserSaving()" style="padding:7px 12px;font-size:12.5px">
+                      @if (editUserSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
+                    </button>
+                    <button class="btn btn-ghost" (click)="cancelEditUser()" [disabled]="editUserSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
+                  </div>
+                </div>
+              }
               <!-- Inline role editor (multi-role). -->
               @if (editRolesId() === u.id) {
                 <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
@@ -1048,12 +1071,68 @@ export class AdminComponent implements OnInit, OnDestroy {
     return !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && this.nuRoles().length > 0 && this.phoneOk();
   });
 
+  // --- inline profile editing (existing accounts) ---
+  editUserId = signal<string | null>(null);
+  editUser = signal<UpdateUserRequest>({ name: '', email: '', agency: '', phone: '' });
+  editUserSaving = signal(false);
+  editUserErr = signal('');
+  editUserMsg = signal<'' | 'updated'>('');
+  editUserPhoneOk = computed(() => /^6\d{8}$/.test((this.editUser().phone ?? '').replace(/\D/g, '')));
+  editUserValid = computed(() => {
+    const u = this.editUser();
+    return !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && this.editUserPhoneOk();
+  });
+  startEditUser(u: User) {
+    this.editRolesId.set(null);
+    this.editUserId.set(u.id);
+    this.editUser.set({ name: u.name, email: u.email, agency: u.agency ?? '', phone: u.phone ?? '' });
+    this.editUserErr.set('');
+    this.editUserMsg.set('');
+  }
+  cancelEditUser() { this.editUserId.set(null); this.editUserErr.set(''); this.editUserMsg.set(''); }
+  onEditUser(k: keyof UpdateUserRequest, e: Event) {
+    let v = (e.target as HTMLInputElement).value;
+    if (k === 'phone') v = v.replace(/\D/g, '').slice(0, 9);
+    this.editUser.update((u) => ({ ...u, [k]: v }));
+    this.editUserErr.set('');
+    this.editUserMsg.set('');
+  }
+  saveUser(u: User) {
+    if (!this.editUserValid() || this.editUserSaving()) return;
+    this.editUserSaving.set(true);
+    this.editUserErr.set('');
+    this.editUserMsg.set('');
+    const body = this.editUser();
+    this.api.updateUser(u.id, {
+      name: body.name.trim(),
+      email: body.email.trim(),
+      agency: body.agency?.trim() || null,
+      phone: body.phone?.trim() || null,
+    }).subscribe({
+      next: (updated) => {
+        this.editUserSaving.set(false);
+        this.usersList.update((list) => list.map((x) => (x.id === u.id ? updated : x)));
+        if (updated.id === this.auth.user()?.id) this.auth.setUser(updated);
+        this.editUserMsg.set('updated');
+      },
+      error: (err) => {
+        this.editUserSaving.set(false);
+        const code = err?.error?.error;
+        this.editUserErr.set(code === 'email_exists' ? 'user_exists'
+          : code === 'phone_exists' ? 'user_phone_exists'
+          : code === 'invalid_name_or_email' ? 'user_invalid'
+          : code === 'agent_phone_required' ? 'user_err_agent_phone' : 'user_err_update');
+      },
+    });
+  }
+
   // --- inline role editing (existing accounts) ---
   editRolesId = signal<string | null>(null);
   editRoles = signal<Role[]>([]);
   editRolesSaving = signal(false);
   editRolesErr = signal('');
   startEditRoles(u: User) {
+    this.editUserId.set(null);
     this.editRolesId.set(u.id);
     this.editRoles.set([...this.userRoles(u)]);
     this.editRolesErr.set('');

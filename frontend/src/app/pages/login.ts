@@ -66,10 +66,12 @@ const SHOW_COLLECTEUR_LOGIN = false;
             </button>
           </div>
         </field>
-        <button type="button" (click)="openForgot()"
-                style="align-self:flex-end;background:none;border:none;padding:0;margin-top:-4px;font-size:12.5px;font-weight:600;color:var(--primary);cursor:pointer">
-          {{ i18n.t('login_forgot') }}
-        </button>
+        <div style="width:100%;text-align:right;margin-top:-4px">
+          <button type="button" (click)="openForgot()"
+                  style="background:none;border:none;padding:0;font-size:12.5px;font-weight:600;color:var(--primary);cursor:pointer">
+            {{ i18n.t('login_forgot') }}
+          </button>
+        </div>
         <button class="btn btn-primary" (click)="submit()" [disabled]="busy()">
           @if (busy()) { <spinner></spinner> } @else { {{ i18n.t('login_btn') }} <ic name="arrowR" [size]="18"></ic> }
         </button>

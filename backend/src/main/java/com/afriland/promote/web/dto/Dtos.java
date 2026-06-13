@@ -111,6 +111,13 @@ public final class Dtos {
      *  the 4-digit collecteur login PIN, present only when a COLLECTEUR account was created. */
     public record CreateUserResult(UserDto user, String tempPassword, String pin) {}
 
+    /** Admin updates an existing staff account (name, email, phone, agency). */
+    public record UpdateUserRequest(
+            @NotBlank String name,
+            @NotBlank String email,
+            String agency,
+            String phone) {}
+
     // ---- config ----
     public record ConfigDto(int price, int fees, int transport, int rechargeMin, int rechargeMax,
                             int rechargeInitiale, int passPremium,

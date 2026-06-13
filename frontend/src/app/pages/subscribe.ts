@@ -97,6 +97,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   receiptBusy = signal(false);
   copied = signal(false);
   busy = signal(false);
+  /** True when the backend runs the simulated MoMo gateway (demo validate/decline buttons). */
+  simulated = signal(false);
   // SARA receipt: extraction in flight + the auto-extracted payer/amount shown alongside the reference.
   saraExtracting = signal(false);
   saraExtract = signal<{ payerPhone: string | null; amount: number | null } | null>(null);
@@ -127,6 +129,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     // draft is being resumed mid-way, in which case skip straight back to where they were.
     this.started.set(!this.isSelf || this.step() > 0);
     this.api.getConfig().subscribe((c) => (this.config = c));
+    this.api.paymentProvider().subscribe({ next: (p) => this.simulated.set(p.provider === 'simulated'), error: () => {} });
     // Pickup branches for the "En agence" option (best-effort — empty list just hides the choice).
     this.api.getAgencies().subscribe({ next: (a) => this.agencies.set(a ?? []), error: () => {} });
     if (this.isSelf && this.form.refPhone) this.onRefPhone(this.form.refPhone);
@@ -561,6 +564,29 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   resumePolling() {
     const ref = this.result()?.ref;
     if (ref) this.startStatusPolling(ref);
+  }
+
+  /** Simulated gateway only — the real aggregator settles via webhook / get-status polling. */
+  simulatePay(outcome: 'validate' | 'fail') {
+    const ref = this.result()?.ref;
+    if (!ref || this.busy()) return;
+    this.busy.set(true);
+    this.api.simulateSubscriptionPay(ref, outcome, outcome === 'fail' ? 'Refusé par le client' : undefined).subscribe({
+      next: (s) => {
+        this.stopPolling();
+        this.busy.set(false);
+        this.waitLong.set(false);
+        const base = this.result() ?? { ref: s.ref };
+        if (outcome === 'validate') {
+          this.result.set({ ...base, payStatus: 'paid' });
+          this.proc.set('reference');
+        } else {
+          this.result.set({ ...base, payStatus: 'failed', message: s.paymentMessage ?? 'Refusé par le client' });
+          this.proc.set('failed');
+        }
+      },
+      error: () => this.busy.set(false),
+    });
   }
 
   private stopPolling() {

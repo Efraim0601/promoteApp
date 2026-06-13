@@ -96,10 +96,22 @@ interface RechargeForm {
             <ic name="phone" [size]="18" style="color:var(--primary);flex-shrink:0;margin-top:1px"></ic>
             <span style="font-size:11.5px;color:var(--text);line-height:1.45;font-weight:600">{{ i18n.t('waiting_pin_instr', { op: pm.name }) }}</span>
           </div>
+          @if (result()?.ref) {
+            <div class="card" style="padding:10px 14px;max-width:300px;width:100%">
+              <div class="kicker" style="text-align:center;margin-bottom:4px">{{ i18n.t('ref_label') }}</div>
+              <div style="font-family:var(--font-head);font-weight:800;font-size:17px;letter-spacing:.04em;text-align:center">{{ result()!.ref }}</div>
+            </div>
+          }
         }
       </div>
       @if (phase() === 'wait') {
         <div class="scr-foot">
+          @if (simulated()) {
+            <button class="btn btn-primary" (click)="simulatePay('validate')" [disabled]="busy()">
+              @if (busy()) { <spinner></spinner> } @else { <ic name="check" [size]="18"></ic> {{ i18n.t('simulate_validate') }} }
+            </button>
+            <button class="btn btn-ghost" (click)="simulatePay('fail')" [disabled]="busy()">{{ i18n.t('simulate_fail') }}</button>
+          }
           <button class="btn btn-ghost" (click)="exit()" style="font-size:13px">{{ i18n.t('cancel') }}</button>
         </div>
       }
@@ -288,6 +300,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   touched = signal(false);
   busy = signal(false);
   copied = signal(false);
+  simulated = signal(false);
   receiptBusy = signal(false);
   saraExtracting = signal(false);
   result = signal<Recharge | null>(null);
@@ -316,6 +329,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
       next: (c) => { if (c.rechargeMin) this.min.set(c.rechargeMin); if (c.rechargeMax) this.max.set(c.rechargeMax); },
       error: () => { /* keep defaults */ },
     });
+    this.api.paymentProvider().subscribe({ next: (p) => this.simulated.set(p.provider === 'simulated'), error: () => {} });
   }
   ngOnDestroy() { this.stopPolling(); }
 
@@ -498,6 +512,27 @@ export class RechargeComponent implements OnInit, OnDestroy {
     });
   }
   resumePolling() { const ref = this.result()?.ref; if (ref) this.startStatusPolling(ref); }
+
+  simulatePay(outcome: 'validate' | 'fail') {
+    const ref = this.result()?.ref;
+    if (!ref || this.busy()) return;
+    this.busy.set(true);
+    this.api.simulateRechargePay(ref, outcome, outcome === 'fail' ? 'Refusé par le client' : undefined).subscribe({
+      next: (r) => {
+        this.stopPolling();
+        this.busy.set(false);
+        this.waitLong.set(false);
+        if (outcome === 'validate') {
+          this.result.set({ ...r, payStatus: 'paid' });
+          this.proc.set('reference');
+        } else {
+          this.result.set({ ...r, payStatus: 'failed', paymentMessage: r.paymentMessage ?? 'Refusé par le client' });
+          this.proc.set('failed');
+        }
+      },
+      error: () => this.busy.set(false),
+    });
+  }
 
   private stopPolling() { this.polling = false; if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; } }
   retry() { this.stopPolling(); this.waitLong.set(false); this.proc.set(null); }
