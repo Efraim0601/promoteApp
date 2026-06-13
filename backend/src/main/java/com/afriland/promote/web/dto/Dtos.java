@@ -300,12 +300,19 @@ public final class Dtos {
     /** One failure-category bucket for the failure-analysis breakdown. */
     public record FailureBucket(String category, long count) {}
 
+    /** Daily MoMo volume bucket for the payment-trends chart (date = yyyy-MM-dd, server zone). */
+    public record PaymentTrendBucket(String date, long paid, long failed, long pending, long total) {}
+
     public record PaymentStats(
             long momoTotal, long momoPaid, long momoFailed, long momoPending,
             long orangeTotal, long orangePaid, long mtnTotal, long mtnPaid,
             long insufficientFunds, long expired, long otherFailures,
             long avgConfirmSeconds, long medianConfirmSeconds,
-            long orangeFailed, long mtnFailed, List<FailureBucket> failuresByCategory) {}
+            long orangeFailed, long mtnFailed,
+            /** NETWORK + UNKNOWN merged — dashboard « échec technique » count. */
+            long networkOrUnknownFailed,
+            List<FailureBucket> failuresByCategory,
+            List<PaymentTrendBucket> trends) {}
 
     // ---- geolocation ----
     /** Browser-reported position; posted by a logged-in user right after login. */

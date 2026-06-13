@@ -317,13 +317,25 @@ export interface PaymentStats {
   medianConfirmSeconds: number; // median PENDING → paid latency
   orangeFailed: number;
   mtnFailed: number;
-  failuresByCategory: FailureBucket[];  // detailed failure breakdown (most frequent first)
+  /** NETWORK + UNKNOWN — technical failures shown on the dashboard. */
+  networkOrUnknownFailed: number;
+  failuresByCategory: FailureBucket[];
+  /** Daily MoMo volumes (last 14 days, oldest first). */
+  trends: PaymentTrendBucket[];
 }
 
 /** One failure-category bucket: a category code + how many failures fall into it. */
 export interface FailureBucket {
-  category: string;   // INSUFFICIENT_FUNDS | WRONG_PIN | CANCELLED | INVALID_SUBSCRIBER | TIMEOUT | NETWORK | API_ERROR | UNKNOWN
+  category: string;   // INSUFFICIENT_FUNDS | … | NETWORK_OR_UNKNOWN
   count: number;
+}
+
+export interface PaymentTrendBucket {
+  date: string;   // yyyy-MM-dd
+  paid: number;
+  failed: number;
+  pending: number;
+  total: number;
 }
 
 export interface ClaimResult {

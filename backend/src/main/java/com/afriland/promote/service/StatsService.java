@@ -15,6 +15,8 @@ import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 /** KPI aggregation for the admin and agent dashboards (ports admin.jsx / agent.jsx). */
 @Service
@@ -111,12 +113,19 @@ public class StatsService {
         long insufficient = byCat.get(PaymentFailures.Category.INSUFFICIENT_FUNDS);
         long expired = byCat.get(PaymentFailures.Category.TIMEOUT);
         long other = failed - insufficient - expired;
-        // Detailed breakdown (drop empty categories), most frequent first.
-        List<FailureBucket> failuresByCategory = byCat.entrySet().stream()
-                .filter(e -> e.getValue() > 0)
+        // Detailed breakdown: merge NETWORK + UNKNOWN for dashboard display (technical failures).
+        long networkOrUnknown = byCat.get(PaymentFailures.Category.NETWORK)
+                + byCat.get(PaymentFailures.Category.UNKNOWN);
+        List<FailureBucket> failuresByCategory = new ArrayList<>();
+        if (networkOrUnknown > 0) {
+            failuresByCategory.add(new FailureBucket("NETWORK_OR_UNKNOWN", networkOrUnknown));
+        }
+        byCat.entrySet().stream()
+                .filter(e -> e.getValue() > 0
+                        && e.getKey() != PaymentFailures.Category.NETWORK
+                        && e.getKey() != PaymentFailures.Category.UNKNOWN)
                 .sorted(java.util.Map.Entry.<PaymentFailures.Category, Long>comparingByValue().reversed())
-                .map(e -> new FailureBucket(e.getKey().name(), e.getValue()))
-                .toList();
+                .forEach(e -> failuresByCategory.add(new FailureBucket(e.getKey().name(), e.getValue())));
 
         // Confirmation latency (PENDING → paid), in seconds, for MoMo payments we have a paidAt for.
         List<Long> secs = momo.stream()
@@ -128,9 +137,41 @@ public class StatsService {
         long avg = secs.isEmpty() ? 0 : Math.round(secs.stream().mapToLong(Long::longValue).average().orElse(0));
         long median = secs.isEmpty() ? 0 : secs.get(secs.size() / 2);
 
+        List<PaymentTrendBucket> trends = paymentTrends(momo, 14);
+
         return new PaymentStats(momo.size(), paid, failed, pending, orange.size(), orangePaid,
                 mtn.size(), mtnPaid, insufficient, expired, other, avg, median,
-                orangeFailed, mtnFailed, failuresByCategory);
+                orangeFailed, mtnFailed, networkOrUnknown, failuresByCategory, trends);
+    }
+
+    /** Daily MoMo volumes for the last {@code days} (inclusive), oldest first. */
+    private List<PaymentTrendBucket> paymentTrends(List<Subscription> momo, int days) {
+        int window = Math.max(1, Math.min(days, 90));
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate today = LocalDate.now(zone);
+        LocalDate start = today.minusDays(window - 1L);
+        Instant since = start.atStartOfDay(zone).toInstant();
+
+        Map<LocalDate, long[]> buckets = new TreeMap<>();
+        for (int i = 0; i < window; i++) {
+            buckets.put(start.plusDays(i), new long[4]); // paid, failed, pending, total
+        }
+        for (Subscription s : momo) {
+            if (s.getCreatedAt() == null || s.getCreatedAt().isBefore(since)) continue;
+            LocalDate day = s.getCreatedAt().atZone(zone).toLocalDate();
+            long[] b = buckets.get(day);
+            if (b == null) continue;
+            b[3]++;
+            if (s.getPayStatus() == PayStatus.paid) b[0]++;
+            else if (s.getPayStatus() == PayStatus.failed) b[1]++;
+            else if (s.getPayStatus() == PayStatus.pending) b[2]++;
+        }
+        List<PaymentTrendBucket> out = new ArrayList<>(window);
+        for (var e : buckets.entrySet()) {
+            long[] b = e.getValue();
+            out.add(new PaymentTrendBucket(e.getKey().toString(), b[0], b[1], b[2], b[3]));
+        }
+        return out;
     }
 
     /** Cashier statistics for a given staff member (aggregated in SQL). */

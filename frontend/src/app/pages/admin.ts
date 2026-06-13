@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
+import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -74,11 +74,12 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px">
         <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
-        <!-- Failed payments — click to jump to the filtered transactions table. -->
+        <!-- Failed payments (technical: network + unknown cause) — click to jump to the filtered transactions table. -->
         <div class="kpi" (click)="showFailed()" style="cursor:pointer"
-             [style.borderColor]="failedCount() ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'"
-             [style.background]="failedCount() ? 'var(--accent-soft)' : 'var(--surface)'">
-          <div class="kv" style="color:var(--accent)">{{ failedCount() }}</div><div class="kl">{{ i18n.t('kpi_failed') }}</div>
+             [style.borderColor]="technicalFailed() ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'"
+             [style.background]="technicalFailed() ? 'var(--accent-soft)' : 'var(--surface)'">
+          <div class="kv" style="color:var(--accent)">{{ technicalFailed() }}</div>
+          <div class="kl">{{ i18n.t('pay_funnel_technical_failed') }}</div>
         </div>
       </div>
 
@@ -98,17 +99,46 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;font-size:12px;font-weight:700">
             <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--success-soft);color:var(--success)">{{ p.momoPaid }} {{ i18n.t('st_paid') }}</span>
             <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--surface-2);color:var(--muted)">{{ p.momoPending }} {{ i18n.t('st_pending') }}</span>
-            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)">{{ p.momoFailed }} {{ i18n.t('st_failed') }}</span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)">{{ p.networkOrUnknownFailed }} {{ i18n.t('pay_funnel_technical_failed') }}</span>
           </div>
+          @if (p.trends.length) {
+            <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+              <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px">{{ i18n.t('pay_trends_title') }}</div>
+              <p class="muted" style="font-size:10px;line-height:1.35;margin-bottom:10px">{{ i18n.t('pay_trends_hint') }}</p>
+              <div style="display:flex;align-items:flex-end;gap:3px;height:110px;padding-bottom:2px">
+                @for (b of p.trends; track b.date) {
+                  <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end" [title]="trendTooltip(b)">
+                    <div style="width:100%;max-width:28px;display:flex;flex-direction:column-reverse;gap:1px">
+                      @if (b.paid) {
+                        <div [style.height.px]="trendBarPx(b.paid, p.trends)" style="background:var(--success);border-radius:2px 2px 0 0;min-height:2px"></div>
+                      }
+                      @if (b.failed) {
+                        <div [style.height.px]="trendBarPx(b.failed, p.trends)" style="background:var(--accent);min-height:2px"></div>
+                      }
+                      @if (b.pending) {
+                        <div [style.height.px]="trendBarPx(b.pending, p.trends)" style="background:var(--af-gold);border-radius:0 0 2px 2px;min-height:2px"></div>
+                      }
+                    </div>
+                    <span style="font-size:8px;color:var(--muted);margin-top:4px;white-space:nowrap">{{ trendDayLabel(b.date) }}</span>
+                  </div>
+                }
+              </div>
+              <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:10.5px;font-weight:600">
+                <span style="color:var(--success)">■ {{ i18n.t('st_paid') }}</span>
+                <span style="color:var(--accent)">■ {{ i18n.t('st_failed') }}</span>
+                <span style="color:var(--af-gold)">■ {{ i18n.t('st_pending') }}</span>
+              </div>
+            </div>
+          }
           <div style="margin-top:14px">
             <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_by_network') }}</div>
             <div class="srow" style="padding:6px 0"><span class="lbl">Orange Money</span><span class="val">{{ p.orangePaid }}/{{ p.orangeTotal }} · {{ rate(p.orangePaid, p.orangeTotal) }}%</span></div>
             <div class="srow" style="padding:6px 0"><span class="lbl">MTN MoMo</span><span class="val">{{ p.mtnPaid }}/{{ p.mtnTotal }} · {{ rate(p.mtnPaid, p.mtnTotal) }}%</span></div>
           </div>
-          @if (p.momoFailed) {
+          @if (p.failuresByCategory.length) {
             <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
               <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                <span class="muted" style="font-size:11.5px;font-weight:700">{{ i18n.t('pay_funnel_failures') }} · {{ p.momoFailed }}</span>
+                <span class="muted" style="font-size:11.5px;font-weight:700">{{ i18n.t('pay_funnel_failures') }} · {{ p.networkOrUnknownFailed }} {{ i18n.t('pay_funnel_technical_failed').toLowerCase() }}</span>
                 <button class="btn btn-ghost" (click)="exportFailures()" style="margin-left:auto;padding:4px 9px;font-size:11px"><ic name="copy" [size]="13"></ic> {{ i18n.t('tx_export') }}</button>
               </div>
               @for (b of p.failuresByCategory; track b.category) {
@@ -116,10 +146,10 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                   <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:2px">
                     <span style="min-width:0;flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ failLabel(b.category) }}</span>
                     <span style="font-weight:800">{{ b.count }}</span>
-                    <span class="muted" style="font-size:10.5px;width:38px;text-align:right">{{ rate(b.count, p.momoFailed) }}%</span>
+                    <span class="muted" style="font-size:10.5px;width:38px;text-align:right">{{ failRate(b, p) }}%</span>
                   </div>
                   <div style="height:6px;border-radius:99px;background:var(--surface-2);overflow:hidden">
-                    <div [style.width.%]="rate(b.count, p.momoFailed)" style="height:100%;background:var(--accent);border-radius:99px;transition:width .4s"></div>
+                    <div [style.width.%]="failRate(b, p)" style="height:100%;background:var(--accent);border-radius:99px;transition:width .4s"></div>
                   </div>
                 </div>
               }
@@ -1542,6 +1572,37 @@ export class AdminComponent implements OnInit, OnDestroy {
   /** Success rate (%) guarded against division by zero. */
   rate(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
 
+  /** MoMo technical failures (network + unknown) for dashboard KPIs. */
+  technicalFailed = computed(() => this.payStats()?.networkOrUnknownFailed ?? 0);
+
+  /** Failure-bar percentage: technical bucket vs technical total; others vs all MoMo failures. */
+  failRate(b: { category: string; count: number }, p: PaymentStats) {
+    const denom = b.category === 'NETWORK_OR_UNKNOWN' ? p.networkOrUnknownFailed : p.momoFailed;
+    return this.rate(b.count, denom);
+  }
+
+  private trendMax(buckets: PaymentTrendBucket[]) {
+    return buckets.reduce((m, b) => Math.max(m, b.paid, b.failed, b.pending, b.total), 1);
+  }
+  trendBarPx(n: number, buckets: PaymentTrendBucket[]) {
+    const max = this.trendMax(buckets);
+    return Math.max(2, Math.round((n / max) * 88));
+  }
+  trendDayLabel(iso: string) {
+    const p = iso.split('-');
+    return p.length === 3 ? `${p[2]}/${p[1]}` : iso;
+  }
+  trendTooltip(b: PaymentTrendBucket) {
+    return `${this.trendDayLabel(b.date)} — ${this.i18n.t('st_paid')}: ${b.paid}, ${this.i18n.t('st_failed')}: ${b.failed}, ${this.i18n.t('st_pending')}: ${b.pending}`;
+  }
+
+  /** Map export category: NETWORK and UNKNOWN roll up to the dashboard bucket. */
+  exportFailCategory(cat: string | null | undefined) {
+    const c = cat || 'UNKNOWN';
+    if (c === 'NETWORK' || c === 'UNKNOWN') return this.failLabel('NETWORK_OR_UNKNOWN');
+    return this.failLabel(c);
+  }
+
   /** Localised label for a failure category code (falls back to the raw code). */
   failLabel(cat: string) {
     const key = 'fail_cat_' + cat;
@@ -1555,7 +1616,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const failed = this.txs().filter((t) => (t.pay === 'om' || t.pay === 'mtn') && (t.payStatus === 'failed' || t.status === 'failed'));
     const rows = failed.map((t) => [
       t.ref, t.fullName, t.phone ?? '', t.pay === 'om' ? 'Orange Money' : 'MTN MoMo',
-      this.failLabel(t.failureCategory || 'UNKNOWN'), t.paymentMessage ?? '', this.fmtDateTime(t.createdAt),
+      this.exportFailCategory(t.failureCategory), t.paymentMessage ?? '', this.fmtDateTime(t.createdAt),
     ].map((v) => esc(String(v))).join(','));
     this.downloadCsv('echecs-paiement.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
   }
@@ -1582,10 +1643,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
   ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
   private refreshLive() {
-    // Only the lightweight, SQL-aggregated KPIs are polled live. The payments funnel and the full
-    // transactions list (heavier) are loaded on open, not on every cycle — this keeps the
-    // dashboard's hot path cheap (they refresh on page (re)load).
     this.api.adminStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
+    this.api.paymentStats().subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
   }
 
   private loadUsers() {
