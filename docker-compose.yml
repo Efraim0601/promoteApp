@@ -69,11 +69,17 @@ services:
       PRINT_PASSWORD: ${PRINT_PASSWORD:-promote}
       PRINT_NAME: ${PRINT_NAME:-Point d'impression}
       APP_PAYMENT_PROVIDER: ${APP_PAYMENT_PROVIDER:-simulated}
+      # Push MoMo off the HTTP thread (create returns pending; worker calls TrustPayWay).
+      APP_PAYMENT_ASYNC: ${APP_PAYMENT_ASYNC:-false}
+      # Periodic sweep for stuck pending payments (enable on ONE backend replica only).
+      PAYMENT_RECONCILE: ${PAYMENT_RECONCILE:-false}
       TRUSTPAYWAY_BASE_URL: ${TRUSTPAYWAY_BASE_URL:-}
       TRUSTPAYWAY_SECRET_KEY: ${TRUSTPAYWAY_SECRET_KEY:-}
       TRUSTPAYWAY_APPLICATION_ID: ${TRUSTPAYWAY_APPLICATION_ID:-}
       TRUSTPAYWAY_NOTIF_URL: ${TRUSTPAYWAY_NOTIF_URL:-}
       TRUSTPAYWAY_WEBHOOK_SECRET: ${TRUSTPAYWAY_WEBHOOK_SECRET:-}
+      TRUSTPAYWAY_CONNECT_TIMEOUT_MS: ${TRUSTPAYWAY_CONNECT_TIMEOUT_MS:-5000}
+      TRUSTPAYWAY_READ_TIMEOUT_MS: ${TRUSTPAYWAY_READ_TIMEOUT_MS:-45000}
       APP_CORS_ALLOWED_ORIGINS: ${APP_CORS_ALLOWED_ORIGINS:-http://localhost:8973}
       # public URL used in account emails (login link), e.g. https://<host>:8443
       APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
