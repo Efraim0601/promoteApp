@@ -1179,7 +1179,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
   /** Roles selected on the create form (multi-role). */
   nuRoles = signal<Role[]>(['AGENT']);
-  userMsg = signal<'' | 'created' | 'recreated' | 'exists' | 'phone_exists' | 'invalid' | 'user_active'>('');
+  userMsg = signal<'' | 'created' | 'recreated' | 'reset' | 'exists' | 'phone_exists' | 'invalid' | 'user_active' | 'user_disabled'>('');
   userBusy = signal(false);
   /** Temporary password returned on the last successful creation (also emailed to the user). */
   createdPw = signal('');
