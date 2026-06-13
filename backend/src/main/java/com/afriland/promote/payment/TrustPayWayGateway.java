@@ -8,12 +8,16 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.web.client.ClientHttpRequestFactories;
 import org.springframework.boot.web.client.ClientHttpRequestFactorySettings;
-import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
@@ -124,16 +128,29 @@ public class TrustPayWayGateway implements PaymentGateway {
         return new PaymentRequest(txId, operator, accepted, message);
     }
 
-    /** POST process-payment, reading the body regardless of HTTP status (we never let RestClient throw). */
+    /** POST process-payment, reading the body regardless of HTTP status (we never let RestClient throw).
+     *  TrustPayWay/Orange sometimes answers with {@code Content-Type: application/octet-stream}
+     *  even when the payload is JSON — RestClient's {@code toEntity(String.class)} then fails
+     *  before we can inspect the body, so we always read raw bytes. */
     private ResponseEntity<String> postProcessPayment(String network, Map<String, String> payload) {
         return http.post()
                 .uri("/api/{network}/process-payment", network)
                 .header("Authorization", "Bearer " + token())
+                .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(payload)
-                .retrieve()
-                .onStatus(HttpStatusCode::isError, (req, res) -> { })
-                .toEntity(String.class);
+                .exchange((req, res) -> ResponseEntity.status(res.getStatusCode()).body(readBody(res)));
+    }
+
+    /** Read the response body as UTF-8 text regardless of Content-Type. */
+    private static String readBody(ClientHttpResponse res) {
+        try (InputStream in = res.getBody()) {
+            if (in == null) return null;
+            byte[] bytes = in.readAllBytes();
+            return bytes.length == 0 ? null : new String(bytes, StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new UncheckedIOException(ex);
+        }
     }
 
     /** Parse the process-payment body into our response shape; null/empty/garbage → null. */
@@ -165,8 +182,17 @@ public class TrustPayWayGateway implements PaymentGateway {
             StatusResponse resp = http.get()
                     .uri("/api/{network}/get-status/{id}", network(sub.getPay()), sub.getPaymentTxId())
                     .header("Authorization", "Bearer " + token())
-                    .retrieve()
-                    .body(StatusResponse.class);
+                    .accept(MediaType.APPLICATION_JSON)
+                    .exchange((req, res) -> {
+                        String raw = readBody(res);
+                        if (!res.getStatusCode().is2xxSuccessful() || raw == null || raw.isBlank()) return null;
+                        try {
+                            return json.readValue(raw, StatusResponse.class);
+                        } catch (Exception ex) {
+                            log.warn("TrustPayWay: unparseable get-status body: {}", raw);
+                            return null;
+                        }
+                    });
             return resp == null ? Optional.empty() : map(resp.status());
         } catch (RuntimeException ex) {
             log.warn("TrustPayWay get-status failed ref={}: {}", sub.getRef(), ex.getMessage());
@@ -184,10 +210,21 @@ public class TrustPayWayGateway implements PaymentGateway {
         LoginResponse login = http.post()
                 .uri("/api/login")
                 .header("Authorization", "Bearer " + props.getSecretKey())
+                .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("applicationId", props.getApplicationId()))
-                .retrieve()
-                .body(LoginResponse.class);
+                .exchange((req, res) -> {
+                    String raw = readBody(res);
+                    if (!res.getStatusCode().is2xxSuccessful() || raw == null || raw.isBlank()) {
+                        throw new IllegalStateException("TrustPayWay login failed: HTTP "
+                                + res.getStatusCode().value());
+                    }
+                    try {
+                        return json.readValue(raw, LoginResponse.class);
+                    } catch (Exception ex) {
+                        throw new IllegalStateException("TrustPayWay login returned unparseable body", ex);
+                    }
+                });
         if (login == null || login.accessToken() == null) {
             throw new IllegalStateException("TrustPayWay login returned no access_token");
         }
