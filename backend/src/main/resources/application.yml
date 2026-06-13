@@ -82,6 +82,7 @@ app:
       enabled: ${PAYMENT_RECONCILE:false}
       interval-ms: ${PAYMENT_RECONCILE_INTERVAL_MS:300000}      # 5 min between sweeps
       pull-after-seconds: ${PAYMENT_RECONCILE_PULL_AFTER:20}   # min age before we pull live status
+      lookback-seconds: ${PAYMENT_RECONCILE_LOOKBACK_SECONDS:3600} # only orders from the last hour
       expire-after-seconds: ${PAYMENT_RECONCILE_EXPIRE_AFTER:900} # 15 min: force-fail beyond any USSD window
       batch: ${PAYMENT_RECONCILE_BATCH:200}                   # max rows processed per tick (never findAll)
       batch-timeout-seconds: ${PAYMENT_RECONCILE_BATCH_TIMEOUT:120}

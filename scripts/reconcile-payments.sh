@@ -5,8 +5,8 @@
 # that are still pending or failed, and updates local pay_status to match the aggregator.
 #
 # Usage:
-#   ./scripts/reconcile-payments.sh           # last 24 hours (default)
-#   ./scripts/reconcile-payments.sh 48        # last 48 hours
+#   ./scripts/reconcile-payments.sh           # last 1 hour (default)
+#   ./scripts/reconcile-payments.sh 2         # last 2 hours (capped by PAYMENT_RECONCILE_LOOKBACK_SECONDS)
 #
 # Reads from .env (project root):
 #   APP_PUBLIC_URL or RECONCILE_APP_URL  — base URL, e.g. https://rfprepaidcard.afrilandfirstbank.com
@@ -18,7 +18,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="$ROOT/.env"
-HOURS="${1:-24}"
+HOURS="${1:-1}"
 
 if [[ -f "$ENV_FILE" ]]; then
   set -a

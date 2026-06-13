@@ -19,24 +19,20 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Safety net for the asynchronous payment flow: a periodic sweep that rescues {@code pending}
  * orders the webhook never confirmed.
  *
+ * <p>Only orders created in the last {@code lookback-seconds} (default 1 h) are considered, so
+ * the sweep stays small and never competes with live payment traffic for long.
+ *
  * <p>For each still-pending order older than {@code pull-after-seconds} it pulls a live status from
- * the aggregator (get-status) <em>in parallel</em>; orders still pending after
- * {@code expire-after-seconds} are forced to {@code failed} (beyond any realistic USSD window).
- * Every step is idempotent — it only ever moves a row that is still {@code pending} — and
- * batch-limited, so it never loads the whole table.
+ * the aggregator (get-status) <em>in parallel on {@code reconcileExecutor}</em>; orders still pending
+ * after {@code expire-after-seconds} are forced to {@code failed}. Every step is idempotent.
  *
- * <p>The {@code @Scheduled} tick only enqueues work on {@code reconcileExecutor} and returns
- * immediately, so the scheduler thread is never blocked by slow gateway calls.
- *
- * <p>Disabled by default ({@code app.payment.reconcile.enabled=false}). With several backend
- * replicas, enable it on EXACTLY ONE instance to avoid duplicate (harmless but wasteful) gateway
- * polls; idempotency keeps correctness even if more than one runs it.
+ * <p>The {@code @Scheduled} tick only enqueues work and returns immediately — it never blocks on
+ * gateway I/O, and uses a dedicated thread pool separate from {@code paymentExecutor}.
  */
 @Component
 public class PaymentReconciliationJob {
@@ -47,6 +43,7 @@ public class PaymentReconciliationJob {
     private final RechargeRepository recharges;
     private final SubscriptionService subscriptionService;
     private final RechargeService rechargeService;
+    private final PaymentReconciliationService reconciliationService;
     private final ThreadPoolTaskExecutor reconcileExecutor;
 
     @Value("${app.payment.reconcile.enabled:false}")
@@ -55,20 +52,22 @@ public class PaymentReconciliationJob {
     private long pullAfterSeconds;
     @Value("${app.payment.reconcile.expire-after-seconds:900}")
     private long expireAfterSeconds;
+    @Value("${app.payment.reconcile.lookback-seconds:3600}")
+    private long lookbackSeconds;
     @Value("${app.payment.reconcile.batch:200}")
     private int batch;
     @Value("${app.payment.reconcile.batch-timeout-seconds:120}")
     private long batchTimeoutSeconds;
 
-    private final AtomicBoolean running = new AtomicBoolean();
-
     public PaymentReconciliationJob(SubscriptionRepository subs, RechargeRepository recharges,
                                     SubscriptionService subscriptionService, RechargeService rechargeService,
+                                    PaymentReconciliationService reconciliationService,
                                     @Qualifier("reconcileExecutor") ThreadPoolTaskExecutor reconcileExecutor) {
         this.subs = subs;
         this.recharges = recharges;
         this.subscriptionService = subscriptionService;
         this.rechargeService = rechargeService;
+        this.reconciliationService = reconciliationService;
         this.reconcileExecutor = reconcileExecutor;
     }
 
@@ -76,8 +75,8 @@ public class PaymentReconciliationJob {
     @Scheduled(fixedDelayString = "${app.payment.reconcile.interval-ms:300000}")
     public void reconcile() {
         if (!enabled) return;
-        if (!running.compareAndSet(false, true)) {
-            log.debug("Payment reconciliation: previous sweep still running, skip tick");
+        if (!reconciliationService.tryAcquireSweep()) {
+            log.debug("Payment reconciliation: sweep already running, skip tick");
             return;
         }
         reconcileExecutor.execute(() -> {
@@ -86,21 +85,28 @@ public class PaymentReconciliationJob {
             } catch (RuntimeException ex) {
                 log.warn("Payment reconciliation sweep failed: {}", ex.getMessage());
             } finally {
-                running.set(false);
+                reconciliationService.releaseSweep();
             }
         });
     }
 
     private void runSweep() {
         Instant now = Instant.now();
+        Instant windowStart = now.minusSeconds(Math.max(60, lookbackSeconds));
         Instant pullCutoff = now.minusSeconds(pullAfterSeconds);
         Instant expireCutoff = now.minusSeconds(expireAfterSeconds);
         var page = PageRequest.of(0, Math.max(1, batch));
 
-        List<Subscription> sPending = subs.findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
-                PayStatus.pending, pullCutoff, page);
-        List<Recharge> rPending = recharges.findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
-                PayStatus.pending, pullCutoff, page);
+        if (!windowStart.isBefore(pullCutoff)) {
+            log.debug("Payment reconciliation: lookback window empty (lookback={}s, pullAfter={}s)",
+                    lookbackSeconds, pullAfterSeconds);
+            return;
+        }
+
+        List<Subscription> sPending = subs.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+                PayStatus.pending, windowStart, pullCutoff, page);
+        List<Recharge> rPending = recharges.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+                PayStatus.pending, windowStart, pullCutoff, page);
 
         int total = sPending.size() + rPending.size();
         if (total == 0) return;
@@ -123,8 +129,8 @@ public class PaymentReconciliationJob {
             log.warn("Payment reconciliation: batch timed out or failed after {}s ({} order(s) in flight): {}",
                     batchTimeoutSeconds, total, ex.getMessage());
         }
-        log.info("Payment reconciliation: processed {} pending order(s) (subs={}, recharges={})",
-                total, sPending.size(), rPending.size());
+        log.info("Payment reconciliation: processed {} pending order(s) from last {}s (subs={}, recharges={})",
+                total, lookbackSeconds, sPending.size(), rPending.size());
     }
 
     private void reconcileSubscription(Subscription s, Instant expireCutoff) {

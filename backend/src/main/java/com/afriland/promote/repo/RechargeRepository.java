@@ -17,9 +17,9 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
     Optional<Recharge> findByGatewayRef(String gatewayRef);
     long countByPayStatus(PayStatus payStatus);
 
-    /** Reconciliation sweep: oldest still-pending recharges created before a cutoff (batch-limited). */
-    List<Recharge> findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
-            PayStatus payStatus, Instant createdAt, Pageable pageable);
+    /** Reconciliation sweep: still-pending recharges in [windowStart, pullCutoff) (batch-limited). */
+    List<Recharge> findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+            PayStatus payStatus, Instant windowStart, Instant pullCutoff, Pageable pageable);
 
     /** Recent MoMo recharges (any status) for duplicate-debit guard and resume. */
     @Query("select r from Recharge r where lower(r.pay) = lower(:pay) and r.amount = :amount "
@@ -31,11 +31,11 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
      *  on pay_status — replaces a full-table scan + in-memory filter. */
     List<Recharge> findByPayStatusAndFulfilledFalseOrderByCreatedAtAsc(PayStatus payStatus);
 
-    /** Manual reconciliation: MoMo recharges still pending/failed with a gateway id, since a cutoff. */
+    /** Manual reconciliation: MoMo recharges still pending/failed with a gateway id, since a cutoff (batch-limited). */
     @Query("select r from Recharge r where r.createdAt >= :since "
             + "and r.payStatus in (com.afriland.promote.model.PayStatus.pending, com.afriland.promote.model.PayStatus.failed) "
             + "and r.gatewayRef is not null "
             + "and lower(r.pay) in ('om', 'mtn') "
             + "order by r.createdAt asc")
-    List<Recharge> findMoMoReconcilableSince(@Param("since") Instant since);
+    List<Recharge> findMoMoReconcilableSince(@Param("since") Instant since, Pageable pageable);
 }

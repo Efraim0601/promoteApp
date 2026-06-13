@@ -45,10 +45,11 @@ public class PaymentController {
 
     /**
      * Admin-only manual reconciliation: pull TrustPayWay get-status for MoMo orders in the last
-     * {@code hours} (default 24, max 168) that are still {@code pending} or {@code failed}.
+     * {@code hours} (default 1, max 168, capped by {@code lookback-seconds}) that are still
+     * {@code pending} or {@code failed}.
      */
     @PostMapping("/reconcile")
-    public ReconcileReport reconcile(@RequestParam(defaultValue = "24") int hours) {
+    public ReconcileReport reconcile(@RequestParam(defaultValue = "1") int hours) {
         if (!"trustpayway".equalsIgnoreCase(gateway.provider())) {
             throw new org.springframework.web.server.ResponseStatusException(
                     org.springframework.http.HttpStatus.CONFLICT, "reconcile_requires_trustpayway");

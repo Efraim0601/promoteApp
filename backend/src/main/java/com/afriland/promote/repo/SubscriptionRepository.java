@@ -17,10 +17,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     Optional<Subscription> findByRefIgnoreCase(String ref);
     Optional<Subscription> findByGatewayRef(String gatewayRef);
 
-    /** Reconciliation sweep: oldest still-pending orders created before a cutoff (batch-limited via
-     *  Pageable — never loads the whole table). Indexed on (pay_status, created_at). */
-    List<Subscription> findByPayStatusAndCreatedAtLessThanOrderByCreatedAtAsc(
-            PayStatus payStatus, Instant createdAt, Pageable pageable);
+    /** Reconciliation sweep: still-pending orders in [windowStart, pullCutoff) (batch-limited). */
+    List<Subscription> findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+            PayStatus payStatus, Instant windowStart, Instant pullCutoff, Pageable pageable);
 
     /** Agent portfolio (mine): sales the agent owns (agent_id) OR sales referring the agent's phone
      *  (referrer_phone9). Both columns are indexed — replaces a full-table scan + in-memory match. */
@@ -37,13 +36,13 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findRecentMomoAttempts(
             @Param("pay") String pay, @Param("amount") int amount, @Param("since") Instant since);
 
-    /** Manual reconciliation: MoMo orders still pending/failed with a gateway id, since a cutoff. */
+    /** Manual reconciliation: MoMo orders still pending/failed with a gateway id, since a cutoff (batch-limited). */
     @Query("select s from Subscription s where s.createdAt >= :since "
             + "and s.payStatus in (com.afriland.promote.model.PayStatus.pending, com.afriland.promote.model.PayStatus.failed) "
             + "and s.gatewayRef is not null "
             + "and lower(s.pay) in ('om', 'mtn') "
             + "order by s.createdAt asc")
-    List<Subscription> findMoMoReconcilableSince(@Param("since") Instant since);
+    List<Subscription> findMoMoReconcilableSince(@Param("since") Instant since, Pageable pageable);
 
     /** True when this CNI already has a non-failed subscription (one card per CNI). */
     boolean existsByCniNormAndPayStatusNot(String cniNorm, PayStatus payStatus);

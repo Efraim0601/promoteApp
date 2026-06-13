@@ -1,5 +1,7 @@
 package com.afriland.promote.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,14 +20,16 @@ import java.util.concurrent.ThreadPoolExecutor;
  * makes the submitting thread run the task itself — graceful back-pressure that degrades toward
  * the legacy synchronous behaviour rather than dropping a payment.
  *
- * <p>{@link EnableScheduling} powers the reconciliation sweep ({@code PaymentReconciliationJob}).
- * {@code reconcileExecutor} runs that sweep off the scheduler thread and fans out parallel
- * get-status calls so a slow aggregator never blocks HTTP workers or the USSD push pool.
+ * <p>{@code reconcileExecutor} runs reconciliation sweeps on its own bounded pool, separate from
+ * {@code paymentExecutor}. When saturated, extra reconcile tasks are dropped (never executed on the
+ * caller thread) so live payment pushes are never delayed by reconciliation back-pressure.
  */
 @Configuration
 @EnableAsync
 @EnableScheduling
 public class AsyncConfig {
+
+    private static final Logger log = LoggerFactory.getLogger(AsyncConfig.class);
 
     @Value("${app.payment.pool.core:32}")
     private int core;
@@ -70,7 +74,10 @@ public class AsyncConfig {
         ex.setQueueCapacity(reconcileQueue);
         ex.setKeepAliveSeconds(keepAliveSeconds);
         ex.setThreadNamePrefix("reconcile-");
-        ex.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        // Never borrow the submitting thread (scheduler / HTTP) — drop when saturated; payments stay fast.
+        ex.setRejectedExecutionHandler((r, executor) ->
+                log.warn("Reconcile pool saturated (active={}, queue={}) — task dropped; payments unaffected",
+                        executor.getActiveCount(), executor.getQueue().size()));
         ex.setWaitForTasksToCompleteOnShutdown(true);
         ex.setAwaitTerminationSeconds(30);
         ex.initialize();
