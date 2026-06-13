@@ -19,6 +19,8 @@ import java.util.concurrent.ThreadPoolExecutor;
  * the legacy synchronous behaviour rather than dropping a payment.
  *
  * <p>{@link EnableScheduling} powers the reconciliation sweep ({@code PaymentReconciliationJob}).
+ * {@code reconcileExecutor} runs that sweep off the scheduler thread and fans out parallel
+ * get-status calls so a slow aggregator never blocks HTTP workers or the USSD push pool.
  */
 @Configuration
 @EnableAsync
@@ -33,6 +35,13 @@ public class AsyncConfig {
     private int queue;
     @Value("${app.payment.pool.keep-alive-seconds:60}")
     private int keepAliveSeconds;
+
+    @Value("${app.payment.reconcile.pool.core:4}")
+    private int reconcileCore;
+    @Value("${app.payment.reconcile.pool.max:16}")
+    private int reconcileMax;
+    @Value("${app.payment.reconcile.pool.queue:64}")
+    private int reconcileQueue;
 
     @Bean("paymentExecutor")
     public ThreadPoolTaskExecutor paymentExecutor() {
@@ -49,6 +58,21 @@ public class AsyncConfig {
         // Let in-flight pushes finish on shutdown (a deploy) instead of being interrupted mid-call.
         ex.setWaitForTasksToCompleteOnShutdown(true);
         ex.setAwaitTerminationSeconds(20);
+        ex.initialize();
+        return ex;
+    }
+
+    @Bean("reconcileExecutor")
+    public ThreadPoolTaskExecutor reconcileExecutor() {
+        ThreadPoolTaskExecutor ex = new ThreadPoolTaskExecutor();
+        ex.setCorePoolSize(reconcileCore);
+        ex.setMaxPoolSize(reconcileMax);
+        ex.setQueueCapacity(reconcileQueue);
+        ex.setKeepAliveSeconds(keepAliveSeconds);
+        ex.setThreadNamePrefix("reconcile-");
+        ex.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        ex.setWaitForTasksToCompleteOnShutdown(true);
+        ex.setAwaitTerminationSeconds(30);
         ex.initialize();
         return ex;
     }

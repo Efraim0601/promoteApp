@@ -192,23 +192,38 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     @Override
     public Optional<PayStatus> queryStatus(Payable sub) {
-        if (sub.getPaymentTxId() == null) return Optional.empty();
+        // TrustPayWay accepts either the aggregator transaction id or our orderId (gatewayRef).
+        // After a 500→400 Duplicate push the tx id is often missing locally while the order is live.
+        String id = sub.getPaymentTxId();
+        if (id == null || id.isBlank()) id = sub.getGatewayRef();
+        if (id == null || id.isBlank()) return Optional.empty();
         try {
+            String network = network(sub.getPay());
+            String lookupId = id;
             StatusResponse resp = http.get()
-                    .uri("/api/{network}/get-status/{id}", network(sub.getPay()), sub.getPaymentTxId())
+                    .uri("/api/{network}/get-status/{id}", network, lookupId)
                     .header("Authorization", "Bearer " + token())
                     .accept(MediaType.APPLICATION_JSON)
                     .exchange((req, res) -> {
                         String raw = readBody(res);
-                        if (!res.getStatusCode().is2xxSuccessful() || raw == null || raw.isBlank()) return null;
+                        if (!res.getStatusCode().is2xxSuccessful() || raw == null || raw.isBlank()) {
+                            log.debug("TrustPayWay get-status ref={} id={} http={} body={}",
+                                    sub.getRef(), lookupId, res.getStatusCode().value(), raw);
+                            return null;
+                        }
                         try {
                             return json.readValue(raw, StatusResponse.class);
                         } catch (Exception ex) {
-                            log.warn("TrustPayWay: unparseable get-status body: {}", raw);
+                            log.warn("TrustPayWay: unparseable get-status body ref={}: {}", sub.getRef(), raw);
                             return null;
                         }
                     });
-            return resp == null ? Optional.empty() : map(resp.status());
+            Optional<PayStatus> mapped = resp == null ? Optional.empty() : map(resp.status());
+            if (mapped.isPresent()) {
+                log.debug("TrustPayWay get-status ref={} id={} status={} -> {}",
+                        sub.getRef(), lookupId, resp.status(), mapped.get());
+            }
+            return mapped;
         } catch (RuntimeException ex) {
             log.warn("TrustPayWay get-status failed ref={}: {}", sub.getRef(), ex.getMessage());
             return Optional.empty();
