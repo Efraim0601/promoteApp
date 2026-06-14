@@ -56,6 +56,8 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           }
           <!-- Collecte statistics — reachable by supervisor (and admin) on a page of its own. -->
           <button (click)="goCollecteStats()"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_collecte_stats') }}</button>
+          <!-- Executive monitoring dashboard -->
+          <button (click)="goDashboard()"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_dashboard') }}</button>
         </nav>
         <div class="admin-spacer"></div>
         <nav class="admin-nav admin-logout">
@@ -1283,6 +1285,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   readonly isSupervisor = computed(() => this.auth.hasRole('SUPERVISEUR') && !this.auth.hasRole('ADMIN'));
   goCollecte() { this.router.navigateByUrl('/collecte'); }
   goCollecteStats() { this.router.navigateByUrl('/collecte-stats'); }
+  goDashboard() { this.router.navigateByUrl('/dashboard'); }
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);

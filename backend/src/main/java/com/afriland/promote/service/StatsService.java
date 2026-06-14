@@ -174,6 +174,100 @@ public class StatsService {
         return out;
     }
 
+    /** Executive monitoring dashboard: all KPIs for the given date window. */
+    public DashboardStats dashboardStats(LocalDate from, LocalDate to) {
+        ZoneId zone = ZoneId.systemDefault();
+        Instant fromInst = from.atStartOfDay(zone).toInstant();
+        Instant toInst   = to.plusDays(1).atStartOfDay(zone).toInstant(); // exclusive upper bound
+        Instant todayStart = startOfToday();
+
+        List<Subscription> window = subs
+                .findByCreatedAtGreaterThanEqualAndCreatedAtLessThanEqualOrderByCreatedAtAsc(fromInst, toInst.minusSeconds(1));
+
+        // — window totals —
+        long totalCreated = window.size();
+        long totalPaid    = window.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
+        long totalPrinted = window.stream().filter(Subscription::isPrinted).count();
+        long totalFailed  = window.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
+        long awaitingPrint    = window.stream()
+                .filter(s -> s.getPayStatus() == PayStatus.paid && !s.isPrinted()).count();
+        long awaitingPayment  = window.stream()
+                .filter(s -> s.getPayStatus() == PayStatus.pending || s.getPayStatus() == PayStatus.cash).count();
+
+        double convRate    = totalCreated == 0 ? 0 : (totalPaid * 100.0 / totalCreated);
+        double printRate   = totalPaid    == 0 ? 0 : (totalPrinted * 100.0 / totalPaid);
+        double failureRate = totalCreated == 0 ? 0 : (totalFailed * 100.0 / totalCreated);
+
+        // — today (absolute, not filtered by the window) —
+        long todayCreated = subs.countByCreatedAtGreaterThanEqual(todayStart);
+        long todayPaid    = subs.countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.paid, todayStart);
+        long todayPrinted = subs.countByPrintedTrueAndPrintedAtGreaterThanEqual(todayStart);
+        long todayFailed  = subs.countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.failed, todayStart);
+
+        // — per-agent KPIs (window) —
+        // Index all window subscriptions by agentId for fast per-agent filtering
+        java.util.HashMap<String, List<Subscription>> byAgent = new java.util.HashMap<>();
+        for (Subscription s : window) {
+            String aid = s.getAgentId() != null ? s.getAgentId() : "online";
+            byAgent.computeIfAbsent(aid, k -> new ArrayList<>()).add(s);
+        }
+        List<AppUser> agents = users.findByRole(Role.AGENT);
+        List<AgentKpi> perAgent = new ArrayList<>();
+        for (AppUser a : agents) {
+            List<Subscription> mine = byAgent.getOrDefault(a.getId(), List.of());
+            long aPaid    = mine.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
+            long aPrinted = mine.stream().filter(Subscription::isPrinted).count();
+            long aFailed  = mine.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
+            long aTotal   = mine.size();
+            double aFR = aTotal == 0 ? 0 : (aFailed * 100.0 / aTotal);
+            double aCR = aTotal == 0 ? 0 : (aPaid * 100.0 / aTotal);
+            double aPR = aPaid  == 0 ? 0 : (aPrinted * 100.0 / aPaid);
+            long aTodayTotal = subs.countByAgentIdAndCreatedAtGreaterThanEqual(a.getId(), todayStart);
+            long aTodayPaid  = subs.countByAgentIdAndPayStatusAndPaidAtGreaterThanEqual(
+                    a.getId(), PayStatus.paid, todayStart);
+            perAgent.add(new AgentKpi(a.getId(), a.getName(), a.getAgency(),
+                    aTotal, aPaid, aPrinted, aFailed, aTodayTotal, aTodayPaid, aFR, aCR, aPR));
+        }
+        perAgent.sort(Comparator.comparingLong(AgentKpi::paid).reversed());
+
+        // — daily trend —
+        List<DailyBucket> trend = buildDailyTrend(window, from, to, zone);
+
+        return new DashboardStats(
+                todayCreated, todayPaid, todayPrinted, todayFailed,
+                totalCreated, totalPaid, totalPrinted, totalFailed,
+                awaitingPrint, awaitingPayment,
+                convRate, printRate, failureRate,
+                perAgent, trend);
+    }
+
+    private List<DailyBucket> buildDailyTrend(
+            List<Subscription> window, LocalDate from, LocalDate to, ZoneId zone) {
+        long days = java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1;
+        int window_size = (int) Math.min(days, 90);
+        LocalDate start = to.minusDays(window_size - 1L);
+
+        Map<LocalDate, long[]> buckets = new TreeMap<>();
+        for (int i = 0; i < window_size; i++) buckets.put(start.plusDays(i), new long[4]); // created,paid,printed,failed
+
+        for (Subscription s : window) {
+            if (s.getCreatedAt() == null) continue;
+            LocalDate day = s.getCreatedAt().atZone(zone).toLocalDate();
+            long[] b = buckets.get(day);
+            if (b == null) continue;
+            b[0]++;
+            if (s.getPayStatus() == PayStatus.paid)    b[1]++;
+            if (s.isPrinted())                         b[2]++;
+            if (s.getPayStatus() == PayStatus.failed)  b[3]++;
+        }
+        List<DailyBucket> out = new ArrayList<>(window_size);
+        for (var e : buckets.entrySet()) {
+            long[] b = e.getValue();
+            out.add(new DailyBucket(e.getKey().toString(), b[0], b[1], b[2], b[3]));
+        }
+        return out;
+    }
+
     /** Cashier statistics for a given staff member (aggregated in SQL). */
     public CashierStats cashierStats(String cashierId) {
         Instant today = startOfToday();

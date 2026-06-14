@@ -96,4 +96,23 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     @Query("select coalesce(sum(s.amount), 0) from Subscription s "
             + "where s.agentId is null and s.payStatus = com.afriland.promote.model.PayStatus.paid")
     long collectedPaidOnline();
+
+    /** Monitoring dashboard — all subscriptions in a time window (oldest first). */
+    List<Subscription> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanEqualOrderByCreatedAtAsc(
+            Instant from, Instant to);
+
+    /** Monitoring dashboard — count all subscriptions created since a given instant. */
+    long countByCreatedAtGreaterThanEqual(Instant since);
+
+    /** Monitoring dashboard — count subscriptions with a given status created since a given instant. */
+    long countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus payStatus, Instant since);
+
+    /** Monitoring dashboard — count printed cards with printedAt since a given instant. */
+    long countByPrintedTrueAndPrintedAtGreaterThanEqual(Instant since);
+
+    /** Monitoring dashboard — count created today per agent. */
+    long countByAgentIdAndCreatedAtGreaterThanEqual(String agentId, Instant since);
+
+    /** Monitoring dashboard — count paid today per agent. */
+    long countByAgentIdAndPayStatusAndPaidAtGreaterThanEqual(String agentId, PayStatus payStatus, Instant since);
 }

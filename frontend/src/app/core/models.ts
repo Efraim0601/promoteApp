@@ -386,6 +386,48 @@ export interface ClaimResult {
   record: Subscription | null;
 }
 
+// ---- monitoring dashboard ----
+export interface DailyBucket {
+  date: string;      // yyyy-MM-dd
+  created: number;
+  paid: number;
+  printed: number;
+  failed: number;
+}
+
+export interface AgentKpi {
+  id: string;
+  name: string;
+  agency: string | null;
+  total: number;
+  paid: number;
+  printed: number;
+  failed: number;
+  todayTotal: number;
+  todayPaid: number;
+  failureRate: number;
+  conversionRate: number;
+  printRate: number;
+}
+
+export interface DashboardStats {
+  todayCreated: number;
+  todayPaid: number;
+  todayPrinted: number;
+  todayFailed: number;
+  totalCreated: number;
+  totalPaid: number;
+  totalPrinted: number;
+  totalFailed: number;
+  awaitingPrint: number;
+  awaitingPayment: number;
+  conversionRate: number;
+  printRate: number;
+  failureRate: number;
+  perAgent: AgentKpi[];
+  dailyTrend: DailyBucket[];
+}
+
 // ---- collectes (ventes de produits bancaires) ----
 export type CollecteProduct = 'compte_ouvert' | 'carte_bancaire' | 'sara_money' | 'e_first';
 
