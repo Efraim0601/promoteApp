@@ -352,6 +352,7 @@ export interface CreateCollecteRequest {
   product: CollecteProduct | string;
   clientNom?: string | null;
   clientPhone?: string | null;
+  cniNumber?: string | null;        // compte_ouvert, e_first
   accountNumber?: string | null;   // compte_ouvert
   cardNumber?: string | null;      // carte_bancaire
   cardType?: string | null;        // carte_bancaire
@@ -362,6 +363,7 @@ export interface Collecte {
   product: string;
   clientNom?: string | null;
   clientPhone?: string | null;
+  cniNumber?: string | null;
   accountNumber?: string | null;
   cardNumber?: string | null;
   cardType?: string | null;

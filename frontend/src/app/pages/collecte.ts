@@ -13,9 +13,9 @@ import { SpinnerComponent } from '../shared/spinner';
 
 interface CForm {
   product: string; clientNom: string; clientPhone: string;
-  accountNumber: string; cardNumber: string; cardType: string;
+  cniNumber: string; accountNumber: string; cardNumber: string; cardType: string;
 }
-const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', accountNumber: '', cardNumber: '', cardType: '' };
+const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '', accountNumber: '', cardNumber: '', cardType: '' };
 
 /**
  * Collecteur portal: capture bank-product sales (collectes) and manage one's own — the native
@@ -48,10 +48,10 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', accountNumbe
             </div>
           </field>
 
-          @if (form().product === 'compte_ouvert') {
-            <field [label]="i18n.t('col_account')" [err]="touched() && !form().accountNumber.trim() ? i18n.t('required') : null">
-              <div class="input-prefix"><span class="pfx"><ic name="hash" [size]="17"></ic></span>
-                <input inputmode="numeric" [value]="form().accountNumber" (input)="set('accountNumber', $any($event.target).value)" [placeholder]="i18n.t('col_account_ph')" />
+          @if (form().product === 'compte_ouvert' || form().product === 'e_first') {
+            <field [label]="i18n.t('col_cni')" [err]="touched() && !form().cniNumber.trim() ? i18n.t('required') : null">
+              <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
+                <input [value]="form().cniNumber" (input)="set('cniNumber', $any($event.target).value)" [placeholder]="i18n.t('col_cni_ph')" />
               </div>
             </field>
           }
@@ -152,7 +152,7 @@ export class CollecteComponent implements OnInit {
   private valid(): boolean {
     const f = this.form();
     if (!f.product || !f.clientNom.trim() || !f.clientPhone.trim()) return false;
-    if (f.product === 'compte_ouvert' && !f.accountNumber.trim()) return false;
+    if ((f.product === 'compte_ouvert' || f.product === 'e_first') && !f.cniNumber.trim()) return false;
     if (f.product === 'carte_bancaire' && !f.cardType) return false;
     return true;
   }
@@ -163,7 +163,7 @@ export class CollecteComponent implements OnInit {
       product: f.product,
       clientNom: f.clientNom.trim(),
       clientPhone: f.clientPhone.trim(),
-      accountNumber: f.product === 'compte_ouvert' ? f.accountNumber.trim() : undefined,
+      cniNumber: (f.product === 'compte_ouvert' || f.product === 'e_first') ? f.cniNumber.trim() : undefined,
       cardNumber: f.product === 'carte_bancaire' ? f.cardNumber.trim() : undefined,
       cardType: f.product === 'carte_bancaire' ? f.cardType : undefined,
     };
@@ -186,7 +186,7 @@ export class CollecteComponent implements OnInit {
     this.editingRef.set(c.ref);
     this.form.set({
       product: c.product, clientNom: c.clientNom ?? '', clientPhone: c.clientPhone ?? '',
-      accountNumber: c.accountNumber ?? '', cardNumber: c.cardNumber ?? '', cardType: c.cardType ?? '',
+      cniNumber: c.cniNumber ?? '', accountNumber: c.accountNumber ?? '', cardNumber: c.cardNumber ?? '', cardType: c.cardType ?? '',
     });
     this.touched.set(false); this.msg.set(''); this.err.set('');
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
