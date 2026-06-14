@@ -144,7 +144,7 @@ const FR: Record<string, string> = {
   // ---- public services choice + card recharge ----
   services_title: 'Que souhaitez-vous faire ?',
   services_sub: 'Choisissez un service pour commencer.',
-  svc_buy_title: 'Souscrire à une carte bancaire', svc_buy_desc: 'Profitez de l\'offre promotionnelle et choisissez votre carte.',
+    svc_buy_title: 'Souscrire à une carte bancaire', svc_buy_desc: 'Profitez de l\'offre promotionnelle et choisissez votre carte.',
   svc_recharge_title: 'Recharger ma carte', svc_recharge_desc: 'Rechargez votre carte prépayée existante en quelques secondes.',
   recharge_welcome_title: 'Recharge de carte',
   recharge_welcome_desc: 'Rechargez votre carte prépayée Afriland en toute simplicité, sans compte.',
@@ -366,8 +366,8 @@ const FR: Record<string, string> = {
   offer_recharge_initiale: 'Recharge initiale', offer_pass_premium: 'Pass Premium (accès permanent à promote)',
   // ---- Choix du type de carte (souscription) ----
   cardtype_choose_label: 'Quelle carte souhaitez-vous payer ?',
-  cardtype_bancaire_title: 'Carte bancaire', cardtype_bancaire_desc: 'Payer une carte bancaire.',
-  cardtype_prepaid_title: 'Carte prépayée', cardtype_prepaid_desc: 'Payer une carte prépayée.',
+  cardtype_bancaire_title: 'Carte prépayé en agence', cardtype_bancaire_desc: 'Payer une carte bancaire.',
+  cardtype_prepaid_title: 'Offre promotionnel prepaye promote', cardtype_prepaid_desc: 'Payer une carte prépayée.',
   cardtype_label: 'Type de carte',
   arrived_via: 'Arrivé via lien / QR',
   login_title: 'Espace professionnel',
@@ -825,8 +825,8 @@ const EN: Record<string, string> = {
   offer_recharge_initiale: 'Initial top-up', offer_pass_premium: 'Premium Pass (permanent access to promote)',
   // ---- Card type choice (subscription) ----
   cardtype_choose_label: 'Which card would you like to pay for?',
-  cardtype_bancaire_title: 'Bank card', cardtype_bancaire_desc: 'Pay for a bank card.',
-  cardtype_prepaid_title: 'Prepaid card', cardtype_prepaid_desc: 'Pay for a prepaid card.',
+  cardtype_bancaire_title: 'Prepaid card at branch', cardtype_bancaire_desc: 'Pay for a bank card.',
+  cardtype_prepaid_title: 'Promote prepaid promotional offer', cardtype_prepaid_desc: 'Pay for a prepaid card.',
   cardtype_label: 'Card type',
   login_title: 'Staff area', login_sub: 'Sign in to manage Promote subscriptions.',
   login_email: 'Username', login_email_ph: 'first.last@afrilandfirstbank.com',
