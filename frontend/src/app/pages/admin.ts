@@ -320,8 +320,9 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
 
       <!-- Main accounts list -->
       <div class="card" style="padding:16px">
-        <div class="kicker" style="margin-bottom:10px">
-          {{ i18n.t('users_list') }} · {{ filteredUsers().length }}@if (userSearch().trim()) { / {{ usersList().length }} }
+        <div class="kicker" style="margin-bottom:10px;display:flex;align-items:center;gap:8px">
+          <span>{{ i18n.t('users_list') }} · {{ filteredUsers().length }}@if (userSearch().trim()) { / {{ usersList().length }} }</span>
+          <button class="btn btn-ghost" (click)="exportUsers()" [disabled]="!filteredUsers().length" style="margin-left:auto;padding:4px 9px;font-size:11px"><ic name="copy" [size]="13"></ic> {{ i18n.t('tx_export') }}</button>
         </div>
         @if (usersLoading()) {
         <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
@@ -1134,6 +1135,21 @@ export class AdminComponent implements OnInit, OnDestroy {
   private readonly _userPageReset = effect(() => { this.filteredUsers().length; this.userPage.set(0); });
   userPrev() { this.userPage.update((p) => Math.max(0, p - 1)); }
   userNext() { this.userPage.update((p) => Math.min(this.userPageCount() - 1, p + 1)); }
+
+  exportUsers() {
+    const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
+    const header = ['Nom', 'Email', 'Téléphone', 'Rôle(s)', 'Agence', 'Actif'];
+    const rows = this.filteredUsers().map((u) => [
+      u.name,
+      u.email,
+      u.phone ?? '',
+      this.userRoles(u).map((r) => this.roleLabel(r)).join(' / '),
+      u.agency ?? '',
+      u.enabled === false ? 'Non' : 'Oui',
+    ].map((v) => esc(String(v))).join(','));
+    this.downloadCsv('utilisateurs.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
+  }
+
   openUserCreate() {
     this.userPanel.set('create');
     this.userMsg.set('');
