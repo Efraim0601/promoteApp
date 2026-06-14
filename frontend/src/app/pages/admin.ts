@@ -277,7 +277,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
       <h1 style="font-size:21px">{{ i18n.t('nav_users') }}</h1>
       <p class="muted" style="font-size:13px;line-height:1.45;margin-top:-8px;margin-bottom:12px">{{ i18n.t('users_sub') }}</p>
 
-      <!-- Toolbar: search + actions -->
+      <!-- Toolbar: search + filters + actions -->
       <div class="card" style="padding:14px 16px;margin-bottom:12px">
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
           <div class="input-prefix" style="flex:1;min-width:200px">
@@ -290,6 +290,29 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           @if (!isSupervisor()) {
             <button class="btn btn-outline" (click)="openUserImport()" style="padding:10px 14px;font-size:13px;white-space:nowrap">
               <ic name="download" [size]="16"></ic> {{ i18n.t('user_import_btn') }}
+            </button>
+          }
+        </div>
+        <!-- Secondary filter row -->
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+          <span class="muted" style="font-size:11.5px;white-space:nowrap">{{ i18n.t('user_filter_role') }}</span>
+          <button (click)="userFilterRole.set(null)"
+                  [class.btn-primary]="userFilterRole() === null" [class.btn-ghost]="userFilterRole() !== null"
+                  class="btn" style="padding:4px 9px;font-size:11.5px">{{ i18n.t('user_filter_all_roles') }}</button>
+          @for (r of allRoles; track r) {
+            <button (click)="userFilterRole.set(userFilterRole() === r ? null : r)"
+                    [class.btn-primary]="userFilterRole() === r" [class.btn-ghost]="userFilterRole() !== r"
+                    class="btn" style="padding:4px 9px;font-size:11.5px">{{ roleLabel(r) }}</button>
+          }
+          <span class="muted" style="font-size:11.5px;white-space:nowrap;margin-left:8px">{{ i18n.t('user_filter_date_from') }}</span>
+          <input type="date" class="input" style="width:140px;padding:4px 8px;font-size:12px"
+                 [value]="userFilterDateFrom()" (change)="userFilterDateFrom.set($any($event.target).value)" />
+          <span class="muted" style="font-size:11.5px;white-space:nowrap">{{ i18n.t('user_filter_date_to') }}</span>
+          <input type="date" class="input" style="width:140px;padding:4px 8px;font-size:12px"
+                 [value]="userFilterDateTo()" (change)="userFilterDateTo.set($any($event.target).value)" />
+          @if (hasActiveFilters()) {
+            <button class="btn btn-ghost" (click)="clearUserFilters()" style="padding:4px 9px;font-size:11.5px;margin-left:auto">
+              <ic name="x" [size]="13"></ic> {{ i18n.t('user_filters_clear') }}
             </button>
           }
         </div>
@@ -320,10 +343,34 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
 
       <!-- Main accounts list -->
       <div class="card" style="padding:16px">
-        <div class="kicker" style="margin-bottom:10px;display:flex;align-items:center;gap:8px">
-          <span>{{ i18n.t('users_list') }} · {{ filteredUsers().length }}@if (userSearch().trim()) { / {{ usersList().length }} }</span>
+        <div class="kicker" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;font-size:12px">
+            <input type="checkbox" [checked]="isAllPageSelected()" [indeterminate]="isSomePageSelected()" (change)="toggleSelectAllPage()" style="cursor:pointer" />
+            {{ i18n.t('users_list') }} · {{ filteredUsers().length }}@if (hasActiveFilters() || userSearch().trim()) { / {{ usersList().length }} }
+          </label>
+          @if (selectedUserIds().size > 0) {
+            <span class="badge" style="background:var(--primary-soft,#e8f0fe);color:var(--primary);font-size:11px">{{ selectedUserIds().size }} {{ i18n.t('user_selected_n') }}</span>
+          }
           <button class="btn btn-ghost" (click)="exportUsers()" [disabled]="!filteredUsers().length" style="margin-left:auto;padding:4px 9px;font-size:11px"><ic name="copy" [size]="13"></ic> {{ i18n.t('tx_export') }}</button>
         </div>
+        <!-- Bulk action bar -->
+        @if (selectedUserIds().size > 0) {
+          <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:10px 12px;margin-bottom:10px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border)">
+            <span style="font-size:12.5px;font-weight:700">{{ selectedUserIds().size }} {{ i18n.t('user_selected_n') }}</span>
+            <span class="muted" style="font-size:12px">{{ i18n.t('user_bulk_assign') }}</span>
+            <select class="input" style="padding:5px 8px;font-size:12px;width:auto" (change)="bulkAssignRole.set($any($event.target).value || null)">
+              <option value="">{{ i18n.t('user_bulk_role_ph') }}</option>
+              @for (r of allRoles; track r) { <option [value]="r" [selected]="bulkAssignRole() === r">{{ roleLabel(r) }}</option> }
+            </select>
+            <button class="btn btn-primary" [disabled]="!bulkAssignRole() || bulkAssignBusy()" (click)="applyBulkAssign()" style="padding:5px 11px;font-size:12px">
+              @if (bulkAssignBusy()) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_bulk_assign_btn') }} }
+            </button>
+            @if (bulkAssignMsg() === 'done') {
+              <span style="font-size:11.5px;color:var(--success);font-weight:700">{{ i18n.t('user_bulk_assigned') }}</span>
+            }
+            <button class="btn btn-ghost" (click)="clearSelection()" style="padding:5px 10px;font-size:12px;margin-left:auto">{{ i18n.t('cancel_short') }}</button>
+          </div>
+        }
         @if (usersLoading()) {
         <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
         } @else if (!filteredUsers().length) {
@@ -332,6 +379,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         <div style="display:flex;flex-direction:column">
           @for (u of pagedUsers(); track u.id) {
             <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border);flex-wrap:wrap" [style.opacity]="u.enabled === false ? '.5' : '1'">
+              <input type="checkbox" [checked]="selectedUserIds().has(u.id)" (change)="toggleSelectUser(u)" style="cursor:pointer;flex-shrink:0" />
               <avatar [name]="u.name" [size]="30"></avatar>
               <div style="min-width:120px;flex:1">
                 <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.name }}</div>
@@ -1118,19 +1166,97 @@ export class AdminComponent implements OnInit, OnDestroy {
   // --- user management ---
   usersList = signal<User[]>([]);
   userSearch = signal('');
+  userFilterRole = signal<Role | null>(null);
+  userFilterDateFrom = signal('');
+  userFilterDateTo = signal('');
   /** Secondary panel: create form or bulk import (main view stays the searchable list). */
   userPanel = signal<'none' | 'create' | 'import'>('none');
+  hasActiveFilters = computed(() =>
+    !!this.userSearch().trim() || this.userFilterRole() !== null ||
+    !!this.userFilterDateFrom() || !!this.userFilterDateTo()
+  );
   filteredUsers = computed(() => {
     const q = this.userSearch().trim().toLowerCase();
     const digits = this.userSearch().replace(/\D/g, '');
+    const filterRole = this.userFilterRole();
+    const dateFrom = this.userFilterDateFrom() ? new Date(this.userFilterDateFrom() + 'T00:00:00') : null;
+    const dateTo = this.userFilterDateTo() ? new Date(this.userFilterDateTo() + 'T23:59:59') : null;
     return this.usersList().filter((u) => {
-      if (!q && !digits) return true;
-      const roles = this.userRoles(u).map((r) => this.roleLabel(r)).join(' ');
-      const hay = `${u.name} ${u.email} ${u.phone ?? ''} ${u.agency ?? ''} ${roles}`.toLowerCase();
-      const phone = (u.phone ?? '').replace(/\D/g, '');
-      return hay.includes(q) || (!!digits && phone.includes(digits));
+      if (q || digits) {
+        const roles = this.userRoles(u).map((r) => this.roleLabel(r)).join(' ');
+        const hay = `${u.name} ${u.email} ${u.phone ?? ''} ${u.agency ?? ''} ${roles}`.toLowerCase();
+        const phone = (u.phone ?? '').replace(/\D/g, '');
+        if (!hay.includes(q) && !(digits && phone.includes(digits))) return false;
+      }
+      if (filterRole && !this.userRoles(u).includes(filterRole)) return false;
+      if (dateFrom || dateTo) {
+        const created = u.createdAt ? new Date(u.createdAt) : null;
+        if (!created) return !(dateFrom || dateTo);
+        if (dateFrom && created < dateFrom) return false;
+        if (dateTo && created > dateTo) return false;
+      }
+      return true;
     });
   });
+  clearUserFilters() {
+    this.userSearch.set('');
+    this.userFilterRole.set(null);
+    this.userFilterDateFrom.set('');
+    this.userFilterDateTo.set('');
+  }
+
+  // --- selection & bulk role assignment ---
+  selectedUserIds = signal<Set<string>>(new Set());
+  bulkAssignRole = signal<Role | null>(null);
+  bulkAssignBusy = signal(false);
+  bulkAssignMsg = signal('');
+  toggleSelectUser(u: User) {
+    this.selectedUserIds.update((s) => { const n = new Set(s); n.has(u.id) ? n.delete(u.id) : n.add(u.id); return n; });
+    this.bulkAssignMsg.set('');
+  }
+  isAllPageSelected = computed(() => {
+    const ids = this.selectedUserIds();
+    return this.pagedUsers().length > 0 && this.pagedUsers().every((u) => ids.has(u.id));
+  });
+  isSomePageSelected = computed(() => {
+    const ids = this.selectedUserIds();
+    return this.pagedUsers().some((u) => ids.has(u.id)) && !this.isAllPageSelected();
+  });
+  toggleSelectAllPage() {
+    const all = this.pagedUsers();
+    if (this.isAllPageSelected()) {
+      this.selectedUserIds.update((s) => { const n = new Set(s); all.forEach((u) => n.delete(u.id)); return n; });
+    } else {
+      this.selectedUserIds.update((s) => { const n = new Set(s); all.forEach((u) => n.add(u.id)); return n; });
+    }
+    this.bulkAssignMsg.set('');
+  }
+  clearSelection() { this.selectedUserIds.set(new Set()); this.bulkAssignRole.set(null); this.bulkAssignMsg.set(''); }
+  applyBulkAssign() {
+    const role = this.bulkAssignRole();
+    const ids = [...this.selectedUserIds()];
+    if (!role || !ids.length || this.bulkAssignBusy()) return;
+    this.bulkAssignBusy.set(true); this.bulkAssignMsg.set('');
+    let done = 0;
+    for (const id of ids) {
+      const u = this.usersList().find((x) => x.id === id);
+      if (!u) { done++; if (done === ids.length) this.finishBulkAssign(); continue; }
+      const roles: Role[] = [...new Set([...this.userRoles(u), role])];
+      this.api.setUserRoles(id, roles).subscribe({
+        next: (updated) => {
+          this.usersList.update((list) => list.map((x) => (x.id === id ? updated : x)));
+          done++;
+          if (done === ids.length) this.finishBulkAssign();
+        },
+        error: () => { done++; if (done === ids.length) this.finishBulkAssign(); },
+      });
+    }
+  }
+  private finishBulkAssign() {
+    this.bulkAssignBusy.set(false);
+    this.bulkAssignMsg.set('done');
+    this.loadUsers();
+  }
   // Client-side pagination of the filtered staff accounts list.
   userPage = signal(0);
   readonly userPageSize = 8;

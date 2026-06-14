@@ -54,11 +54,13 @@ public final class Dtos {
                                     List<ImportRowResult> rows) {}
 
     public record UserDto(String id, String name, String email, String role, List<String> roles,
-                          String agency, String phone, boolean mustChangePassword, boolean enabled) {
+                          String agency, String phone, boolean mustChangePassword, boolean enabled,
+                          String createdAt) {
         public static UserDto of(AppUser u) {
             List<String> roles = u.effectiveRoles().stream().map(Enum::name).toList();
+            String createdAt = u.getCreatedAt() != null ? u.getCreatedAt().toString() : null;
             return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), roles, u.getAgency(), u.getPhone(),
-                    u.isMustChangePassword(), u.isEnabled());
+                    u.isMustChangePassword(), u.isEnabled(), createdAt);
         }
     }
 

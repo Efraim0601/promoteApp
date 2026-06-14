@@ -15,6 +15,7 @@ export interface User {
   phone: string | null;
   mustChangePassword?: boolean;   // true until the user sets their own password (first login)
   enabled?: boolean;              // false → account disabled by an admin (cannot log in)
+  createdAt?: string | null;
 }
 
 /** One audited login attempt (admin view). */

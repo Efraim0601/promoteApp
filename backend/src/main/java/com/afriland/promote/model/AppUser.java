@@ -3,6 +3,7 @@ package com.afriland.promote.model;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.CreationTimestamp;
 
 /** A staff account (admin, relationship officer, or print-point operator). */
 @Entity
@@ -80,6 +81,11 @@ public class AppUser {
     @Column(nullable = false)
     @ColumnDefault("true")
     private boolean enabled = true;
+
+    /** When the account was created. Populated automatically on insert. */
+    @CreationTimestamp
+    @Column(updatable = false)
+    private java.time.Instant createdAt;
 
     /** Last known geolocation (browser GPS), reported by the frontend right after login. Null until
      *  the user logs in from a browser that grants the geolocation permission. */
