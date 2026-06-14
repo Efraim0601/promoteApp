@@ -2364,7 +2364,10 @@ export class AdminComponent implements OnInit, OnDestroy {
         t.phone, t.email, t.quartier, t.region, t.ville,
         yn(t.hasSelfie), yn(t.hasCniRecto), yn(t.hasCniVerso),
         t.pay, t.payPhone ?? '', t.referrerName ?? '', t.referrerPhone ?? '',
-        t.delivery, t.channel === 'self' ? 'En ligne' : (this.agentName(t.agentId)), t.cardNumber ?? '', t.pan ?? '',
+        t.delivery,
+        t.channel === 'self' ? 'En ligne' : 'Agent',
+        t.channel === 'self' ? '' : (this.agentName(t.agentId) ?? ''),
+        t.cardNumber ?? '', t.pan ?? '',
         t.status, String(t.amount),
       ].map((v) => esc(String(v))).join(',')),
     );
