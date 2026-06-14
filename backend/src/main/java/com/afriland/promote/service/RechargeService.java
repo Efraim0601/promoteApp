@@ -290,17 +290,7 @@ public class RechargeService {
         if (q == null || q.isBlank()) return List.of();
         String needle = q.trim().toLowerCase();
         String digits = q.replaceAll("\\D", "");
-        return recharges.findAll().stream()
-                .filter(r -> {
-                    boolean byRef = r.getRef() != null && r.getRef().toLowerCase().contains(needle);
-                    boolean byName = r.getFullName() != null && r.getFullName().toLowerCase().contains(needle);
-                    boolean byPan = !digits.isEmpty() && r.getPan() != null
-                            && r.getPan().replaceAll("\\D", "").contains(digits);
-                    return byRef || byName || byPan;
-                })
-                .sorted(java.util.Comparator.comparing(Recharge::getCreatedAt).reversed())
-                .limit(30)
-                .toList();
+        return recharges.searchByAny(needle, digits == null ? "" : digits);
     }
 
     public Recharge findByOrderId(String orderId) {

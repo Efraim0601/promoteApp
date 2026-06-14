@@ -38,4 +38,14 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
             + "and lower(r.pay) in ('om', 'mtn') "
             + "order by r.createdAt asc")
     List<Recharge> findMoMoReconcilableSince(@Param("since") Instant since, Pageable pageable);
+
+    /**
+     * Search recharges by ref, full_name, pan, phone or card_number. Native query for performance.
+     */
+    @Query(value = "select * from recharge r where "
+            + "(lower(r.ref) like concat('%', :needle, '%') or lower(r.full_name) like concat('%', :needle, '%')) "
+            + "or (:digits <> '' and (regexp_replace(coalesce(r.pan,''), '\\\\D', '', 'g') like concat('%', :digits, '%') "
+            + "or regexp_replace(coalesce(r.phone,''), '\\\\D', '', 'g') like concat('%', :digits, '%'))) "
+            + "order by r.created_at desc limit 30", nativeQuery = true)
+    List<Recharge> searchByAny(@Param("needle") String needle, @Param("digits") String digits);
 }
