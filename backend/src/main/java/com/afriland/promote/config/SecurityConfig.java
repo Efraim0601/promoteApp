@@ -63,6 +63,9 @@ public class SecurityConfig {
                 // 4xx status reaches the client instead of being masked as 403 for anonymous callers.
                 .requestMatchers("/error").permitAll()
 
+                // ---- profile / habilitation management (admin only) ----
+                .requestMatchers("/api/profiles/**").hasRole("ADMIN")
+
                 // ---- admin only ----
                 .requestMatchers(HttpMethod.PUT, "/api/config").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions").hasRole("ADMIN")

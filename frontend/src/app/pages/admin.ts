@@ -4,7 +4,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
-import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
+import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, PERM_MATRIX, Profile, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -50,6 +50,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
           <button [class.active]="section() === 'recharges'" (click)="section.set('recharges')"><ic name="phone" [size]="18"></ic> {{ i18n.t('nav_recharges') }}</button>
           <button [class.active]="section() === 'collectes'" (click)="section.set('collectes')"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
+          <button [class.active]="section() === 'habilitations'" (click)="section.set('habilitations'); loadProfiles()"><ic name="lock" [size]="18"></ic> {{ i18n.t('nav_habilitations') }}</button>
           <button [class.active]="section() === 'audit'" (click)="section.set('audit')"><ic name="shield" [size]="18"></ic> {{ i18n.t('nav_audit') }}</button>
           <button [class.active]="section() === 'map'" (click)="section.set('map')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_map') }}</button>
           }
@@ -392,12 +393,19 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                 @if (u.enabled === false) {
                   <span class="badge" style="background:var(--accent-soft);color:var(--accent);font-size:10px">{{ i18n.t('user_disabled') }}</span>
                 }
-                @for (r of userRoles(u); track r) {
-                  <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(r) }}</span>
+                @for (pid of (u.profileIds ?? []); track pid) {
+                  @if (profileById(pid); as pr) {
+                    <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ pr.name }}</span>
+                  }
+                }
+                @if (!(u.profileIds ?? []).length) {
+                  @for (r of userRoles(u); track r) {
+                    <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10.5px">{{ roleLabel(r) }}</span>
+                  }
                 }
                 @if (!isSupervisor()) {
                   <button class="icon-btn" (click)="startEditUser(u)" [title]="i18n.t('user_edit_info')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
-                  <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
+                  <button class="icon-btn" (click)="startAssignProfiles(u)" [title]="i18n.t('hab_assign_profiles')" style="flex-shrink:0"><ic name="shield" [size]="15"></ic></button>
                 }
                 @if (!isSupervisor() || userRoles(u).includes('COLLECTEUR')) {
                   <button class="icon-btn" (click)="toggleUserActions(u)" [title]="i18n.t('user_more_actions')" style="flex-shrink:0"><ic name="more" [size]="15" [sw]="3"></ic></button>
@@ -424,21 +432,24 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                   </div>
                 </div>
               }
-              @if (editRolesId() === u.id) {
-                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
+              @if (assignProfilesId() === u.id) {
+                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:10px">
+                  <div class="kicker">{{ i18n.t('hab_assign_profiles') }}</div>
                   <div style="display:flex;flex-wrap:wrap;gap:7px">
-                    @for (r of allRoles; track r) {
-                      <button type="button" (click)="toggleEditRole(r)"
-                              [class.btn-primary]="editRoles().includes(r)" [class.btn-outline]="!editRoles().includes(r)"
-                              class="btn" style="padding:5px 10px;font-size:11.5px">{{ roleLabel(r) }}</button>
+                    @for (pr of profilesList(); track pr.id) {
+                      <button type="button" (click)="toggleAssignProfile(pr.id)"
+                              [class.btn-primary]="assignProfileIds().includes(pr.id)"
+                              [class.btn-outline]="!assignProfileIds().includes(pr.id)"
+                              class="btn" style="padding:5px 10px;font-size:11.5px">{{ pr.name }}</button>
                     }
                   </div>
-                  @if (editRolesErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(editRolesErr()) }}</span> }
+                  @if (assignProfilesErr()) { <span class="err" style="font-size:11.5px">{{ i18n.t(assignProfilesErr()) }}</span> }
+                  @if (assignProfilesMsg()) { <span style="font-size:11.5px;color:var(--success);font-weight:700">{{ i18n.t('hab_assign_saved') }}</span> }
                   <div style="display:flex;gap:8px">
-                    <button class="btn btn-primary" (click)="saveRoles(u)" [disabled]="!editRoles().length || editRolesSaving()" style="padding:7px 12px;font-size:12.5px">
-                      @if (editRolesSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
+                    <button class="btn btn-primary" (click)="saveAssignProfiles(u)" [disabled]="assignProfilesSaving()" style="padding:7px 12px;font-size:12.5px">
+                      @if (assignProfilesSaving()) { <spinner></spinner> } @else { {{ i18n.t('hab_assign_save') }} }
                     </button>
-                    <button class="btn btn-ghost" (click)="editRolesId.set(null)" [disabled]="editRolesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
+                    <button class="btn btn-ghost" (click)="assignProfilesId.set(null)" [disabled]="assignProfilesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
                   </div>
                 </div>
               }
@@ -1121,6 +1132,138 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
         </div>
       }
 
+      <!-- ========== HABILITATIONS ========== -->
+      @if (section() === 'habilitations') {
+      <h1 style="font-size:21px">{{ i18n.t('hab_title') }}</h1>
+      <p class="muted" style="font-size:13px;margin-top:-8px;margin-bottom:14px">{{ i18n.t('hab_sub') }}</p>
+
+      <!-- Profile list -->
+      <div class="card" style="padding:16px;margin-bottom:14px">
+        <div class="kicker" style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
+          <span>{{ i18n.t('hab_profiles') }} · {{ profilesList().length }}</span>
+          <button class="btn btn-primary" (click)="startNewProfile()" [disabled]="editProfileId() !== null"
+                  style="margin-left:auto;padding:5px 12px;font-size:12px">
+            <ic name="plus" [size]="14"></ic> {{ i18n.t('hab_new_profile') }}
+          </button>
+        </div>
+        @if (profilesLoading()) {
+          <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
+        } @else {
+          @for (profile of profilesList(); track profile.id) {
+            <div style="border-top:1px solid var(--border);padding:10px 2px">
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13.5px;font-weight:700">{{ profile.name }}
+                    @if (profile.builtin) {
+                      <span class="badge" style="background:var(--surface-2);color:var(--muted);font-size:10px;margin-left:5px">{{ i18n.t('hab_builtin') }}</span>
+                    }
+                  </div>
+                  @if (profile.description) { <div class="muted" style="font-size:11.5px;margin-top:2px">{{ profile.description }}</div> }
+                  <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">
+                    @for (mod of permMatrix; track mod.module) {
+                      @for (action of mod.actions; track action) {
+                        @if (profile.permissions.includes(asPermission(mod.module + '_' + action))) {
+                          <span class="badge" style="background:var(--primary-soft,#e8f0fe);color:var(--primary);font-size:10px">
+                            {{ i18n.t('hab_module_' + mod.module) }} · {{ i18n.t('hab_perm_' + action.toLowerCase()) }}
+                          </span>
+                        }
+                      }
+                    }
+                    @if (!profile.permissions.length) {
+                      <span class="muted" style="font-size:11px">{{ i18n.t('hab_no_perm') }}</span>
+                    }
+                  </div>
+                </div>
+                <div style="display:flex;gap:6px;flex-shrink:0">
+                  <button class="icon-btn" (click)="startEditProfile(profile)"><ic name="pencil" [size]="15"></ic></button>
+                  @if (!profile.builtin) {
+                    <button class="icon-btn" (click)="deleteProfile(profile)" style="color:var(--accent)"><ic name="trash" [size]="15"></ic></button>
+                  }
+                </div>
+              </div>
+            </div>
+          }
+          @if (profileDeleteMsg()) {
+            <p style="font-size:12px;color:var(--success);font-weight:700;margin-top:8px">{{ i18n.t('hab_deleted') }}</p>
+          }
+        }
+      </div>
+
+      <!-- Profile editor (create / edit) -->
+      @if (editProfileId() !== null) {
+        <div class="card" style="padding:16px;margin-bottom:14px">
+          <div class="kicker" style="margin-bottom:12px">
+            {{ editProfileId() === -1 ? i18n.t('hab_new_profile') : (profilesList().find(p => p.id === editProfileId())?.name ?? '') }}
+          </div>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            <field [label]="i18n.t('hab_profile_name')">
+              <input class="input" [placeholder]="i18n.t('hab_profile_name_ph')"
+                     [value]="profileDraft().name"
+                     (input)="profileDraft.update(f => ({...f, name: $any($event.target).value}))" />
+            </field>
+            <field [label]="i18n.t('hab_profile_desc')">
+              <input class="input" [placeholder]="i18n.t('hab_profile_desc_ph')"
+                     [value]="profileDraft().description"
+                     (input)="profileDraft.update(f => ({...f, description: $any($event.target).value}))" />
+            </field>
+            <!-- Permission matrix -->
+            <div>
+              <div class="kicker" style="margin-bottom:8px">{{ i18n.t('hab_permissions') }}</div>
+              <div style="overflow-x:auto">
+                <table style="border-collapse:collapse;font-size:12.5px;min-width:100%">
+                  <thead>
+                    <tr style="background:var(--surface-2)">
+                      <th style="text-align:left;padding:6px 10px;border:1px solid var(--border);min-width:130px">Module</th>
+                      @for (action of allActions; track action) {
+                        <th style="text-align:center;padding:6px 10px;border:1px solid var(--border);white-space:nowrap">
+                          {{ i18n.t('hab_perm_' + action.toLowerCase()) }}
+                        </th>
+                      }
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (mod of permMatrix; track mod.module) {
+                      <tr>
+                        <td style="padding:7px 10px;border:1px solid var(--border);font-weight:600">
+                          {{ i18n.t('hab_module_' + mod.module) }}
+                        </td>
+                        @for (action of allActions; track action) {
+                          <td style="text-align:center;padding:7px 10px;border:1px solid var(--border)">
+                            @if (mod.actions.includes(action)) {
+                              <input type="checkbox"
+                                     [checked]="profileDraft().permissions.includes(mod.module + '_' + action)"
+                                     (change)="toggleProfilePerm(mod.module + '_' + action)"
+                                     style="cursor:pointer;width:15px;height:15px" />
+                            } @else {
+                              <span style="color:var(--border)">—</span>
+                            }
+                          </td>
+                        }
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            @if (editProfileId()! > 0 && profilesList().find(p => p.id === editProfileId())?.builtin) {
+              <p class="muted" style="font-size:11.5px;display:flex;align-items:center;gap:5px">
+                <ic name="alert" [size]="13"></ic> {{ i18n.t('hab_builtin_tip') }}
+              </p>
+            }
+            @if (profileSaveMsg()) {
+              <span style="font-size:12px;color:var(--success);font-weight:700">{{ i18n.t('hab_saved') }}</span>
+            }
+            <div style="display:flex;gap:8px">
+              <button class="btn btn-primary" [disabled]="!profileDraft().name.trim() || profileSaving()" (click)="saveProfile()" style="padding:7px 14px;font-size:12.5px">
+                @if (profileSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
+              </button>
+              <button class="btn btn-ghost" (click)="cancelProfileEdit()" style="padding:7px 14px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
+            </div>
+          </div>
+        </div>
+      }
+      }
+
       </main>
     </div>
   </div>`,
@@ -1134,7 +1277,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private poll?: ReturnType<typeof setInterval>;
 
   /** Active sidebar section. */
-  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map'>('overview');
+  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
 
   /** A supervisor (without ADMIN) gets a restricted view: only collecteur user management. */
   readonly isSupervisor = computed(() => this.auth.hasRole('SUPERVISEUR') && !this.auth.hasRole('ADMIN'));
@@ -1362,6 +1505,105 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
   readonly allRoles = ALL_ROLES;
+  readonly permMatrix = PERM_MATRIX;
+  readonly allActions = ['READ', 'WRITE', 'VALIDATE', 'PRINT', 'EXPORT'];
+
+  // --- profile / habilitation management ---
+  profilesList = signal<Profile[]>([]);
+  profilesLoading = signal(false);
+  loadProfiles() {
+    if (this.profilesList().length) return;
+    this.profilesLoading.set(true);
+    this.api.getProfiles().subscribe({ next: (ps) => { this.profilesList.set(ps); this.profilesLoading.set(false); }, error: () => this.profilesLoading.set(false) });
+  }
+  profileById(id: number): Profile | undefined { return this.profilesList().find((p) => p.id === id); }
+  asPermission(s: string) { return s as any; }
+
+  editProfileId = signal<number | null>(null);
+  profileDraft = signal<{ name: string; description: string; permissions: string[] }>({ name: '', description: '', permissions: [] });
+  profileSaving = signal(false);
+  profileSaveMsg = signal(false);
+  profileDeleteMsg = signal(false);
+
+  startNewProfile() {
+    this.editProfileId.set(-1);
+    this.profileDraft.set({ name: '', description: '', permissions: [] });
+    this.profileSaveMsg.set(false);
+  }
+  startEditProfile(p: Profile) {
+    this.editProfileId.set(p.id);
+    this.profileDraft.set({ name: p.name, description: p.description ?? '', permissions: [...p.permissions] });
+    this.profileSaveMsg.set(false);
+  }
+  cancelProfileEdit() { this.editProfileId.set(null); }
+  toggleProfilePerm(key: string) {
+    this.profileDraft.update((d) => {
+      const perms = d.permissions.includes(key) ? d.permissions.filter((p) => p !== key) : [...d.permissions, key];
+      return { ...d, permissions: perms };
+    });
+  }
+  saveProfile() {
+    const draft = this.profileDraft();
+    if (!draft.name.trim() || this.profileSaving()) return;
+    const req = { name: draft.name.trim(), description: draft.description.trim(), permissions: draft.permissions as any[] };
+    this.profileSaving.set(true); this.profileSaveMsg.set(false);
+    const id = this.editProfileId();
+    const obs = id === -1 ? this.api.createProfile(req) : this.api.updateProfile(id!, req);
+    obs.subscribe({
+      next: (saved) => {
+        this.profilesList.update((list) => {
+          const idx = list.findIndex((p) => p.id === saved.id);
+          return idx >= 0 ? list.map((p) => (p.id === saved.id ? saved : p)) : [...list, saved];
+        });
+        this.profileSaving.set(false); this.profileSaveMsg.set(true);
+        this.editProfileId.set(saved.id);
+      },
+      error: () => this.profileSaving.set(false),
+    });
+  }
+  deleteProfile(p: Profile) {
+    if (!confirm(this.i18n.t('hab_delete_confirm'))) return;
+    this.api.deleteProfile(p.id).subscribe({
+      next: () => {
+        this.profilesList.update((list) => list.filter((x) => x.id !== p.id));
+        this.profileDeleteMsg.set(true);
+        setTimeout(() => this.profileDeleteMsg.set(false), 3000);
+      },
+    });
+  }
+
+  // --- profile assignment to users ---
+  assignProfilesId = signal<string | null>(null);
+  assignProfileIds = signal<number[]>([]);
+  assignProfilesSaving = signal(false);
+  assignProfilesErr = signal('');
+  assignProfilesMsg = signal(false);
+
+  startAssignProfiles(u: User) {
+    this.editUserId.set(null);
+    this.userActionsId.set(null);
+    this.assignProfilesId.set(u.id);
+    this.assignProfileIds.set([...(u.profileIds ?? [])]);
+    this.assignProfilesErr.set('');
+    this.assignProfilesMsg.set(false);
+    this.loadProfiles();
+  }
+  toggleAssignProfile(id: number) {
+    this.assignProfileIds.update((ids) => ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]);
+  }
+  saveAssignProfiles(u: User) {
+    if (this.assignProfilesSaving()) return;
+    this.assignProfilesSaving.set(true); this.assignProfilesErr.set(''); this.assignProfilesMsg.set(false);
+    this.api.setUserProfiles(u.id, this.assignProfileIds()).subscribe({
+      next: (updated) => {
+        this.usersList.update((list) => list.map((x) => (x.id === u.id ? updated : x)));
+        if (updated.id === this.auth.user()?.id) this.auth.setUser(updated);
+        this.assignProfilesSaving.set(false); this.assignProfilesMsg.set(true);
+      },
+      error: () => { this.assignProfilesSaving.set(false); this.assignProfilesErr.set('generic_error'); },
+    });
+  }
+
   nu = signal<CreateUserRequest>({ name: '', email: '', role: 'AGENT', agency: '', phone: '' });
   /** Roles selected on the create form (multi-role). */
   nuRoles = signal<Role[]>(['AGENT']);
@@ -1399,7 +1641,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     return !!u.name.trim() && /\S+@\S+\.\S+/.test(u.email) && this.editUserPhoneOk();
   });
   startEditUser(u: User) {
-    this.editRolesId.set(null);
+    this.assignProfilesId.set(null);
     this.userActionsId.set(null);
     this.editUserId.set(u.id);
     this.editUser.set({ name: u.name, email: u.email, agency: u.agency ?? '', phone: u.phone ?? '' });

@@ -43,11 +43,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 String rolesClaim = claims.get("roles", String.class);
                 String roleClaim = claims.get("role", String.class);
                 String csv = (rolesClaim != null && !rolesClaim.isBlank()) ? rolesClaim : roleClaim;
-                List<SimpleGrantedAuthority> authorities = csv == null ? List.of()
-                        : java.util.Arrays.stream(csv.split(","))
-                            .map(String::trim).filter(s -> !s.isEmpty())
-                            .map(r -> new SimpleGrantedAuthority("ROLE_" + r))
-                            .toList();
+                java.util.List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+                if (csv != null) {
+                    for (String r : csv.split(",")) {
+                        String t = r.trim();
+                        if (!t.isEmpty()) authorities.add(new SimpleGrantedAuthority("ROLE_" + t));
+                    }
+                }
+                String permClaim = claims.get("permissions", String.class);
+                if (permClaim != null && !permClaim.isBlank()) {
+                    for (String p : permClaim.split(",")) {
+                        String t = p.trim();
+                        if (!t.isEmpty()) authorities.add(new SimpleGrantedAuthority("PERM_" + t));
+                    }
+                }
                 // Reject a token whose account has since been disabled (or deleted): the
                 // authentication is simply not set, so protected endpoints answer 401/403.
                 boolean active = users.findById(claims.getSubject()).map(u -> u.isEnabled()).orElse(false);

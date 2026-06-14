@@ -2,6 +2,43 @@
 
 export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER' | 'COLLECTEUR' | 'SUPERVISEUR';
 
+export type Permission =
+  | 'SOUSCRIPTIONS_READ' | 'SOUSCRIPTIONS_WRITE' | 'SOUSCRIPTIONS_VALIDATE'
+  | 'SOUSCRIPTIONS_PRINT' | 'SOUSCRIPTIONS_EXPORT'
+  | 'RECHARGES_READ' | 'RECHARGES_VALIDATE' | 'RECHARGES_EXPORT'
+  | 'COLLECTES_READ' | 'COLLECTES_WRITE' | 'COLLECTES_EXPORT'
+  | 'UTILISATEURS_READ' | 'UTILISATEURS_WRITE'
+  | 'CONFIG_READ' | 'CONFIG_WRITE';
+
+export interface Profile {
+  id: number;
+  name: string;
+  description: string | null;
+  builtin: boolean;
+  permissions: Permission[];
+}
+
+export interface ProfileRequest {
+  name: string;
+  description: string;
+  permissions: Permission[];
+}
+
+/** Matrix definition used to render the permission grid in the admin UI. */
+export interface PermMatrixModule {
+  module: string;
+  label: string;
+  actions: string[];
+}
+
+export const PERM_MATRIX: PermMatrixModule[] = [
+  { module: 'SOUSCRIPTIONS', label: 'Souscriptions', actions: ['READ', 'WRITE', 'VALIDATE', 'PRINT', 'EXPORT'] },
+  { module: 'RECHARGES',     label: 'Recharges',     actions: ['READ', 'VALIDATE', 'EXPORT'] },
+  { module: 'COLLECTES',     label: 'Collectes',     actions: ['READ', 'WRITE', 'EXPORT'] },
+  { module: 'UTILISATEURS',  label: 'Utilisateurs',  actions: ['READ', 'WRITE'] },
+  { module: 'CONFIG',        label: 'Configuration', actions: ['READ', 'WRITE'] },
+];
+
 /** All assignable roles, in landing-priority order (first present drives the landing page). */
 export const ALL_ROLES: Role[] = ['ADMIN', 'SUPERVISEUR', 'AGENT', 'CASHIER', 'PRINT_AGENT', 'COLLECTEUR'];
 
@@ -13,9 +50,11 @@ export interface User {
   roles?: Role[];      // full set of roles the account holds
   agency: string | null;
   phone: string | null;
-  mustChangePassword?: boolean;   // true until the user sets their own password (first login)
-  enabled?: boolean;              // false → account disabled by an admin (cannot log in)
+  mustChangePassword?: boolean;
+  enabled?: boolean;
   createdAt?: string | null;
+  profileIds?: number[] | null;
+  permissions?: Permission[] | null;
 }
 
 /** One audited login attempt (admin view). */

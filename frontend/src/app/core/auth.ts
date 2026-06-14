@@ -3,7 +3,7 @@ import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { Api } from './api';
 import { Geo } from './geo';
-import { ALL_ROLES, Role, User } from './models';
+import { ALL_ROLES, Permission, Role, User } from './models';
 
 const TOKEN_KEY = 'promote.token';
 const USER_KEY = 'promote.user';
@@ -69,6 +69,17 @@ export class Auth {
   hasRole(...roles: Role[]): boolean {
     const mine = this.roles();
     return roles.some((r) => mine.includes(r));
+  }
+
+  permissions(): Permission[] {
+    return (this.user()?.permissions ?? []) as Permission[];
+  }
+
+  /** ADMIN bypasses all permission checks for backward compatibility with pre-profile sessions. */
+  hasPermission(...perms: Permission[]): boolean {
+    if (this.hasRole('ADMIN')) return true;
+    const mine = this.permissions();
+    return perms.some((p) => mine.includes(p));
   }
 
   /** True until the user has set their own password (forces the change-password screen). */

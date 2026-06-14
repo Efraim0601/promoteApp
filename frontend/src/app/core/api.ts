@@ -6,7 +6,7 @@ import {
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ImportUserRow, ImportUsersResult, LoginAudit, Role,
-  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Recharge, Subscription, UpdateUserRequest, User,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Profile, ProfileRequest, Recharge, Subscription, UpdateUserRequest, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -268,5 +268,22 @@ export class Api {
   /** Admin — Mobile Money payment funnel (acceptance, latency, failure causes, by network). */
   paymentStats(): Observable<PaymentStats> {
     return this.http.get<PaymentStats>(`${this.base}/stats/payments`);
+  }
+
+  // ---- profile / habilitation management ----
+  getProfiles(): Observable<Profile[]> {
+    return this.http.get<Profile[]>(`${this.base}/profiles`);
+  }
+  createProfile(req: ProfileRequest): Observable<Profile> {
+    return this.http.post<Profile>(`${this.base}/profiles`, req);
+  }
+  updateProfile(id: number, req: ProfileRequest): Observable<Profile> {
+    return this.http.put<Profile>(`${this.base}/profiles/${id}`, req);
+  }
+  deleteProfile(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/profiles/${id}`);
+  }
+  setUserProfiles(userId: string, profileIds: number[]): Observable<User> {
+    return this.http.put<User>(`${this.base}/profiles/users/${userId}`, profileIds);
   }
 }

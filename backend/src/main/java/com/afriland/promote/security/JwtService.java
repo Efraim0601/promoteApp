@@ -27,11 +27,13 @@ public class JwtService {
     public String generate(AppUser user) {
         Date now = new Date();
         String roles = String.join(",", user.effectiveRoles().stream().map(Enum::name).toList());
+        String permissions = com.afriland.promote.model.Permission.toCsv(user.effectivePermissions());
         return Jwts.builder()
                 .subject(user.getId())
                 .claim("email", user.getEmail())
-                .claim("role", user.getRole().name())   // primary role (kept for compatibility)
-                .claim("roles", roles)                  // full effective role set (comma-separated)
+                .claim("role", user.getRole().name())   // primary role (kept for landing-page routing)
+                .claim("roles", roles)                  // full role set (comma-separated)
+                .claim("permissions", permissions)      // effective permission set (comma-separated)
                 .claim("name", user.getName())
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expirationMs))

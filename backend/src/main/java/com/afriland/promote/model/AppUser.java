@@ -87,6 +87,22 @@ public class AppUser {
     @Column(updatable = false)
     private java.time.Instant createdAt;
 
+    /** Profiles (groups of permissions) assigned to this account. Loaded eagerly so that
+     *  {@link #effectivePermissions()} is available without an open Hibernate session. */
+    @ManyToMany(fetch = jakarta.persistence.FetchType.EAGER)
+    @JoinTable(name = "user_profile",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "profile_id"))
+    @Builder.Default
+    private java.util.Set<AppProfile> profiles = new java.util.HashSet<>();
+
+    /** Union of all permissions granted by assigned profiles. */
+    public java.util.Set<Permission> effectivePermissions() {
+        java.util.Set<Permission> result = java.util.EnumSet.noneOf(Permission.class);
+        for (AppProfile p : profiles) result.addAll(p.permissionSet());
+        return result;
+    }
+
     /** Last known geolocation (browser GPS), reported by the frontend right after login. Null until
      *  the user logs in from a browser that grants the geolocation permission. */
     private Double lastLat;

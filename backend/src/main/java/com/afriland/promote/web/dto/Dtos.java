@@ -1,6 +1,8 @@
 package com.afriland.promote.web.dto;
 
+import com.afriland.promote.model.AppProfile;
 import com.afriland.promote.model.AppUser;
+import com.afriland.promote.model.Permission;
 import com.afriland.promote.model.Subscription;
 import jakarta.validation.constraints.NotBlank;
 
@@ -55,14 +57,30 @@ public final class Dtos {
 
     public record UserDto(String id, String name, String email, String role, List<String> roles,
                           String agency, String phone, boolean mustChangePassword, boolean enabled,
-                          String createdAt) {
+                          String createdAt, List<Long> profileIds, List<String> permissions) {
         public static UserDto of(AppUser u) {
             List<String> roles = u.effectiveRoles().stream().map(Enum::name).toList();
             String createdAt = u.getCreatedAt() != null ? u.getCreatedAt().toString() : null;
-            return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), roles, u.getAgency(), u.getPhone(),
-                    u.isMustChangePassword(), u.isEnabled(), createdAt);
+            List<Long> profileIds = u.getProfiles().stream().map(AppProfile::getId).sorted().toList();
+            List<String> permissions = u.effectivePermissions().stream()
+                    .map(Permission::name).sorted().toList();
+            return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), roles,
+                    u.getAgency(), u.getPhone(), u.isMustChangePassword(), u.isEnabled(),
+                    createdAt, profileIds, permissions);
         }
     }
+
+    /** A permission profile (group of fine-grained permissions). */
+    public record ProfileDto(Long id, String name, String description, boolean builtin,
+                             List<String> permissions) {
+        public static ProfileDto of(AppProfile p) {
+            List<String> perms = p.permissionSet().stream().map(Permission::name).sorted().toList();
+            return new ProfileDto(p.getId(), p.getName(), p.getDescription(), p.isBuiltin(), perms);
+        }
+    }
+
+    /** Create / update a profile. */
+    public record ProfileRequest(String name, String description, List<String> permissions) {}
 
     /** Admin enables/disables a staff account. */
     public record SetEnabledRequest(boolean enabled) {}
