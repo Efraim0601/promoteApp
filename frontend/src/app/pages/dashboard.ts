@@ -179,6 +179,82 @@ import { IconComponent } from '../shared/icon';
     }
   </div>
 
+  <!-- ===== Rapport journalier interactif ===== -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <h3 class="chart-title">Rapport journalier</h3>
+      <div class="day-actions">
+        <!-- Day-of-week quick-select chips -->
+        <button class="dow-chip" (click)="selectAll()">Tous</button>
+        <button class="dow-chip" (click)="selectByDow(1)">Lun</button>
+        <button class="dow-chip" (click)="selectByDow(2)">Mar</button>
+        <button class="dow-chip" (click)="selectByDow(3)">Mer</button>
+        <button class="dow-chip" (click)="selectByDow(4)">Jeu</button>
+        <button class="dow-chip dow-weekend" (click)="selectByDow(5)">Ven</button>
+        <button class="dow-chip dow-weekend" (click)="selectByDow(6)">Sam</button>
+        <button class="dow-chip dow-weekend" (click)="selectByDow(0)">Dim</button>
+        <button class="dow-chip dow-we-all" (click)="selectByDow(5, 6, 0)">Week-end</button>
+        <button class="dow-chip dow-clear" (click)="clearSelection()">Effacer</button>
+      </div>
+    </div>
+
+    <div class="day-table-wrap">
+      <table class="day-table">
+        <thead>
+          <tr>
+            <th class="chk-col">
+              <input type="checkbox"
+                     [checked]="allSelected()"
+                     [indeterminate]="someSelected()"
+                     (change)="toggleAll($event)">
+            </th>
+            <th>Jour</th>
+            <th class="num-col">Paiements confirmés</th>
+            <th class="num-col">Cartes produites</th>
+            <th class="num-col">Volume (FCFA)</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (d of s.dailyTrend; track d.date) {
+            <tr [class.row-empty]="d.paid === 0 && d.printed === 0"
+                [class.row-selected]="isSelected(d.date)"
+                (click)="toggleDate(d.date)">
+              <td class="chk-col" (click)="$event.stopPropagation()">
+                <input type="checkbox" [checked]="isSelected(d.date)" (change)="toggleDate(d.date)">
+              </td>
+              <td class="day-cell">
+                <span class="day-badge" [class.day-we]="isWeekend(d.date)">{{ dayLabel(d.date) }}</span>
+              </td>
+              <td class="num-col">{{ d.paid | number }}</td>
+              <td class="num-col bold-purple">{{ d.printed | number }}</td>
+              <td class="num-col bold-green">{{ d.amount | number }} FCFA</td>
+            </tr>
+          }
+        </tbody>
+        @if (selectedTotals().days > 0) {
+          <tfoot>
+            <tr class="total-row">
+              <td class="chk-col"></td>
+              <td class="total-label">TOTAL — {{ selectedTotals().days }} jour(s)</td>
+              <td class="num-col total-val">{{ selectedTotals().paid | number }}</td>
+              <td class="num-col total-val bold-purple">{{ selectedTotals().printed | number }}</td>
+              <td class="num-col total-val bold-green">{{ selectedTotals().amount | number }} FCFA</td>
+            </tr>
+          </tfoot>
+        }
+      </table>
+    </div>
+
+    @if (selectedTotals().days > 0) {
+      <div class="export-row">
+        <span class="export-info">{{ selectedTotals().days }} jour(s) sélectionné(s)</span>
+        <button class="export-btn" (click)="exportSelection()">
+          <ic name="download" [size]="14"></ic> Export Excel — sélection
+        </button>
+      </div>
+    }
+  </div>
+
   <!-- ===== Conversion Funnel ===== -->
   <div class="charts-row">
     <div class="chart-card flex-1">
@@ -516,6 +592,43 @@ import { IconComponent } from '../shared/icon';
 
     .no-data { text-align: center; padding: 32px; color: #9ca3af; font-size: 14px; }
 
+    /* ---- Interactive daily report ---- */
+    .day-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .dow-chip {
+      padding: 4px 12px; border-radius: 99px; font-size: 12px; font-weight: 600; cursor: pointer;
+      border: 1px solid #d1d5db; background: #f9fafb; color: #374151;
+    }
+    .dow-chip:hover { background: #f3f4f6; border-color: #9ca3af; }
+    .dow-weekend { border-color: #818cf8; color: #4f46e5; background: #eef2ff; }
+    .dow-weekend:hover { background: #e0e7ff; }
+    .dow-we-all { border-color: #4f46e5; color: #fff; background: #4f46e5; }
+    .dow-we-all:hover { background: #4338ca; }
+    .dow-clear { color: #9ca3af; }
+    .dow-clear:hover { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+
+    .day-table-wrap { overflow-x: auto; margin-top: 12px; }
+    .day-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .day-table thead th { padding: 8px 12px; font-size: 11px; font-weight: 700; color: #9ca3af; text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid #f3f4f6; text-align: left; }
+    .day-table thead .num-col { text-align: right; }
+    .day-table tbody tr { cursor: pointer; transition: background .1s; }
+    .day-table tbody tr:hover td { background: #f0f9ff; }
+    .day-table tbody td { padding: 9px 12px; border-bottom: 1px solid #f9fafb; }
+    .chk-col { width: 36px; text-align: center; }
+    .row-empty td { opacity: .35; }
+    .row-selected td { background: #eff6ff !important; }
+    .day-badge { font-weight: 600; color: #374151; }
+    .day-we { color: #4f46e5; }
+    .day-cell { white-space: nowrap; }
+
+    .day-table tfoot .total-row td { padding: 10px 12px; background: #1e293b; color: #f8fafc; font-weight: 700; border-top: 2px solid #334155; }
+    .total-label { font-size: 13px; }
+    .total-val { font-size: 15px; color: #f8fafc; }
+    .total-val.bold-green { color: #6ee7b7; }
+    .total-val.bold-purple { color: #c4b5fd; }
+
+    .export-row { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 12px; }
+    .export-info { font-size: 12px; color: #6b7280; }
+
     @media (max-width: 768px) {
       .dash-page { padding: 12px 16px; }
       .charts-row { flex-direction: column; }
@@ -544,6 +657,68 @@ export class DashboardComponent implements OnInit {
 
   filterFrom = '';
   filterTo   = '';
+
+  // ---- day selection ----
+  selectedDates = signal<Set<string>>(new Set());
+
+  isSelected(date: string)    { return this.selectedDates().has(date); }
+  isWeekend(dateStr: string)  { const d = new Date(dateStr + 'T12:00:00').getDay(); return d === 0 || d === 5 || d === 6; }
+
+  toggleDate(date: string) {
+    this.selectedDates.update(s => { const n = new Set(s); n.has(date) ? n.delete(date) : n.add(date); return n; });
+  }
+
+  toggleAll(ev: Event) {
+    const chk = (ev.target as HTMLInputElement).checked;
+    chk ? this.selectAll() : this.clearSelection();
+  }
+
+  selectAll() {
+    const s = this.stats();
+    this.selectedDates.set(new Set(s ? s.dailyTrend.map(d => d.date) : []));
+  }
+
+  clearSelection() { this.selectedDates.set(new Set()); }
+
+  selectByDow(...days: number[]) {
+    const s = this.stats();
+    if (!s) return;
+    this.selectedDates.update(() => {
+      const ns = new Set<string>();
+      for (const d of s.dailyTrend) {
+        if (days.includes(new Date(d.date + 'T12:00:00').getDay())) ns.add(d.date);
+      }
+      return ns;
+    });
+  }
+
+  allSelected = computed(() => {
+    const s = this.stats();
+    return !!s && s.dailyTrend.length > 0 && this.selectedDates().size === s.dailyTrend.length;
+  });
+
+  someSelected = computed(() => {
+    const sel = this.selectedDates().size;
+    const s = this.stats();
+    return sel > 0 && !!s && sel < s.dailyTrend.length;
+  });
+
+  selectedRows = computed(() => {
+    const s = this.stats();
+    if (!s) return [];
+    const sel = this.selectedDates();
+    return s.dailyTrend.filter(d => sel.has(d.date));
+  });
+
+  selectedTotals = computed(() => {
+    const rows = this.selectedRows();
+    return {
+      days:    rows.length,
+      paid:    rows.reduce((a, d) => a + d.paid,    0),
+      printed: rows.reduce((a, d) => a + d.printed, 0),
+      amount:  rows.reduce((a, d) => a + d.amount,  0),
+    };
+  });
 
   ngOnInit() {
     const to   = new Date();
@@ -663,19 +838,54 @@ export class DashboardComponent implements OnInit {
     return Math.ceil(n / 10);
   });
 
+  // ---- helpers ----
+
+  readonly FR_DAYS = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
+
+  dayLabel(dateStr: string): string {
+    const d = new Date(dateStr + 'T12:00:00');
+    const [, mm, dd] = dateStr.split('-');
+    return `${this.FR_DAYS[d.getDay()]} ${dd}/${mm}`;
+  }
+
   // ---- Excel export ----
+
+  exportSelection() {
+    const rows = this.selectedRows();
+    if (!rows.length) return;
+
+    const sheetRows: (string | number)[][] = [
+      ['Rapport journalier — Afriland Carte Promote'],
+      [`Période sélectionnée : ${this.filterFrom} → ${this.filterTo}`],
+      [`${rows.length} jour(s) sélectionné(s)`],
+      [],
+      ['Jour', 'Paiements confirmés', 'Cartes produites', 'Volume (FCFA)'],
+    ];
+
+    let totPaid = 0, totPrinted = 0, totAmount = 0;
+    for (const d of rows) {
+      sheetRows.push([this.dayLabel(d.date), d.paid, d.printed, d.amount]);
+      totPaid    += d.paid;
+      totPrinted += d.printed;
+      totAmount  += d.amount;
+    }
+    sheetRows.push(['TOTAL', totPaid, totPrinted, totAmount]);
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetRows);
+    ws['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 18 }];
+    ws['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Rapport sélection');
+
+    const dates = rows.map(r => r.date).sort();
+    const filename = `rapport_${dates[0]}_${dates[dates.length - 1]}.xlsx`;
+    XLSX.writeFile(wb, filename);
+  }
 
   exportExcel() {
     const s = this.stats();
     if (!s) return;
-
-    const FR_DAYS = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
-
-    const dayLabel = (dateStr: string) => {
-      const d = new Date(dateStr + 'T12:00:00');
-      const [, mm, dd] = dateStr.split('-');
-      return `${FR_DAYS[d.getDay()]} ${dd}/${mm}`;
-    };
 
     const fmt = (n: number) => n.toLocaleString('fr-FR');
 
@@ -690,7 +900,7 @@ export class DashboardComponent implements OnInit {
     let totPaid = 0, totPrinted = 0, totAmount = 0;
     for (const d of s.dailyTrend) {
       if (d.paid === 0 && d.printed === 0 && d.amount === 0) continue; // skip empty days
-      summaryRows.push([dayLabel(d.date), d.paid, d.printed, d.amount]);
+      summaryRows.push([this.dayLabel(d.date), d.paid, d.printed, d.amount]);
       totPaid    += d.paid;
       totPrinted += d.printed;
       totAmount  += d.amount;
@@ -731,7 +941,7 @@ export class DashboardComponent implements OnInit {
       ['Date', 'Souscriptions', 'Encaissements', 'Impressions', 'Échecs', 'Volume (FCFA)'],
     ];
     for (const d of s.dailyTrend) {
-      trendRows.push([dayLabel(d.date), d.created, d.paid, d.printed, d.failed, d.amount]);
+      trendRows.push([this.dayLabel(d.date), d.created, d.paid, d.printed, d.failed, d.amount]);
     }
     const ws3 = XLSX.utils.aoa_to_sheet(trendRows);
     ws3['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 18 }];
