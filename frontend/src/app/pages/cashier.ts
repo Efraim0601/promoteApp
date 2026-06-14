@@ -236,6 +236,7 @@ import { SpinnerComponent } from '../shared/spinner';
             }
           </div>
         }
+      }
       } @else if (mode() === 'recharges') {
         <div>
           <h2 style="font-size:17px;margin-bottom:2px">{{ i18n.t('cash_rch_title') }}</h2>
