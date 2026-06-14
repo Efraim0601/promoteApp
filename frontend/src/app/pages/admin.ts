@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
+import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
 import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
@@ -41,6 +42,9 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <button [class.active]="section() === 'config'" (click)="section.set('config')"><ic name="gear" [size]="18"></ic> {{ i18n.t('nav_config') }}</button>
           }
           <button [class.active]="section() === 'users'" (click)="section.set('users')"><ic name="user" [size]="18"></ic> {{ i18n.t(isSupervisor() ? 'nav_collecteurs' : 'nav_users') }}</button>
+          @if (auth.hasRole('COLLECTEUR')) {
+          <button (click)="goCollecte()"><ic name="store" [size]="18"></ic> {{ i18n.t('my_collectes') }}</button>
+          }
           @if (!isSupervisor()) {
           <button [class.active]="section() === 'agencies'" (click)="section.set('agencies')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_agencies') }}</button>
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
@@ -1068,6 +1072,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   i18n = inject(I18n);
   auth = inject(Auth);
   private api = inject(Api);
+  private configStore = inject(ConfigStore);
   private router = inject(Router);
   private poll?: ReturnType<typeof setInterval>;
 
@@ -1076,6 +1081,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   /** A supervisor (without ADMIN) gets a restricted view: only collecteur user management. */
   readonly isSupervisor = computed(() => this.auth.hasRole('SUPERVISEUR') && !this.auth.hasRole('ADMIN'));
+  goCollecte() { this.router.navigateByUrl('/collecte'); }
   goCollecteStats() { this.router.navigateByUrl('/collecte-stats'); }
 
   stats = signal<AdminStats | null>(null);
@@ -1979,6 +1985,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.api.updateConfig(this.cfg()).subscribe({
       next: (c) => {
         this.original.set({ ...c }); this.cfg.set({ ...c }); this.saving.set(false);
+        // Update the shared frontend store so other pages reflect the new config immediately.
+        this.configStore.setLocal(c);
         this.saved.set(true); setTimeout(() => this.saved.set(false), 1600);
       },
       error: () => { this.saveErr.set(true); this.saving.set(false); },

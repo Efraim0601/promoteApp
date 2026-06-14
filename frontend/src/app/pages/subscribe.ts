@@ -2,6 +2,7 @@ import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
+import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
 import { Geo, GeoFix } from '../core/geo';
 import { Agency, Agent, CardConfig, Subscription } from '../core/models';
@@ -75,7 +76,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly STEP_COUNT = STEP_COUNT;
   readonly payById = payById;
 
-  config: CardConfig = { price: 10000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000, rechargeInitiale: 2500, passPremium: 2000, rechargeInitialeBancaire: 2500, passPremiumBancaire: 2000 };
+  private configStore = inject(ConfigStore);
+  private DEFAULT_CONFIG: CardConfig = { price: 10000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000, rechargeInitiale: 2500, passPremium: 2000, rechargeInitialeBancaire: 2500, passPremiumBancaire: 2000 };
+  get config(): CardConfig { return this.configStore.cfg() ?? this.DEFAULT_CONFIG; }
 
   /** Pickup branches (lieux de retrait) loaded from the server — shown when delivery == agence. */
   agencies = signal<Agency[]>([]);
@@ -129,7 +132,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     // Agent flow starts on the form; the client (QR) flow opens on the welcome screen — unless a
     // draft is being resumed mid-way, in which case skip straight back to where they were.
     this.started.set(!this.isSelf || this.step() > 0);
-    this.api.getConfig().subscribe((c) => (this.config = c));
+    // Ensure store is fresh; components read `this.config` which returns the shared value.
+    this.configStore.refresh();
     this.api.paymentProvider().subscribe({ next: (p) => this.simulated.set(p.provider === 'simulated'), error: () => {} });
     // Pickup branches for the "En agence" option (best-effort — empty list just hides the choice).
     this.api.getAgencies().subscribe({ next: (a) => this.agencies.set(a ?? []), error: () => {} });

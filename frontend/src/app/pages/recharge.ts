@@ -3,6 +3,7 @@ import { Router } from '@angular/router';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
+import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
 import { Geo, GeoFix } from '../core/geo';
 import { Recharge } from '../core/models';
@@ -307,6 +308,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   // Admin-configurable amount bounds (loaded from /api/config); fall back to the defaults until loaded.
   min = signal(MIN_AMOUNT);
   max = signal(MAX_AMOUNT);
+  private configStore = inject(ConfigStore);
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
@@ -324,11 +326,11 @@ export class RechargeComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.restore();
     this.geo.current().then((f) => (this.geoFix = f));
-    // Apply the admin-configured recharge bounds.
-    this.api.getConfig().subscribe({
-      next: (c) => { if (c.rechargeMin) this.min.set(c.rechargeMin); if (c.rechargeMax) this.max.set(c.rechargeMax); },
-      error: () => { /* keep defaults */ },
-    });
+    // Apply the admin-configured recharge bounds from the shared store.
+    this.configStore.refresh();
+    const c = this.configStore.cfg();
+    if (c?.rechargeMin) this.min.set(c.rechargeMin);
+    if (c?.rechargeMax) this.max.set(c.rechargeMax);
     this.api.paymentProvider().subscribe({ next: (p) => this.simulated.set(p.provider === 'simulated'), error: () => {} });
   }
   ngOnDestroy() { this.stopPolling(); }
