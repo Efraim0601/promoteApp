@@ -47,6 +47,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     /** True when this CNI already has a non-failed subscription (one card per CNI). */
     boolean existsByCniNormAndPayStatusNot(String cniNorm, PayStatus payStatus);
 
+    /** Count non-failed subscriptions for this CNI (limit to 2 cards max per person). */
+    long countByCniNormAndPayStatusNot(String cniNorm, PayStatus payStatus);
+
     /** Backfill {@link Subscription#getCniNorm()} for legacy CNI rows (batch-limited). */
     @Query("select s from Subscription s where s.cniNorm is null and s.cni is not null and s.cni <> '' "
             + "and (s.docType is null or lower(s.docType) = 'cni')")
@@ -66,6 +69,19 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     long countByCashCollectedByIdAndCashCollectedAtGreaterThanEqual(String cashCollectedById, Instant since);
     long countByAgentId(String agentId);
     long countByAgentIdIsNull();
+
+    /**
+     * Search subscription by ref, full_name, phone digits, cni, email, pan or card_number.
+     * Uses a native query for efficient SQL matching and limits results to 30 most recent.
+     */
+    @Query(value = "select * from subscription s where "
+            + "(lower(s.ref) like concat('%', :needle, '%') or lower(s.full_name) like concat('%', :needle, '%') "
+            + "or lower(s.cni) like concat('%', :needle, '%') or lower(s.email) like concat('%', :needle, '%')) "
+            + "or (:digits <> '' and (regexp_replace(coalesce(s.phone,''), '\\\\D', '', 'g') like concat('%', :digits, '%') "
+            + "or regexp_replace(coalesce(s.pan,''), '\\\\D', '', 'g') like concat('%', :digits, '%') "
+            + "or coalesce(s.card_number,'') like concat('%', :digits, '%'))) "
+            + "order by s.created_at desc limit 30", nativeQuery = true)
+    List<Subscription> searchByAny(@Param("needle") String needle, @Param("digits") String digits);
 
     @Query("select coalesce(sum(s.amount), 0) from Subscription s where s.payStatus = :st")
     long sumAmountByPayStatus(@Param("st") PayStatus st);

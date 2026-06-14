@@ -192,13 +192,13 @@ public class SubscriptionService {
             }
         }
 
-        // One Promote card per CNI: block a second subscription while any earlier one is still
+        // Two Promote cards per CNI max: block a third subscription while any earlier ones are still
         // active (pending / paid / cash / SARA). A failed attempt may be retried with the same CNI.
         if (isCniDocument(req.docType()) && !isValidCniFormat(req.cni())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cni_invalid");
         }
         if (isCniDocument(req.docType()) && !normCniMatch(req.cni()).isEmpty()
-                && subs.existsByCniNormAndPayStatusNot(normCniMatch(req.cni()), PayStatus.failed)) {
+                && subs.countByCniNormAndPayStatusNot(normCniMatch(req.cni()), PayStatus.failed) >= 2) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "cni_exists");
         }
 
@@ -413,17 +413,8 @@ public class SubscriptionService {
         if (q == null || q.isBlank()) return List.of();
         String needle = q.trim().toLowerCase();
         String digits = q.replaceAll("\\D", "");
-        return subs.findAll().stream()
-                .filter(s -> {
-                    boolean byRef = s.getRef() != null && s.getRef().toLowerCase().contains(needle);
-                    boolean byName = s.getFullName() != null && s.getFullName().toLowerCase().contains(needle);
-                    boolean byPhone = !digits.isEmpty() && s.getPhone() != null
-                            && s.getPhone().replaceAll("\\D", "").contains(digits);
-                    return byRef || byName || byPhone;
-                })
-                .sorted(java.util.Comparator.comparing(Subscription::getCreatedAt).reversed())
-                .limit(30)
-                .toList();
+        // Use repository native query to perform SQL-side search over several columns efficiently.
+        return subs.searchByAny(needle, digits == null ? "" : digits);
     }
 
     @Transactional
