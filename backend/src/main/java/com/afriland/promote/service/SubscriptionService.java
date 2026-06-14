@@ -612,7 +612,7 @@ public class SubscriptionService {
      * {@code reject} → {@code failed} (+ reason, e.g. the client never showed up to pay).
      */
     @Transactional
-    public Subscription validateCash(String ref, String outcome, String reason, String cashierId) {
+    public Subscription validateCash(String ref, String outcome, String reason, String cashierId, String paymentReference) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         if (s.getPayStatus() != PayStatus.cash) return s;
         if ("validate".equalsIgnoreCase(outcome)) {
@@ -623,6 +623,7 @@ public class SubscriptionService {
             s.setCashCollectedBy(cashierName(cashierId));
             s.setCashCollectedById(cashierId);
             s.setCashCollectedAt(Instant.now());
+            s.setCashPaymentReference(blankToNull(paymentReference));
         } else {
             s.markFailed();
             s.setPaymentMessage(reason == null || reason.isBlank() ? "Paiement espèces non perçu" : reason.trim());

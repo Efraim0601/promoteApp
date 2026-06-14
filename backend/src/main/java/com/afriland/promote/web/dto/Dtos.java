@@ -180,7 +180,7 @@ public final class Dtos {
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
             String saraRef, String saraPayerPhone, Integer saraAmount, String cardNumber, String pan,
-            String cashCollectedBy, String cashCollectedAt,
+            String cashCollectedBy, String cashCollectedAt, String cashPaymentReference,
             String status, String createdAt, String paymentMessage, String failureCategory) {
         public static SubscriptionDto of(Subscription s) {
             // Failure category (for the failure-analysis view) — only meaningful on a failed payment.
@@ -197,6 +197,7 @@ public final class Dtos {
                     s.getSaraReceiptKey() != null,
                     s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(), s.getCardNumber(), s.getPan(),
                     s.getCashCollectedBy(), s.getCashCollectedAt() == null ? null : s.getCashCollectedAt().toString(),
+                    s.getCashPaymentReference(),
                     s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage(), failCat);
         }
     }
@@ -218,7 +219,7 @@ public final class Dtos {
 
     /** Cashier decision on an in-person cash payment. {@code outcome} = "validate" (→ paid) |
      *  "reject" (→ failed, with an optional reason, e.g. the client never paid). */
-    public record CashValidateRequest(String outcome, String reason) {}
+    public record CashValidateRequest(String outcome, String reason, String paymentReference) {}
 
     /** Lightweight, public payment status for the client polling the result. */
     public record PaymentStatusDto(String ref, String payStatus, String message) {}

@@ -94,6 +94,7 @@ export interface Subscription {
   pan?: string | null;             // PAN (Primary Account Number), captured at card activation
   cashCollectedBy?: string | null; // cashier who validated the in-person cash payment
   cashCollectedAt?: string | null; // when the cash was collected (ISO instant)
+  cashPaymentReference?: string | null; // GAB/external payment reference entered when validating cash
   status: string;     // printed | failed | cash | sara_pending | awaiting
   createdAt: string;
   paymentMessage?: string | null;  // aggregator reason on failure (e.g. "Solde insuffisant")

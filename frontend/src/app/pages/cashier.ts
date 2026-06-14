@@ -40,13 +40,14 @@ import { SpinnerComponent } from '../shared/spinner';
         </button>
       }
 
-      <!-- Tabs: cash desk vs recharge validation. -->
+      <!-- Tabs: cash/GAB collection vs recharge validation. -->
       <div style="display:flex;gap:8px">
-        <button class="btn" [class.btn-primary]="mode()==='caisse'" [class.btn-outline]="mode()!=='caisse'" (click)="setMode('caisse')" style="flex:1;padding:9px;font-size:13px"><ic name="store" [size]="16"></ic> {{ i18n.t('cash_tab_cash') }}</button>
+        <button class="btn" [class.btn-primary]="mode()==='especes'" [class.btn-outline]="mode()!=='especes'" (click)="setMode('especes')" style="flex:1;padding:9px;font-size:13px"><ic name="store" [size]="16"></ic> {{ i18n.t('cash_tab_cash') }}</button>
+        <button class="btn" [class.btn-primary]="mode()==='gab'" [class.btn-outline]="mode()!=='gab'" (click)="setMode('gab')" style="flex:1;padding:9px;font-size:13px"><ic name="hash" [size]="16"></ic> {{ i18n.t('cash_tab_gab') }}</button>
         <button class="btn" [class.btn-primary]="mode()==='recharges'" [class.btn-outline]="mode()!=='recharges'" (click)="setMode('recharges')" style="flex:1;padding:9px;font-size:13px"><ic name="phone" [size]="16"></ic> {{ i18n.t('cash_tab_recharges') }}@if (pendingRch().length) { <span style="margin-left:5px;background:var(--warning);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ pendingRch().length }}</span> }</button>
       </div>
 
-      @if (mode() === 'caisse') {
+      @if (mode() === 'especes' || mode() === 'gab') {
       <!-- The cashier can also initiate a new subscription or a recharge (hidden while viewing a record). -->
       @if (!rec() && !rRec()) {
         <div style="display:flex;gap:10px;flex-wrap:wrap">
@@ -158,6 +159,7 @@ import { SpinnerComponent } from '../shared/spinner';
                 <div class="srow total"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
               }
               @if (r.cashCollectedBy) { <div class="srow"><span class="lbl">{{ i18n.t('cash_collected_by') }}</span><span class="val">{{ r.cashCollectedBy }}</span></div> }
+              @if (r.cashPaymentReference) { <div class="srow"><span class="lbl">{{ i18n.t('cash_payment_reference') }}</span><span class="val">{{ r.cashPaymentReference }}</span></div> }
             </div>
             @if (r.payStatus !== 'cash') {
               <div style="padding:0 16px 16px">
@@ -186,6 +188,7 @@ import { SpinnerComponent } from '../shared/spinner';
             <h2 style="font-size:18px">{{ i18n.t('cash_validated_ok') }}</h2>
             <div style="font-weight:800;letter-spacing:.06em;white-space:nowrap">{{ r.ref }}</div>
             <div style="font-size:18px;font-weight:800;color:var(--success)">{{ i18n.money(r.amount) }}</div>
+            @if (r.cashPaymentReference) { <div class="muted" style="font-size:12px">{{ i18n.t('cash_payment_reference') }} · {{ r.cashPaymentReference }}</div> }
             <p class="muted" style="font-size:12.5px;line-height:1.4">{{ i18n.t('cash_handover_hint') }}</p>
           </div>
         } @else {
@@ -219,6 +222,7 @@ import { SpinnerComponent } from '../shared/spinner';
               @if (r.cashCollectedBy) {
                 <div class="srow"><span class="lbl">{{ i18n.t('cash_collected_by') }}</span><span class="val">{{ r.cashCollectedBy }}</span></div>
               }
+              @if (r.cashPaymentReference) { <div class="srow"><span class="lbl">{{ i18n.t('cash_payment_reference') }}</span><span class="val">{{ r.cashPaymentReference }}</span></div> }
             </div>
 
             <!-- The record is not a pending cash payment: nothing to collect here. -->
@@ -232,9 +236,7 @@ import { SpinnerComponent } from '../shared/spinner';
             }
           </div>
         }
-      }
-      } @else {
-        <!-- ===== Recharges à valider (créditer la carte puis valider) ===== -->
+      } @else if (mode() === 'recharges') {
         <div>
           <h2 style="font-size:17px;margin-bottom:2px">{{ i18n.t('cash_rch_title') }}</h2>
           <p class="muted" style="font-size:12.5px;line-height:1.4">{{ i18n.t('cash_rch_sub') }}</p>
@@ -301,8 +303,8 @@ import { SpinnerComponent } from '../shared/spinner';
       } @else if (r.payStatus === 'cash') {
         <div class="scr-foot">
           @if (err()) { <div class="feedback err-box" style="font-size:12.5px"><ic name="alert" [size]="18" style="flex-shrink:0"></ic> {{ i18n.t('cash_error') }}</div> }
-          <button class="btn btn-primary" (click)="doValidate(r.ref)" [disabled]="busy()">
-            @if (busy()) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('cash_validate') }} }
+          <button class="btn btn-primary" (click)="mode() === 'gab' ? doValidateGab(r.ref) : doValidate(r.ref)" [disabled]="busy()">
+            @if (busy()) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ mode() === 'gab' ? i18n.t('cash_validate_gab') : i18n.t('cash_validate') }} }
           </button>
           <div style="display:flex;gap:10px">
             <button class="btn btn-ghost" (click)="doReject(r.ref)" [disabled]="busy()" style="font-size:13px;color:var(--accent)"><ic name="x" [size]="16"></ic> {{ i18n.t('cash_reject') }}</button>
@@ -358,12 +360,14 @@ export class CashierComponent implements OnInit, OnDestroy {
   private objectUrls: string[] = [];
 
   // ---- recharge fulfillment (cashier credits the card after payment, then validates) ----
-  mode = signal<'caisse' | 'recharges'>('caisse');
+  mode = signal<'especes' | 'gab' | 'recharges'>('especes');
   rchView = signal<'queue' | 'all'>('queue');
   pendingRch = signal<Recharge[]>([]);     // paid, not yet credited — the validation queue
   allRch = signal<Recharge[]>([]);
   allRchLoading = signal(false);
   fulfilling = signal<string | null>(null); // ref being validated
+  gabPaymentReference = signal('');
+  gabTouched = signal(false);
   newAlert = signal(false);                  // strong alert when a new recharge enters the queue
   private prevPending = -1;
 
@@ -424,7 +428,7 @@ export class CashierComponent implements OnInit, OnDestroy {
     } catch { /* audio unavailable — the visual banner still shows */ }
   }
 
-  setMode(m: 'caisse' | 'recharges') {
+  setMode(m: 'especes' | 'gab' | 'recharges') {
     this.mode.set(m);
     if (m === 'recharges') { this.newAlert.set(false); this.loadPending(); if (this.rchView() === 'all') this.loadAllRch(); }
   }
@@ -522,6 +526,7 @@ export class CashierComponent implements OnInit, OnDestroy {
     this.ref.set(''); this.searched.set(false); this.rec.set(null); this.results.set([]);
     this.rRec.set(null); this.rechargeResults.set([]); this.rValidated.set(false);
     this.justValidated.set(false); this.err.set(false); this.clear();
+    this.gabPaymentReference.set(''); this.gabTouched.set(false);
   }
 
   /** Validate / reject a cash recharge (mirrors the subscription cash flow). */
@@ -553,6 +558,17 @@ export class CashierComponent implements OnInit, OnDestroy {
     this.busy.set(true); this.err.set(false);
     this.api.cashValidate(ref, 'validate').subscribe({
       next: (s) => { this.rec.set(s); this.busy.set(false); this.justValidated.set(true); this.loadStats(); },
+      error: () => { this.busy.set(false); this.err.set(true); },
+    });
+  }
+
+  /** Validate a GAB collection: same cash record, but require the client payment reference. */
+  doValidateGab(ref: string) {
+    if (this.busy()) return;
+    if (!this.gabPaymentReference().trim()) { this.gabTouched.set(true); return; }
+    this.busy.set(true); this.err.set(false);
+    this.api.cashValidate(ref, 'validate', undefined, this.gabPaymentReference().trim()).subscribe({
+      next: (s) => { this.rec.set(s); this.busy.set(false); this.justValidated.set(true); this.gabPaymentReference.set(''); this.gabTouched.set(false); this.loadStats(); },
       error: () => { this.busy.set(false); this.err.set(true); },
     });
   }

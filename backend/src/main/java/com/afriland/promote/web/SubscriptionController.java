@@ -122,7 +122,7 @@ public class SubscriptionController {
     @PatchMapping("/{ref}/cash-validate")
     public SubscriptionDto cashValidate(@PathVariable String ref, @RequestBody CashValidateRequest req,
                                         Authentication auth) {
-        return SubscriptionDto.of(service.validateCash(ref, req.outcome(), req.reason(), (String) auth.getPrincipal()));
+        return SubscriptionDto.of(service.validateCash(ref, req.outcome(), req.reason(), (String) auth.getPrincipal(), req.paymentReference()));
     }
 
     /** Agent claims a paid, unattributed QR sale (optionally capturing the client's NIU). */

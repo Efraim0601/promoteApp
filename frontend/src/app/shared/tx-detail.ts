@@ -76,6 +76,8 @@ import { ReceiptService } from './receipt';
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_channel') }}</span><span class="val">{{ t.channel === 'self' ? i18n.t('online_channel') : (sellerName ? (i18n.t('tx_agent') + ' · ' + sellerName) : i18n.t('tx_agent')) }}</span></div>
         @if (t.cardNumber) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pp_card_number') }}</span><span class="val">{{ t.cardNumber }}</span></div> }
         @if (t.pan) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('pp_pan') }}</span><span class="val">{{ fmtPan(t.pan) }}</span></div> }
+        @if (t.cashCollectedBy) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('cash_collected_by') }}</span><span class="val">{{ t.cashCollectedBy }}</span></div> }
+        @if (t.cashPaymentReference) { <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('cash_payment_reference') }}</span><span class="val">{{ t.cashPaymentReference }}</span></div> }
         <div class="srow total" style="padding:8px 0"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(t.amount) }}</span></div>
       </div>
 

@@ -57,7 +57,7 @@ class StatsServiceTest {
         assertTrue(p.totalPrinted() >= 1);
 
         // Cashier validates the cash payment → cashier KPIs reflect it.
-        service.validateCash(cash.getRef(), "validate", null, cashier);
+        service.validateCash(cash.getRef(), "validate", null, cashier, null);
         CashierStats c = stats.cashierStats(cashier);
         assertEquals(1, c.myCount());
         assertEquals(cash.getAmount(), c.myCollected());

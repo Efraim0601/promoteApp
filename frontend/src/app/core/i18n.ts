@@ -322,6 +322,7 @@ const FR: Record<string, string> = {
   cash_title: 'Espace caissier',
   cash_sub: 'Retrouvez une souscription, vérifiez l’identité du client et validez l’encaissement en espèces.',
   cash_validate: 'Valider l’encaissement espèces',
+  cash_validate_gab: 'Valider l’encaissement GAB',
   cash_reject: 'Signaler non payé',
   cash_reject_reason: 'Motif (paiement espèces non perçu) :',
   cash_validated_ok: 'Encaissement validé',
@@ -329,6 +330,9 @@ const FR: Record<string, string> = {
   cash_recharges: 'Recharges', cash_recharge_record: 'Recharge de carte',
   pp_recharges: 'Recharges', pp_recharge_record: 'Recharge de carte',
   cash_collected_by: 'Encaissé par',
+  cash_payment_reference: 'Référence de paiement',
+  cash_payment_reference_ph: 'Ex. 1234567890',
+  cash_payment_reference_required: 'La référence de paiement est obligatoire.',
   cash_not_cash: 'Cette souscription n’est pas un paiement en espèces à encaisser (déjà réglée ou autre mode).',
   cash_error: 'Échec de la validation. Réessayez.',
   // --- KPIs imprimeur / caissier ---
@@ -351,7 +355,7 @@ const FR: Record<string, string> = {
   st_paid: 'Payée', st_pending: 'Paiement en attente', st_to_print: 'Payée — à imprimer', st_awaiting: 'KYC en attente', st_cash: 'À payer (espèces)', st_sara_pending: 'SARA — à valider', st_failed: 'Échouée', st_printed: 'Imprimée',
   st_to_fulfill: 'Payée — à créditer', st_fulfilled: 'Rechargée',
   // ---- cashier: recharge fulfillment queue ----
-  cash_tab_cash: 'Encaissement', cash_tab_recharges: 'Recharges',
+  cash_tab_cash: 'Encaissement espèces', cash_tab_gab: 'Encaissement GAB', cash_tab_recharges: 'Recharges',
   cash_rch_title: 'Recharges à valider', cash_rch_sub: 'Créditez la carte du client, puis validez la recharge.',
   cash_rch_queue: 'À valider', cash_rch_done: 'Validées', cash_rch_all: 'Toutes',
   cash_rch_empty: 'Aucune recharge à valider pour le moment.',
@@ -784,6 +788,7 @@ const EN: Record<string, string> = {
   cash_title: 'Cashier desk',
   cash_sub: 'Find a subscription, verify the client’s identity, then validate the cash payment.',
   cash_validate: 'Validate cash payment',
+  cash_validate_gab: 'Validate GAB payment',
   cash_reject: 'Report not paid',
   cash_reject_reason: 'Reason (cash payment not collected):',
   cash_validated_ok: 'Cash payment validated',
@@ -791,6 +796,9 @@ const EN: Record<string, string> = {
   cash_recharges: 'Recharges', cash_recharge_record: 'Card recharge',
   pp_recharges: 'Recharges', pp_recharge_record: 'Card recharge',
   cash_collected_by: 'Collected by',
+  cash_payment_reference: 'Payment reference',
+  cash_payment_reference_ph: 'e.g. 1234567890',
+  cash_payment_reference_required: 'Payment reference is required.',
   cash_not_cash: 'This subscription is not a cash payment to collect (already settled or another method).',
   cash_error: 'Validation failed. Please retry.',
   // --- printer / cashier KPIs ---
@@ -813,7 +821,7 @@ const EN: Record<string, string> = {
   st_paid: 'Paid', st_pending: 'Payment pending', st_to_print: 'Paid — to print', st_awaiting: 'Pending KYC', st_cash: 'Cash due', st_sara_pending: 'SARA — to validate', st_failed: 'Failed', st_printed: 'Printed',
   st_to_fulfill: 'Paid — to credit', st_fulfilled: 'Recharged',
   // ---- cashier: recharge fulfillment queue ----
-  cash_tab_cash: 'Cash desk', cash_tab_recharges: 'Recharges',
+  cash_tab_cash: 'Cash payment', cash_tab_gab: 'GAB payment', cash_tab_recharges: 'Recharges',
   cash_rch_title: 'Recharges to validate', cash_rch_sub: 'Credit the customer\'s card, then validate the recharge.',
   cash_rch_queue: 'To validate', cash_rch_done: 'Validated', cash_rch_all: 'All',
   cash_rch_empty: 'No recharge to validate right now.',

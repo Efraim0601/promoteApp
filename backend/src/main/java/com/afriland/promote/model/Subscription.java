@@ -146,6 +146,7 @@ public class Subscription implements Payable {
     private String cashCollectedBy;     // cashier display name (shown on screens)
     private String cashCollectedById;   // cashier id (stats attribution)
     private Instant cashCollectedAt;
+    private String cashPaymentReference; // GAB/external payment reference entered by cashier when validating cash
 
     /** Resolve a stored image key by kind. */
     @Transient
