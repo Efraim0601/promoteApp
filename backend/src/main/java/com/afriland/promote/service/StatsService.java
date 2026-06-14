@@ -187,7 +187,7 @@ public class StatsService {
         // — window totals —
         long totalCreated = window.size();
         long totalPaid    = window.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
-        long totalPrinted = window.stream().filter(Subscription::isPrinted).count();
+        // totalPrinted is derived from printedInWindow (by printedAt), computed below after that query.
         long totalFailed  = window.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
         long awaitingPrint    = window.stream()
                 .filter(s -> s.getPayStatus() == PayStatus.paid && !s.isPrinted()).count();
@@ -195,7 +195,6 @@ public class StatsService {
                 .filter(s -> s.getPayStatus() == PayStatus.pending || s.getPayStatus() == PayStatus.cash).count();
 
         double convRate    = totalCreated == 0 ? 0 : (totalPaid * 100.0 / totalCreated);
-        double printRate   = totalPaid    == 0 ? 0 : (totalPrinted * 100.0 / totalPaid);
         double failureRate = totalCreated == 0 ? 0 : (totalFailed * 100.0 / totalCreated);
 
         // — today (absolute, not filtered by the window) —
@@ -231,7 +230,12 @@ public class StatsService {
         perAgent.sort(Comparator.comparingLong(AgentKpi::paid).reversed());
 
         // — daily trend —
-        List<DailyBucket> trend = buildDailyTrend(window, from, to, zone);
+        // Printed cards bucketed by printedAt (not createdAt) — includes cards created before the
+        // window that were printed within it, and excludes cards created in the window but printed later.
+        List<Subscription> printedInWindow = subs.findByPrintedTrueAndPrintedAtBetween(fromInst, toInst.minusSeconds(1));
+        long totalPrinted = printedInWindow.size();
+        double printRate  = totalPaid == 0 ? 0 : (totalPrinted * 100.0 / totalPaid);
+        List<DailyBucket> trend = buildDailyTrend(window, printedInWindow, from, to, zone);
 
         return new DashboardStats(
                 todayCreated, todayPaid, todayPrinted, todayFailed,
@@ -242,7 +246,8 @@ public class StatsService {
     }
 
     private List<DailyBucket> buildDailyTrend(
-            List<Subscription> window, LocalDate from, LocalDate to, ZoneId zone) {
+            List<Subscription> window, List<Subscription> printedInWindow,
+            LocalDate from, LocalDate to, ZoneId zone) {
         long days = java.time.temporal.ChronoUnit.DAYS.between(from, to) + 1;
         int window_size = (int) Math.min(days, 90);
         LocalDate start = to.minusDays(window_size - 1L);
@@ -250,6 +255,7 @@ public class StatsService {
         Map<LocalDate, long[]> buckets = new TreeMap<>();
         for (int i = 0; i < window_size; i++) buckets.put(start.plusDays(i), new long[5]); // created,paid,printed,failed,amount
 
+        // created / paid / failed / amount — bucketed by the subscription's createdAt
         for (Subscription s : window) {
             if (s.getCreatedAt() == null) continue;
             LocalDate day = s.getCreatedAt().atZone(zone).toLocalDate();
@@ -257,8 +263,14 @@ public class StatsService {
             if (b == null) continue;
             b[0]++;
             if (s.getPayStatus() == PayStatus.paid)   { b[1]++; b[4] += s.getAmount(); }
-            if (s.isPrinted())                          b[2]++;
             if (s.getPayStatus() == PayStatus.failed)  b[3]++;
+        }
+        // printed — bucketed by printedAt (the day the physical card was actually produced)
+        for (Subscription s : printedInWindow) {
+            if (s.getPrintedAt() == null) continue;
+            LocalDate day = s.getPrintedAt().atZone(zone).toLocalDate();
+            long[] b = buckets.get(day);
+            if (b != null) b[2]++;
         }
         List<DailyBucket> out = new ArrayList<>(window_size);
         for (var e : buckets.entrySet()) {

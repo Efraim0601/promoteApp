@@ -101,6 +101,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findByCreatedAtGreaterThanEqualAndCreatedAtLessThanEqualOrderByCreatedAtAsc(
             Instant from, Instant to);
 
+    /** Monitoring dashboard — cards actually printed in a given window (bucketed by printedAt). */
+    List<Subscription> findByPrintedTrueAndPrintedAtBetween(Instant from, Instant to);
+
     /** Monitoring dashboard — count all subscriptions created since a given instant. */
     long countByCreatedAtGreaterThanEqual(Instant since);
 
