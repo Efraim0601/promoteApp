@@ -393,6 +393,7 @@ export interface DailyBucket {
   paid: number;
   printed: number;
   failed: number;
+  amount: number;    // total FCFA collected (paid subscriptions)
 }
 
 export interface AgentKpi {

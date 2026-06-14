@@ -2,6 +2,7 @@ import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import * as XLSX from 'xlsx';
 import { Api } from '../core/api';
 import { I18n } from '../core/i18n';
 import { AgentKpi, DailyBucket, DashboardStats } from '../core/models';
@@ -33,6 +34,11 @@ import { IconComponent } from '../shared/icon';
       <button class="refresh-btn" (click)="load()" [disabled]="loading()">
         <ic name="refresh" [size]="15"></ic> {{ t('dash_refresh') }}
       </button>
+      @if (stats()) {
+        <button class="export-btn" (click)="exportExcel()">
+          <ic name="download" [size]="15"></ic> Export Excel
+        </button>
+      }
     </div>
   </div>
 
@@ -378,6 +384,12 @@ import { IconComponent } from '../shared/icon';
     }
     .refresh-btn:hover { background: #4f46e5; }
     .refresh-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .export-btn {
+      display: flex; align-items: center; gap: 6px;
+      padding: 8px 16px; background: #059669; color: #fff;
+      border: none; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600;
+    }
+    .export-btn:hover { background: #047857; }
 
     /* ---- Loading / Error ---- */
     .dash-loading { display: flex; align-items: center; gap: 10px; padding: 40px; color: #6b7280; }
@@ -650,4 +662,87 @@ export class DashboardComponent implements OnInit {
     if (n <= 15) return 2;
     return Math.ceil(n / 10);
   });
+
+  // ---- Excel export ----
+
+  exportExcel() {
+    const s = this.stats();
+    if (!s) return;
+
+    const FR_DAYS = ['Dim.', 'Lun.', 'Mar.', 'Mer.', 'Jeu.', 'Ven.', 'Sam.'];
+
+    const dayLabel = (dateStr: string) => {
+      const d = new Date(dateStr + 'T12:00:00');
+      const [, mm, dd] = dateStr.split('-');
+      return `${FR_DAYS[d.getDay()]} ${dd}/${mm}`;
+    };
+
+    const fmt = (n: number) => n.toLocaleString('fr-FR');
+
+    // ---- Sheet 1: Résumé journalier ----
+    const summaryRows: (string | number)[][] = [
+      ['Tableau de bord — Monitoring Afriland Carte Promote'],
+      [`Période : ${this.filterFrom} → ${this.filterTo}`],
+      [],
+      ['Jour', 'Paiements confirmés', 'Cartes produites', 'Volume (FCFA)'],
+    ];
+
+    let totPaid = 0, totPrinted = 0, totAmount = 0;
+    for (const d of s.dailyTrend) {
+      if (d.paid === 0 && d.printed === 0 && d.amount === 0) continue; // skip empty days
+      summaryRows.push([dayLabel(d.date), d.paid, d.printed, d.amount]);
+      totPaid    += d.paid;
+      totPrinted += d.printed;
+      totAmount  += d.amount;
+    }
+    summaryRows.push(['TOTAL', totPaid, totPrinted, totAmount]);
+
+    const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
+
+    // Widths
+    ws1['!cols'] = [{ wch: 16 }, { wch: 22 }, { wch: 18 }, { wch: 18 }];
+
+    // Style: title merge
+    ws1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }];
+
+    // ---- Sheet 2: Performance par commercial ----
+    const agentRows: (string | number)[][] = [
+      ['Commercial', 'Agence', 'Total', 'Encaissés', 'Imprimés', 'Échecs', 'Conv. %', 'Impr. %', 'Échec %', 'Auj.'],
+    ];
+    for (const a of s.perAgent) {
+      agentRows.push([
+        a.name,
+        a.agency ?? '',
+        a.total,
+        a.paid,
+        a.printed,
+        a.failed,
+        parseFloat(a.conversionRate.toFixed(1)),
+        parseFloat(a.printRate.toFixed(1)),
+        parseFloat(a.failureRate.toFixed(1)),
+        a.todayTotal,
+      ]);
+    }
+    const ws2 = XLSX.utils.aoa_to_sheet(agentRows);
+    ws2['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 8 }, { wch: 9 }, { wch: 9 }, { wch: 9 }, { wch: 6 }];
+
+    // ---- Sheet 3: Évolution journalière complète ----
+    const trendRows: (string | number)[][] = [
+      ['Date', 'Souscriptions', 'Encaissements', 'Impressions', 'Échecs', 'Volume (FCFA)'],
+    ];
+    for (const d of s.dailyTrend) {
+      trendRows.push([dayLabel(d.date), d.created, d.paid, d.printed, d.failed, d.amount]);
+    }
+    const ws3 = XLSX.utils.aoa_to_sheet(trendRows);
+    ws3['!cols'] = [{ wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 10 }, { wch: 18 }];
+
+    // ---- Workbook ----
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Résumé journalier');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Commerciaux');
+    XLSX.utils.book_append_sheet(wb, ws3, 'Évolution');
+
+    const filename = `monitoring_${this.filterFrom}_${this.filterTo}.xlsx`;
+    XLSX.writeFile(wb, filename);
+  }
 }

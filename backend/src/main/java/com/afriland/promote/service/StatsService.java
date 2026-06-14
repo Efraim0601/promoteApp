@@ -248,7 +248,7 @@ public class StatsService {
         LocalDate start = to.minusDays(window_size - 1L);
 
         Map<LocalDate, long[]> buckets = new TreeMap<>();
-        for (int i = 0; i < window_size; i++) buckets.put(start.plusDays(i), new long[4]); // created,paid,printed,failed
+        for (int i = 0; i < window_size; i++) buckets.put(start.plusDays(i), new long[5]); // created,paid,printed,failed,amount
 
         for (Subscription s : window) {
             if (s.getCreatedAt() == null) continue;
@@ -256,14 +256,14 @@ public class StatsService {
             long[] b = buckets.get(day);
             if (b == null) continue;
             b[0]++;
-            if (s.getPayStatus() == PayStatus.paid)    b[1]++;
-            if (s.isPrinted())                         b[2]++;
+            if (s.getPayStatus() == PayStatus.paid)   { b[1]++; b[4] += s.getAmount(); }
+            if (s.isPrinted())                          b[2]++;
             if (s.getPayStatus() == PayStatus.failed)  b[3]++;
         }
         List<DailyBucket> out = new ArrayList<>(window_size);
         for (var e : buckets.entrySet()) {
             long[] b = e.getValue();
-            out.add(new DailyBucket(e.getKey().toString(), b[0], b[1], b[2], b[3]));
+            out.add(new DailyBucket(e.getKey().toString(), b[0], b[1], b[2], b[3], b[4]));
         }
         return out;
     }

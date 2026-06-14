@@ -338,7 +338,7 @@ public final class Dtos {
     // ---- monitoring dashboard ----
 
     /** One day in the executive monitoring trend chart. */
-    public record DailyBucket(String date, long created, long paid, long printed, long failed) {}
+    public record DailyBucket(String date, long created, long paid, long printed, long failed, long amount) {}
 
     /** Per-agent KPIs for the monitoring dashboard. */
     public record AgentKpi(
