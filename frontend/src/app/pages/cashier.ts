@@ -12,13 +12,14 @@ import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
+import { PhotoCaptureComponent } from '../shared/photo-capture';
 
 /** Cashier — retrieve a subscription, verify the client's identity, then validate the in-person
  *  cash payment (cash → paid). The printed card is then handed over at the print point. */
 @Component({
   selector: 'page-cashier',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -212,6 +213,38 @@ import { SpinnerComponent } from '../shared/spinner';
                 <div class="muted" style="font-size:12px;margin-top:2px">{{ r.phone }}@if (r.email) { · {{ r.email }}}</div>
               </div>
             </div>
+            <!-- Reprise photos (selfie + CNI recto/verso) -->
+            @if (retakingPhoto()) {
+              <div style="padding:0 16px 12px">
+                <photo-capture [facing]="retakingPhoto() === 'selfie' ? 'user' : 'environment'"
+                  [round]="retakingPhoto() === 'selfie'" [allowFlip]="retakingPhoto() === 'selfie'"
+                  [boxW]="retakingPhoto() === 'selfie' ? 200 : 280" [boxH]="retakingPhoto() === 'selfie' ? 200 : 160"
+                  (captured)="onRetakePhoto(r.ref, retakingPhoto()!, $event)" (retake)="retakingPhoto.set(null)"></photo-capture>
+                @if (retakeBusy()) { <div class="muted" style="font-size:12px;margin-top:4px;text-align:center">{{ i18n.t('pp_photo_saving') }}</div> }
+                @else { <button class="btn btn-ghost" (click)="retakingPhoto.set(null)" style="font-size:13px;margin-top:6px">{{ i18n.t('cancel') }}</button> }
+              </div>
+            } @else {
+              <div style="padding:0 16px 10px;display:flex;gap:8px">
+                <div style="flex:1;text-align:center">
+                  @if (selfieUrl()) { <img [src]="selfieUrl()" alt="selfie" (click)="preview.open(selfieUrl())" style="width:100%;height:68px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" /> }
+                  @else { <div style="height:68px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="user" [size]="20"></ic></div> }
+                  <div class="muted" style="font-size:10px;margin-top:2px">{{ i18n.t('tx_photo_client') }}</div>
+                  <button class="btn btn-ghost" (click)="retakingPhoto.set('selfie')" style="padding:2px 7px;font-size:10px;margin-top:2px" [title]="i18n.t('pp_retake_photo')"><ic name="camera" [size]="11"></ic></button>
+                </div>
+                <div style="flex:1;text-align:center">
+                  @if (rectoUrl()) { <img [src]="rectoUrl()" alt="CNI recto" (click)="preview.open(rectoUrl())" style="width:100%;height:68px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" /> }
+                  @else { <div style="height:68px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="20"></ic></div> }
+                  <div class="muted" style="font-size:10px;margin-top:2px">{{ i18n.t('pp_cni_recto') }}</div>
+                  <button class="btn btn-ghost" (click)="retakingPhoto.set('cni-recto')" style="padding:2px 7px;font-size:10px;margin-top:2px" [title]="i18n.t('pp_retake_recto')"><ic name="camera" [size]="11"></ic></button>
+                </div>
+                <div style="flex:1;text-align:center">
+                  @if (versoUrl()) { <img [src]="versoUrl()" alt="CNI verso" (click)="preview.open(versoUrl())" style="width:100%;height:68px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" /> }
+                  @else { <div style="height:68px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="20"></ic></div> }
+                  <div class="muted" style="font-size:10px;margin-top:2px">{{ i18n.t('pp_cni_verso') }}</div>
+                  <button class="btn btn-ghost" (click)="retakingPhoto.set('cni-verso')" style="padding:2px 7px;font-size:10px;margin-top:2px" [title]="i18n.t('pp_retake_verso')"><ic name="camera" [size]="11"></ic></button>
+                </div>
+              </div>
+            }
             <div style="padding:0 16px 14px">
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm(r).bg" [style.color]="pm(r).fg" style="width:22px;height:22px;font-size:9px;border-radius:6px;overflow:hidden">@if (pm(r).logo) { <img [src]="pm(r).logo" [alt]="pm(r).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(r).short }} }</span>{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : pm(r).name }}</span></div>
               @if (r.payStatus === 'cash') {
@@ -355,6 +388,10 @@ export class CashierComponent implements OnInit, OnDestroy {
   rValidated = signal(false);
   stats = signal<CashierStats | null>(null);
   selfieUrl = signal<SafeUrl | null>(null);
+  rectoUrl = signal<SafeUrl | null>(null);
+  versoUrl = signal<SafeUrl | null>(null);
+  retakingPhoto = signal<string | null>(null);
+  retakeBusy = signal(false);
   busy = signal(false);
   err = signal(false);
   justValidated = signal(false);
@@ -590,6 +627,8 @@ export class CashierComponent implements OnInit, OnDestroy {
     this.rec.set(s);
     this.justValidated.set(false);
     if (s.hasSelfie) this.loadImage(s.ref, 'selfie', this.selfieUrl);
+    if (s.hasCniRecto) this.loadImage(s.ref, 'cni-recto', this.rectoUrl);
+    if (s.hasCniVerso) this.loadImage(s.ref, 'cni-verso', this.versoUrl);
   }
 
   private loadImage(ref: string, kind: string, target: { set: (v: SafeUrl | null) => void }) {
@@ -606,7 +645,24 @@ export class CashierComponent implements OnInit, OnDestroy {
   private clear() {
     this.objectUrls.forEach((u) => URL.revokeObjectURL(u));
     this.objectUrls = [];
-    this.selfieUrl.set(null);
+    this.selfieUrl.set(null); this.rectoUrl.set(null); this.versoUrl.set(null);
+    this.retakingPhoto.set(null); this.retakeBusy.set(false);
+  }
+
+  onRetakePhoto(ref: string, kind: string, dataUrl: string) {
+    this.retakeBusy.set(true);
+    this.api.uploadImage(dataUrl, kind).subscribe({
+      next: (u) => this.api.updatePhoto(ref, kind, u.key).subscribe({
+        next: (s) => {
+          this.rec.set(s); this.retakingPhoto.set(null); this.retakeBusy.set(false);
+          if (kind === 'selfie') { this.selfieUrl.set(null); this.loadImage(ref, 'selfie', this.selfieUrl); }
+          if (kind === 'cni-recto') { this.rectoUrl.set(null); this.loadImage(ref, 'cni-recto', this.rectoUrl); }
+          if (kind === 'cni-verso') { this.versoUrl.set(null); this.loadImage(ref, 'cni-verso', this.versoUrl); }
+        },
+        error: () => this.retakeBusy.set(false),
+      }),
+      error: () => this.retakeBusy.set(false),
+    });
   }
 
   exit() { this.router.navigateByUrl(this.auth.landingPath()); }

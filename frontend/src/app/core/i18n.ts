@@ -317,6 +317,7 @@ const FR: Record<string, string> = {
   pp_pan_hint: 'Le numéro à 16 chiffres présent sur la carte (optionnel).',
   pp_card_number_required: 'Le numéro de carte est obligatoire avant d’imprimer.',
   pp_retake_photo: 'Reprendre la photo', pp_retake_guide: 'Reprenez une photo nette du client.',
+  pp_retake_recto: 'Reprendre CNI recto', pp_retake_verso: 'Reprendre CNI verso',
   pp_photo_saving: 'Enregistrement de la photo…',
   pp_again: 'Nouvelle recherche',
   // --- cashier (cash payment validation) ---
@@ -784,6 +785,7 @@ const EN: Record<string, string> = {
   pp_pan_hint: 'The 16-digit number printed on the card (optional).',
   pp_card_number_required: 'The card number is required before printing.',
   pp_retake_photo: 'Retake photo', pp_retake_guide: 'Take a clear new photo of the client.',
+  pp_retake_recto: 'Retake ID front', pp_retake_verso: 'Retake ID back',
   pp_photo_saving: 'Saving photo…',
   pp_again: 'New search',
   // --- cashier (cash payment validation) ---

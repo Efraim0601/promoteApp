@@ -8,6 +8,7 @@ import { IconComponent } from './icon';
 import { SpinnerComponent } from './spinner';
 import { ImagePreview } from './image-preview';
 import { ReceiptService } from './receipt';
+import { PhotoCaptureComponent } from './photo-capture';
 
 /**
  * Full detail of a subscription — every field the client filled in, plus the
@@ -18,10 +19,22 @@ import { ReceiptService } from './receipt';
 @Component({
   selector: 'tx-detail',
   standalone: true,
-  imports: [IconComponent, SpinnerComponent],
+  imports: [IconComponent, SpinnerComponent, PhotoCaptureComponent],
   template: `
     <div class="card" style="margin:2px 2px 8px;padding:13px 14px;background:var(--surface-2)">
-      <!-- Photos: client + CNI recto/verso (présence + aperçu) -->
+      <!-- Retake panel (selfie ou CNI) -->
+      @if (retakingKind()) {
+        <div style="margin-bottom:12px">
+          <photo-capture [facing]="retakingKind() === 'selfie' ? 'user' : 'environment'"
+            [round]="retakingKind() === 'selfie'" [allowFlip]="retakingKind() === 'selfie'"
+            [boxW]="retakingKind() === 'selfie' ? 200 : 280" [boxH]="retakingKind() === 'selfie' ? 200 : 160"
+            (captured)="doRetake(retakingKind()!, $event)" (retake)="retakingKind.set(null)"></photo-capture>
+          @if (retakeBusy()) { <div class="muted" style="font-size:12px;margin-top:6px;text-align:center">{{ i18n.t('pp_photo_saving') }}</div> }
+          @else { <button class="btn btn-ghost" (click)="retakingKind.set(null)" style="margin-top:6px;font-size:13px">{{ i18n.t('cancel') }}</button> }
+        </div>
+      }
+
+      <!-- Photos: client + CNI recto/verso (présence + aperçu + reprise) -->
       <div style="display:flex;gap:10px;margin-bottom:8px">
         <div style="flex:1;text-align:center">
           @if (selfie()) {
@@ -32,6 +45,7 @@ import { ReceiptService } from './receipt';
             <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="user" [size]="22"></ic></div>
           }
           <div class="muted" style="font-size:10px;margin-top:3px">{{ i18n.t('tx_photo_client') }} · <b [style.color]="t.hasSelfie ? 'var(--success)' : 'var(--accent)'">{{ i18n.t(t.hasSelfie ? 'tx_present' : 'tx_absent') }}</b></div>
+          <button class="btn btn-ghost" (click)="retakingKind.set('selfie')" [disabled]="retakingKind() !== null" style="padding:2px 7px;font-size:10px;margin-top:2px" [title]="i18n.t('pp_retake_photo')"><ic name="camera" [size]="11"></ic></button>
         </div>
         <div style="flex:1;text-align:center">
           @if (recto()) {
@@ -42,6 +56,7 @@ import { ReceiptService } from './receipt';
             <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
           }
           <div class="muted" style="font-size:10px;margin-top:3px">{{ i18n.t('pp_cni_recto') }} · <b [style.color]="t.hasCniRecto ? 'var(--success)' : 'var(--accent)'">{{ i18n.t(t.hasCniRecto ? 'tx_present' : 'tx_absent') }}</b></div>
+          <button class="btn btn-ghost" (click)="retakingKind.set('cni-recto')" [disabled]="retakingKind() !== null" style="padding:2px 7px;font-size:10px;margin-top:2px" [title]="i18n.t('pp_retake_recto')"><ic name="camera" [size]="11"></ic></button>
         </div>
         <div style="flex:1;text-align:center">
           @if (verso()) {
@@ -52,6 +67,7 @@ import { ReceiptService } from './receipt';
             <div style="width:100%;height:80px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
           }
           <div class="muted" style="font-size:10px;margin-top:3px">{{ i18n.t('pp_cni_verso') }} · <b [style.color]="t.hasCniVerso ? 'var(--success)' : 'var(--accent)'">{{ i18n.t(t.hasCniVerso ? 'tx_present' : 'tx_absent') }}</b></div>
+          <button class="btn btn-ghost" (click)="retakingKind.set('cni-verso')" [disabled]="retakingKind() !== null" style="padding:2px 7px;font-size:10px;margin-top:2px" [title]="i18n.t('pp_retake_verso')"><ic name="camera" [size]="11"></ic></button>
         </div>
       </div>
 
@@ -96,6 +112,8 @@ export class TxDetailComponent implements OnInit, OnDestroy {
   private sanitizer = inject(DomSanitizer);
   private receipt = inject(ReceiptService);
   receiptBusy = signal(false);
+  retakingKind = signal<string | null>(null);
+  retakeBusy = signal(false);
 
   @Input() t!: Subscription;
   /** Resolved seller name (admin view); leave null when irrelevant (agent's own sales). */
@@ -108,6 +126,22 @@ export class TxDetailComponent implements OnInit, OnDestroy {
   recto = signal<SafeUrl | null>(null);
   verso = signal<SafeUrl | null>(null);
   private urls: string[] = [];
+
+  doRetake(kind: string, dataUrl: string) {
+    this.retakeBusy.set(true);
+    this.api.uploadImage(dataUrl, kind).subscribe({
+      next: (u) => this.api.updatePhoto(this.t.ref, kind, u.key).subscribe({
+        next: () => {
+          this.retakingKind.set(null); this.retakeBusy.set(false);
+          if (kind === 'selfie') { this.t.hasSelfie = true; this.selfie.set(null); this.load('selfie', this.selfie); }
+          if (kind === 'cni-recto') { this.t.hasCniRecto = true; this.recto.set(null); this.load('cni-recto', this.recto); }
+          if (kind === 'cni-verso') { this.t.hasCniVerso = true; this.verso.set(null); this.load('cni-verso', this.verso); }
+        },
+        error: () => this.retakeBusy.set(false),
+      }),
+      error: () => this.retakeBusy.set(false),
+    });
+  }
 
   ngOnInit() {
     if (this.t.hasSelfie) this.load('selfie', this.selfie);

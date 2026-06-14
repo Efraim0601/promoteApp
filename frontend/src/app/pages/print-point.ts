@@ -166,22 +166,39 @@ import { SpinnerComponent } from '../shared/spinner';
                 @if (photoBusy()) { <span class="muted" style="font-size:11.5px">{{ i18n.t('pp_photo_saving') }}</span> }
               </div>
             }
-            @if (rectoUrl() || versoUrl()) {
-              <div style="padding:0 16px 12px;display:flex;gap:10px">
-                @if (rectoUrl()) {
-                  <div style="flex:1;text-align:center">
-                    <img [src]="rectoUrl()" alt="CNI recto" (click)="preview.open(rectoUrl())" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
-                    <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_recto') }}</div>
-                  </div>
-                }
-                @if (versoUrl()) {
-                  <div style="flex:1;text-align:center">
-                    <img [src]="versoUrl()" alt="CNI verso" (click)="preview.open(versoUrl())" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
-                    <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_verso') }}</div>
-                  </div>
-                }
+            <!-- CNI recto / verso — display + retake -->
+            @if (retakingCni()) {
+              <div style="padding:0 16px 12px">
+                <photo-capture facing="environment" [boxW]="280" [boxH]="160"
+                  (captured)="onRetakeCni(r.ref, retakingCni()!, $event)" (retake)="retakingCni.set(null)"></photo-capture>
+                @if (cniBusy()) { <div class="muted" style="font-size:12px;margin-top:4px;text-align:center">{{ i18n.t('pp_photo_saving') }}</div> }
+                @else { <button class="btn btn-ghost" (click)="retakingCni.set(null)" style="font-size:13px;margin-top:6px">{{ i18n.t('cancel') }}</button> }
               </div>
             }
+            <div style="padding:0 16px 12px;display:flex;gap:10px">
+              <div style="flex:1;text-align:center">
+                @if (rectoUrl()) {
+                  <img [src]="rectoUrl()" alt="CNI recto" (click)="preview.open(rectoUrl())" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
+                } @else if (r.hasCniRecto) {
+                  <div style="height:84px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="18"></spinner></div>
+                } @else {
+                  <div style="height:84px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
+                }
+                <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_recto') }}</div>
+                <button class="btn btn-ghost" (click)="retakingCni.set('cni-recto')" [disabled]="retakingCni() !== null || cniBusy()" style="padding:2px 8px;font-size:11px;margin-top:3px" [title]="i18n.t('pp_retake_recto')"><ic name="camera" [size]="12"></ic></button>
+              </div>
+              <div style="flex:1;text-align:center">
+                @if (versoUrl()) {
+                  <img [src]="versoUrl()" alt="CNI verso" (click)="preview.open(versoUrl())" style="width:100%;height:84px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in" />
+                } @else if (r.hasCniVerso) {
+                  <div style="height:84px;border-radius:8px;border:1px solid var(--border);display:flex;align-items:center;justify-content:center"><spinner tone="muted" [size]="18"></spinner></div>
+                } @else {
+                  <div style="height:84px;border-radius:8px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted)"><ic name="idcard" [size]="22"></ic></div>
+                }
+                <div class="muted" style="font-size:10.5px;margin-top:3px">{{ i18n.t('pp_cni_verso') }}</div>
+                <button class="btn btn-ghost" (click)="retakingCni.set('cni-verso')" [disabled]="retakingCni() !== null || cniBusy()" style="padding:2px 8px;font-size:11px;margin-top:3px" [title]="i18n.t('pp_retake_verso')"><ic name="camera" [size]="12"></ic></button>
+              </div>
+            </div>
             <div style="padding:0 16px 6px">
               <!-- NIU: shown to staff; agent/admin can add or correct it when the client didn't provide it -->
               <div class="srow">
@@ -404,6 +421,8 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   // Print point: retake photo + mandatory card number before printing.
   retaking = signal(false);
   photoBusy = signal(false);
+  retakingCni = signal<'cni-recto' | 'cni-verso' | null>(null);
+  cniBusy = signal(false);
   printing = signal(false);
   printErr = signal<string | null>(null);
   cardNumber = signal('');
@@ -574,6 +593,21 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   private reloadSelfie(ref: string) {
     this.selfieUrl.set(null);
     this.loadImage(ref, 'selfie', this.selfieUrl);
+  }
+
+  onRetakeCni(ref: string, kind: string, dataUrl: string) {
+    this.cniBusy.set(true);
+    this.api.uploadImage(dataUrl, kind).subscribe({
+      next: (u) => this.api.updatePhoto(ref, kind, u.key).subscribe({
+        next: (s) => {
+          this.rec.set(s); this.cniBusy.set(false); this.retakingCni.set(null);
+          if (kind === 'cni-recto') { this.rectoUrl.set(null); this.loadImage(ref, 'cni-recto', this.rectoUrl); }
+          if (kind === 'cni-verso') { this.versoUrl.set(null); this.loadImage(ref, 'cni-verso', this.versoUrl); }
+        },
+        error: () => this.cniBusy.set(false),
+      }),
+      error: () => this.cniBusy.set(false),
+    });
   }
 
   /** The agent's confirmed/corrected receipt values, sent alongside the validate/reject decision. */
