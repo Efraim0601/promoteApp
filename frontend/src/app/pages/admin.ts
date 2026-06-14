@@ -351,23 +351,8 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                   <button class="icon-btn" (click)="startEditUser(u)" [title]="i18n.t('user_edit_info')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
                   <button class="icon-btn" (click)="startEditRoles(u)" [title]="i18n.t('user_edit_roles')" style="flex-shrink:0"><ic name="gear" [size]="15"></ic></button>
                 }
-                @if (u.enabled === false && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
-                  <button class="btn btn-primary" (click)="recreateUser(u)" [disabled]="userRecreating() === u.id"
-                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
-                    @if (userRecreating() === u.id) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_recreate') }} }
-                  </button>
-                }
-                @if (u.enabled !== false && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
-                  <button class="btn btn-outline" (click)="resetUserCredentials(u)" [disabled]="userResetting() === u.id"
-                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
-                    @if (userResetting() === u.id) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_reset_credentials') }} }
-                  </button>
-                }
-                @if (u.id !== auth.user()?.id && (!isSupervisor() || userRoles(u).includes('COLLECTEUR'))) {
-                  <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
-                          style="padding:5px 9px;font-size:11px;white-space:nowrap">
-                    {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
-                  </button>
+                @if (!isSupervisor() || userRoles(u).includes('COLLECTEUR')) {
+                  <button class="icon-btn" (click)="toggleUserActions(u)" [title]="i18n.t('user_more_actions')" style="flex-shrink:0"><ic name="more" [size]="15" [sw]="3"></ic></button>
                 }
               </div>
               @if (editUserId() === u.id) {
@@ -407,6 +392,29 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                     </button>
                     <button class="btn btn-ghost" (click)="editRolesId.set(null)" [disabled]="editRolesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
                   </div>
+                </div>
+              }
+              @if (userActionsId() === u.id) {
+                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-wrap:wrap;gap:8px;align-items:center">
+                  @if (u.enabled === false) {
+                    <button class="btn btn-primary" (click)="recreateUser(u)" [disabled]="userRecreating() === u.id"
+                            style="padding:6px 12px;font-size:12px;white-space:nowrap">
+                      @if (userRecreating() === u.id) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_recreate') }} }
+                    </button>
+                  }
+                  @if (u.enabled !== false) {
+                    <button class="btn btn-outline" (click)="resetUserCredentials(u)" [disabled]="userResetting() === u.id"
+                            style="padding:6px 12px;font-size:12px;white-space:nowrap">
+                      @if (userResetting() === u.id) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('user_reset_credentials') }} }
+                    </button>
+                  }
+                  @if (u.id !== auth.user()?.id) {
+                    <button class="btn btn-outline" (click)="toggleUser(u)" [disabled]="userToggling() === u.id"
+                            style="padding:6px 12px;font-size:12px;white-space:nowrap">
+                      {{ u.enabled === false ? i18n.t('user_enable') : i18n.t('user_disable') }}
+                    </button>
+                  }
+                  <button class="btn btn-ghost" (click)="userActionsId.set(null)" style="padding:6px 12px;font-size:12px;margin-left:auto">{{ i18n.t('cancel_short') }}</button>
                 </div>
               }
             </div>
@@ -1266,6 +1274,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   });
   startEditUser(u: User) {
     this.editRolesId.set(null);
+    this.userActionsId.set(null);
     this.editUserId.set(u.id);
     this.editUser.set({ name: u.name, email: u.email, agency: u.agency ?? '', phone: u.phone ?? '' });
     this.editUserErr.set('');
@@ -1308,6 +1317,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   }
 
+  // --- secondary actions panel (destructive actions behind ⋮) ---
+  userActionsId = signal<string | null>(null);
+  toggleUserActions(u: User) {
+    this.editUserId.set(null);
+    this.editRolesId.set(null);
+    this.userActionsId.update((id) => (id === u.id ? null : u.id));
+  }
+
   // --- inline role editing (existing accounts) ---
   editRolesId = signal<string | null>(null);
   editRoles = signal<Role[]>([]);
@@ -1315,6 +1332,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   editRolesErr = signal('');
   startEditRoles(u: User) {
     this.editUserId.set(null);
+    this.userActionsId.set(null);
     this.editRolesId.set(u.id);
     this.editRoles.set([...this.userRoles(u)]);
     this.editRolesErr.set('');
