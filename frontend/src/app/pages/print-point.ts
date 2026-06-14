@@ -33,6 +33,10 @@ import { SpinnerComponent } from '../shared/spinner';
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('pp_sub') }}</p>
       </div>
 
+      @if (auth.hasRole('COLLECTEUR')) {
+        <button class="btn btn-outline" (click)="goCollecte()" style="width:100%;margin-bottom:10px"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
+      }
+
       <!-- Print-point KPIs (hidden while viewing a single record) -->
       @if (!rec() && stats(); as st) {
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
@@ -664,4 +668,5 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     this.receiptImg.set(null); this.receiptPdf.set(null); this.receiptOpenUrl.set(null);
   }
   exit() { this.router.navigateByUrl(this.auth.landingPath()); }
+  goCollecte() { this.router.navigateByUrl('/collecte'); }
 }

@@ -37,6 +37,9 @@ import { ReceiptService } from '../shared/receipt';
 
       <button class="btn btn-primary" (click)="newSub()"><ic name="plus" [size]="19"></ic> {{ i18n.t('new_sub_btn') }}</button>
       <button class="btn btn-outline" (click)="newRecharge()" style="margin-top:-4px"><ic name="phone" [size]="18"></ic> {{ i18n.t('new_recharge_btn') }}</button>
+      @if (auth.hasRole('COLLECTEUR')) {
+        <button class="btn btn-outline" (click)="goCollecte()" style="margin-top:-4px"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
+      }
       <button class="btn btn-outline" (click)="claiming.set(true)" style="margin-top:-4px"><ic name="qr" [size]="18"></ic> {{ i18n.t('claim_btn') }}</button>
       <button class="btn btn-ghost" (click)="openVerify()" style="margin-top:-4px;font-size:13.5px"><ic name="search" [size]="17"></ic> {{ i18n.t('verify_ref_btn') }}</button>
 
@@ -317,6 +320,7 @@ export class AgentHomeComponent implements OnInit, OnDestroy {
 
   newSub() { this.router.navigateByUrl('/subscribe'); }
   newRecharge() { this.router.navigateByUrl('/recharge'); }
+  goCollecte() { this.router.navigateByUrl('/collecte'); }
   openRef(ref: string) { this.router.navigate(['/print'], { queryParams: { ref } }); }
   toggleExpand(ref: string) { this.expandedRef.set(this.expandedRef() === ref ? null : ref); }
 

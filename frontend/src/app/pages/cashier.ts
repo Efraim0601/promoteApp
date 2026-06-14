@@ -52,6 +52,9 @@ import { SpinnerComponent } from '../shared/spinner';
         <div style="display:flex;gap:10px;flex-wrap:wrap">
           <button class="btn btn-primary" (click)="newSub()" style="flex:1;min-width:150px"><ic name="plus" [size]="18"></ic> {{ i18n.t('new_sub_btn') }}</button>
           <button class="btn btn-outline" (click)="newRecharge()" style="flex:1;min-width:150px"><ic name="phone" [size]="18"></ic> {{ i18n.t('new_recharge_btn') }}</button>
+          @if (auth.hasRole('COLLECTEUR')) {
+            <button class="btn btn-outline" (click)="goCollecte()" style="flex:1;min-width:150px"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
+          }
         </div>
       }
 
@@ -592,4 +595,5 @@ export class CashierComponent implements OnInit, OnDestroy {
   exit() { this.router.navigateByUrl(this.auth.landingPath()); }
   newSub() { this.router.navigateByUrl('/subscribe'); }
   newRecharge() { this.router.navigateByUrl('/recharge'); }
+  goCollecte() { this.router.navigateByUrl('/collecte'); }
 }
