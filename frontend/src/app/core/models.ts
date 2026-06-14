@@ -176,6 +176,7 @@ export interface Recharge {
   saraAmount?: number | null;
   cashCollectedBy?: string | null;
   cashCollectedAt?: string | null;
+  cashPaymentReference?: string | null;
   fulfilled: boolean;            // true once the cashier credited the card and validated
   fulfilledBy?: string | null;
   fulfilledAt?: string | null;
