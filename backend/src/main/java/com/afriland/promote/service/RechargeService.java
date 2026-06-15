@@ -49,7 +49,7 @@ public class RechargeService {
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
     private final CardConfigRepository configs;
-    private final ReferenceSequence refs;     // shared PRM-#### sequence (same as subscriptions)
+    private final ReferenceSequence refs;     // RC-#### sequence (distinct from subscriptions)
     private final ApplicationEventPublisher events;
 
     /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */
@@ -87,10 +87,9 @@ public class RechargeService {
         refs.init();
     }
 
-    /** Same nomenclature as subscriptions: a PRM-#### reference from the shared sequence (unique
-     *  across both subscriptions and recharges). */
+    /** RC-#### reference from the recharge-specific sequence. */
     private String newRef() {
-        return refs.next();
+        return refs.nextRecharge();
     }
 
     /** Globally-unique aggregator order id — same shape as the card flow ({@code ref-suffix}). */

@@ -38,7 +38,7 @@ public class SubscriptionService {
     private final PaymentGateway gateway;
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
-    private final ReferenceSequence refs;     // shared PRM-#### sequence (subscriptions + recharges)
+    private final ReferenceSequence refs;     // PRM-#### sequence (subscriptions only)
     private final ApplicationEventPublisher events;
 
     /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */

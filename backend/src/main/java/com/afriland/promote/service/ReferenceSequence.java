@@ -8,41 +8,54 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
- * The single source of business references, shared by subscriptions AND recharges so both draw from
- * the same {@code PRM-####} sequence and never collide. The counter is initialised above the highest
- * existing PRM number across BOTH tables (after seeding), so a restart can't reuse a number.
+ * Source of business references.
+ *  - Subscriptions: {@code PRM-####} (shared prefix, counter starts at 1008 to skip demo data)
+ *  - Recharges:     {@code RC-####}  (distinct prefix, own counter)
+ * Each counter is initialised above the highest existing number in its respective table so a
+ * restart never reuses a reference.
  */
 @Service
 public class ReferenceSequence {
 
-    private static final int START = 1008;   // prototype demo data used 1000..1008
-    private static final String PREFIX = "PRM-";
+    private static final int  SUB_START = 1008;   // demo data used PRM-1000..PRM-1008
+    private static final int  RC_START  = 1000;
+    private static final String SUB_PREFIX = "PRM-";
+    private static final String RC_PREFIX  = "RC-";
 
     private final SubscriptionRepository subs;
     private final RechargeRepository recharges;
-    private final AtomicInteger seq = new AtomicInteger(START);
+    private final AtomicInteger seq   = new AtomicInteger(SUB_START);
+    private final AtomicInteger seqRc = new AtomicInteger(RC_START);
 
     public ReferenceSequence(SubscriptionRepository subs, RechargeRepository recharges) {
         this.subs = subs;
         this.recharges = recharges;
     }
 
-    /** Next reference, e.g. "PRM-1010" — unique across subscriptions and recharges. */
+    /** Next subscription reference, e.g. {@code PRM-1010}. */
     public String next() {
-        return PREFIX + seq.incrementAndGet();
+        return SUB_PREFIX + seq.incrementAndGet();
     }
 
-    /** Raise the counter above the highest existing PRM reference in BOTH tables. */
+    /** Next recharge reference, e.g. {@code RC-1001}. */
+    public String nextRecharge() {
+        return RC_PREFIX + seqRc.incrementAndGet();
+    }
+
+    /** Raise both counters above the highest existing reference in each table. */
     public synchronized void init() {
-        int max = Math.max(START, Math.max(
-                maxRef(subs.findAll().stream().map(com.afriland.promote.model.Subscription::getRef)),
-                maxRef(recharges.findAll().stream().map(com.afriland.promote.model.Recharge::getRef))));
-        seq.set(max);
+        int maxSub = Math.max(SUB_START,
+                maxRef(subs.findAll().stream().map(com.afriland.promote.model.Subscription::getRef), SUB_PREFIX));
+        seq.set(maxSub);
+
+        int maxRc = Math.max(RC_START,
+                maxRef(recharges.findAll().stream().map(com.afriland.promote.model.Recharge::getRef), RC_PREFIX));
+        seqRc.set(maxRc);
     }
 
-    private static int maxRef(Stream<String> refs) {
-        return refs.filter(r -> r != null && r.startsWith(PREFIX))
-                .map(r -> { try { return Integer.parseInt(r.substring(PREFIX.length())); } catch (Exception e) { return 0; } })
-                .max(Integer::compareTo).orElse(START);
+    private static int maxRef(Stream<String> refs, String prefix) {
+        return refs.filter(r -> r != null && r.startsWith(prefix))
+                .map(r -> { try { return Integer.parseInt(r.substring(prefix.length())); } catch (Exception e) { return 0; } })
+                .max(Integer::compareTo).orElse(0);
     }
 }
