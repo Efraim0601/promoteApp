@@ -882,7 +882,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                         style="border:none;border-left:1px solid var(--border);padding:3px 10px;cursor:pointer;font-weight:700;font-size:11.5px;font-family:var(--font)">ET</button>
               </div>
               @if (txStatuses().size > 0) {
-                <button (click)="txStatuses.set(new Set())" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0">Effacer</button>
+                <button (click)="clearTxStatuses()" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0">Effacer</button>
               }
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:5px">
@@ -1536,6 +1536,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   clearNotifRecipients() { this.notifRecipientIds.set(new Set()); }
+  clearTxStatuses() { this.txStatuses.set(new Set()); }
 
   openNotifPanel(seedFromSelection: boolean) {
     this.notifRecipientIds.set(seedFromSelection && this.selectedUserIds().size > 0
