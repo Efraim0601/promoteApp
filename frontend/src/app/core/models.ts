@@ -125,6 +125,7 @@ export interface Subscription {
   pay: string;        // om | mtn | cash | sara
   payPhone?: string | null;  // MoMo number used for payment (may differ from contact phone)
   delivery: string;   // promote | agence | home
+  pickupAgencyId?: string | null;    // chosen pickup branch id (delivery == agence)
   pickupAgencyName?: string | null;  // chosen pickup branch name (delivery == agence)
   cardType?: string;  // bancaire | prepaid
   amount: number;
@@ -274,6 +275,19 @@ export interface Agency {
   id: string;
   name: string;
   city?: string | null;
+}
+
+export interface AgencyPickupBucket {
+  id: string;
+  name: string;
+  count: number;
+}
+
+export interface AgencyPickupStats {
+  totalAgence: number;
+  totalPromote: number;
+  totalHome: number;
+  byAgency: AgencyPickupBucket[];
 }
 export interface ImportAgencyRow {
   name: string;

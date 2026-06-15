@@ -2,7 +2,7 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AdminStats, Agency, Agent, AgentStats, AppNotification, CardConfig, CashierStats, ClaimResult,
+  AdminStats, Agency, AgencyPickupStats, Agent, AgentStats, AppNotification, CardConfig, CashierStats, ClaimResult,
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, DashboardStats, ImportAgenciesResult, ImportAgencyRow,
   ActionAudit, ImportUserRow, ImportUsersResult, LoginAudit, Role,
@@ -257,6 +257,13 @@ export class Api {
 
   adminStats(): Observable<AdminStats> {
     return this.http.get<AdminStats>(`${this.base}/stats/admin`);
+  }
+  /** Admin — pickup-agency delivery breakdown + branch ranking (optional date window). */
+  agencyPickupStats(from?: string, to?: string): Observable<AgencyPickupStats> {
+    const params: Record<string, string> = {};
+    if (from) params['from'] = from;
+    if (to)   params['to']   = to;
+    return this.http.get<AgencyPickupStats>(`${this.base}/stats/agencies`, { params });
   }
   agentStats(): Observable<AgentStats> {
     return this.http.get<AgentStats>(`${this.base}/stats/agent`);
