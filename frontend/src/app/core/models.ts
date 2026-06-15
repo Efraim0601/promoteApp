@@ -427,6 +427,13 @@ export interface DashboardStats {
   failureRate: number;
   perAgent: AgentKpi[];
   dailyTrend: DailyBucket[];
+  payByOm: number;
+  payByMtn: number;
+  payByCash: number;
+  payBySara: number;
+  channelAgent: number;
+  channelSelf: number;
+  totalActivated: number;
 }
 
 // ---- collectes (ventes de produits bancaires) ----

@@ -90,6 +90,10 @@ import { IconComponent } from '../shared/icon';
       <div class="kpi-value">{{ s.totalPrinted }}</div>
       <div class="kpi-label">{{ t('dash_total_printed') }}</div>
     </div>
+    <div class="kpi-card kpi-teal">
+      <div class="kpi-value">{{ s.totalActivated }}</div>
+      <div class="kpi-label">Cartes activées (PAN)</div>
+    </div>
     <div class="kpi-card kpi-orange">
       <div class="kpi-value">{{ s.awaitingPrint }}</div>
       <div class="kpi-label">{{ t('dash_awaiting_print') }}</div>
@@ -346,6 +350,7 @@ import { IconComponent } from '../shared/icon';
               <th>{{ t('dash_agent_name') }}</th>
               <th class="num-col">{{ t('dash_agent_total') }}</th>
               <th class="num-col">{{ t('dash_agent_paid') }}</th>
+              <th class="num-col">Réalisation /{{ QUOTA }}</th>
               <th class="num-col">{{ t('dash_agent_printed') }}</th>
               <th class="num-col">{{ t('dash_agent_failed') }}</th>
               <th class="num-col">{{ t('dash_agent_conversion') }}</th>
@@ -363,6 +368,18 @@ import { IconComponent } from '../shared/icon';
                 </td>
                 <td class="num-col">{{ a.total }}</td>
                 <td class="num-col bold-green">{{ a.paid }}</td>
+                <td class="num-col">
+                  <div class="realisation-cell">
+                    <div class="realisation-bar-bg">
+                      <div class="realisation-bar"
+                           [class.rb-green]="realisationPct(a.paid) >= 75"
+                           [class.rb-amber]="realisationPct(a.paid) >= 50 && realisationPct(a.paid) < 75"
+                           [class.rb-red]="realisationPct(a.paid) < 50"
+                           [style.width]="realisationPct(a.paid) + '%'"></div>
+                    </div>
+                    <span class="realisation-val">{{ realisationPct(a.paid) }}%</span>
+                  </div>
+                </td>
                 <td class="num-col bold-purple">{{ a.printed }}</td>
                 <td class="num-col" [class.bold-red]="a.failed > 0">{{ a.failed }}</td>
                 <td class="num-col">
@@ -399,7 +416,7 @@ import { IconComponent } from '../shared/icon';
   </div>
 
   <!-- ===== Failure Rate per agent ===== -->
-  <div class="chart-card" style="margin-bottom:2rem">
+  <div class="chart-card">
     <h3 class="chart-title">{{ t('dash_bar_fail_title') }}</h3>
     @if (s.perAgent.length) {
       <div class="fail-bars">
@@ -422,6 +439,87 @@ import { IconComponent } from '../shared/icon';
     } @else {
       <div class="no-data">{{ t('dash_no_data') }}</div>
     }
+  </div>
+
+  <!-- ===== Taux de réalisation /40 ===== -->
+  <div class="chart-card">
+    <h3 class="chart-title">Taux de réalisation — objectif {{ QUOTA }} ventes par commercial</h3>
+    @if (s.perAgent.length) {
+      <div class="fail-bars">
+        @for (a of sortedByRealisation(); track a.id) {
+          <div class="abar-row">
+            <div class="abar-name">{{ a.name }}</div>
+            <div class="abar-track">
+              <div class="abar-fill"
+                   [class.abar-fail-green]="realisationPct(a.paid) >= 75"
+                   [class.abar-fail-amber]="realisationPct(a.paid) >= 50 && realisationPct(a.paid) < 75"
+                   [class.abar-fail-red]="realisationPct(a.paid) < 50"
+                   [style.width]="realisationPct(a.paid) + '%'">
+              </div>
+            </div>
+            <div class="abar-vals">{{ a.paid }}/{{ QUOTA }} <span class="abar-pct">({{ realisationPct(a.paid) }}%)</span></div>
+          </div>
+        }
+      </div>
+    } @else {
+      <div class="no-data">{{ t('dash_no_data') }}</div>
+    }
+  </div>
+
+  <!-- ===== Répartition paiements + Provenance souscripteurs ===== -->
+  <div class="charts-row" style="margin-bottom:2rem">
+    <div class="chart-card flex-1">
+      <h3 class="chart-title">Répartition des moyens de paiement</h3>
+      <div class="funnel">
+        @for (pm of payMethods(s); track pm.label) {
+          <div class="funnel-row">
+            <span class="funnel-label">{{ pm.label }}</span>
+            <div class="funnel-bar-bg">
+              <div class="funnel-bar" [style.width]="funnelPct(pm.count, s.totalCreated)" [style.background]="pm.color"></div>
+            </div>
+            <span class="funnel-count">{{ pm.count }} <span class="funnel-pct">({{ funnelPct(pm.count, s.totalCreated) }})</span></span>
+          </div>
+        }
+      </div>
+    </div>
+
+    <div class="chart-card flex-1">
+      <h3 class="chart-title">Provenance des souscripteurs</h3>
+      <div class="funnel">
+        <div class="funnel-row">
+          <span class="funnel-label">Via commerciaux</span>
+          <div class="funnel-bar-bg">
+            <div class="funnel-bar" [style.width]="funnelPct(s.channelAgent, s.totalCreated)" style="background:#6366f1"></div>
+          </div>
+          <span class="funnel-count">{{ s.channelAgent }} <span class="funnel-pct">({{ funnelPct(s.channelAgent, s.totalCreated) }})</span></span>
+        </div>
+        <div class="funnel-row">
+          <span class="funnel-label">QR / En ligne</span>
+          <div class="funnel-bar-bg">
+            <div class="funnel-bar" [style.width]="funnelPct(s.channelSelf, s.totalCreated)" style="background:#14b8a6"></div>
+          </div>
+          <span class="funnel-count">{{ s.channelSelf }} <span class="funnel-pct">({{ funnelPct(s.channelSelf, s.totalCreated) }})</span></span>
+        </div>
+      </div>
+
+      <div class="activated-compare">
+        <div class="section-title" style="margin-top:20px;margin-bottom:8px">Cycle de vie des cartes</div>
+        <div class="funnel-row">
+          <span class="funnel-label">Imprimées</span>
+          <div class="funnel-bar-bg">
+            <div class="funnel-bar" [style.width]="funnelPct(s.totalPrinted, s.totalPaid)" style="background:#8b5cf6"></div>
+          </div>
+          <span class="funnel-count">{{ s.totalPrinted }}</span>
+        </div>
+        <div class="funnel-row">
+          <span class="funnel-label">Activées (PAN)</span>
+          <div class="funnel-bar-bg">
+            <div class="funnel-bar" [style.width]="funnelPct(s.totalActivated, s.totalPaid)" style="background:#14b8a6"></div>
+          </div>
+          <span class="funnel-count">{{ s.totalActivated }} <span class="funnel-pct">({{ funnelPct(s.totalActivated, s.totalPrinted) }} des imprimées)</span></span>
+        </div>
+      </div>
+    </div>
   </div>
 
   } <!-- end @if stats -->
@@ -494,6 +592,8 @@ import { IconComponent } from '../shared/icon';
     .kpi-amber .kpi-value { color: #92400e; }
     .kpi-red { border-top: 3px solid #ef4444; }
     .kpi-red .kpi-value { color: #991b1b; }
+    .kpi-teal { border-top: 3px solid #14b8a6; }
+    .kpi-teal .kpi-value { color: #0f766e; }
 
     /* ---- Rate cards ---- */
     .rate-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
@@ -565,7 +665,20 @@ import { IconComponent } from '../shared/icon';
     .abar-dot { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; }
     .abar-dot-paid { background: #10b981; }
     .abar-dot-printed { background: #8b5cf6; opacity: .6; }
+    .abar-pct { font-size: 11px; color: #9ca3af; margin-left: 4px; }
     .fail-bars { display: flex; flex-direction: column; gap: 8px; }
+
+    /* ---- Réalisation cell (in agent table) ---- */
+    .realisation-cell { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .realisation-bar-bg { width: 60px; height: 6px; background: #f3f4f6; border-radius: 99px; overflow: hidden; }
+    .realisation-bar { height: 100%; border-radius: 99px; transition: width .5s; }
+    .rb-green  { background: #10b981; }
+    .rb-amber  { background: #f59e0b; }
+    .rb-red    { background: #ef4444; }
+    .realisation-val { font-size: 12px; font-weight: 700; color: #374151; min-width: 36px; text-align: right; }
+
+    /* ---- Activated compare ---- */
+    .activated-compare { border-top: 1px solid #f3f4f6; padding-top: 4px; }
 
     /* ---- Performance table ---- */
     .table-wrap { overflow-x: auto; }
@@ -644,6 +757,8 @@ export class DashboardComponent implements OnInit {
   private router = inject(Router);
   private i18n = inject(I18n);
   t = (k: string) => this.i18n.t(k);
+
+  readonly QUOTA = 40;
 
   readonly SVG_W = 900;
   readonly SVG_H = 220;
@@ -771,6 +886,25 @@ export class DashboardComponent implements OnInit {
     if (!s) return [];
     return [...s.perAgent].sort((a, b) => b.failureRate - a.failureRate);
   });
+
+  sortedByRealisation = computed(() => {
+    const s = this.stats();
+    if (!s) return [];
+    return [...s.perAgent].sort((a, b) => b.paid - a.paid);
+  });
+
+  realisationPct(paid: number): number {
+    return Math.min(100, Math.round((paid / this.QUOTA) * 100));
+  }
+
+  payMethods(s: { payByOm: number; payByMtn: number; payByCash: number; payBySara: number }) {
+    return [
+      { label: 'Orange Money', count: s.payByOm,   color: '#f97316' },
+      { label: 'MTN MoMo',     count: s.payByMtn,  color: '#eab308' },
+      { label: 'Cash',         count: s.payByCash, color: '#6b7280' },
+      { label: 'SARA Money',   count: s.payBySara, color: '#8b5cf6' },
+    ];
+  }
 
   // ---- SVG chart helpers ----
 

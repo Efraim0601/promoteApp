@@ -359,7 +359,13 @@ public final class Dtos {
             // — per-agent breakdown (window) —
             java.util.List<AgentKpi> perAgent,
             // — daily trend (window) —
-            java.util.List<DailyBucket> dailyTrend) {}
+            java.util.List<DailyBucket> dailyTrend,
+            // — payment method breakdown (window) —
+            long payByOm, long payByMtn, long payByCash, long payBySara,
+            // — channel provenance (window) —
+            long channelAgent, long channelSelf,
+            // — card lifecycle (window): activated = PAN assigned —
+            long totalActivated) {}
 
     // ---- geolocation ----
     /** Browser-reported position; posted by a logged-in user right after login. */

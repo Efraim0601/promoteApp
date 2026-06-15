@@ -237,12 +237,29 @@ public class StatsService {
         double printRate  = totalPaid == 0 ? 0 : (totalPrinted * 100.0 / totalPaid);
         List<DailyBucket> trend = buildDailyTrend(window, printedInWindow, from, to, zone);
 
+        // — payment method breakdown —
+        long payByOm    = window.stream().filter(s -> "om".equals(s.getPay())).count();
+        long payByMtn   = window.stream().filter(s -> "mtn".equals(s.getPay())).count();
+        long payByCash  = window.stream().filter(s -> "cash".equals(s.getPay())).count();
+        long payBySara  = window.stream().filter(s -> "sara".equals(s.getPay())).count();
+
+        // — channel provenance —
+        long channelAgent = window.stream().filter(s -> "agent".equals(s.getChannel())).count();
+        long channelSelf  = window.stream().filter(s -> "self".equals(s.getChannel())).count();
+
+        // — activated cards: PAN assigned by the print point —
+        long totalActivated = window.stream()
+                .filter(s -> s.getPan() != null && !s.getPan().isBlank()).count();
+
         return new DashboardStats(
                 todayCreated, todayPaid, todayPrinted, todayFailed,
                 totalCreated, totalPaid, totalPrinted, totalFailed,
                 awaitingPrint, awaitingPayment,
                 convRate, printRate, failureRate,
-                perAgent, trend);
+                perAgent, trend,
+                payByOm, payByMtn, payByCash, payBySara,
+                channelAgent, channelSelf,
+                totalActivated);
     }
 
     private List<DailyBucket> buildDailyTrend(
