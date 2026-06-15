@@ -415,7 +415,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
             <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 10px;background:var(--surface-2);border-radius:6px;min-height:32px">
               @if (notifRecipientIds().size > 0) {
                 <span style="font-size:12px;font-weight:700;color:var(--primary)">{{ notifRecipientIds().size }} destinataire(s)</span>
-                <button (click)="notifRecipientIds.set(new Set())"
+                <button (click)="clearNotifRecipients()"
                         style="font-size:11px;color:var(--accent);font-weight:700;background:none;border:none;cursor:pointer;padding:0">
                   Effacer
                 </button>
@@ -1495,6 +1495,8 @@ export class AdminComponent implements OnInit, OnDestroy {
       return n;
     });
   }
+
+  clearNotifRecipients() { this.notifRecipientIds.set(new Set()); }
 
   openNotifPanel(seedFromSelection: boolean) {
     this.notifRecipientIds.set(seedFromSelection && this.selectedUserIds().size > 0
