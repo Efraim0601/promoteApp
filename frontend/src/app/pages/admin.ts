@@ -357,6 +357,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           @if (selectedUserIds().size > 0) {
             <span class="badge" style="background:var(--primary-soft,#e8f0fe);color:var(--primary);font-size:11px">{{ selectedUserIds().size }} {{ i18n.t('user_selected_n') }}</span>
           }
+          <button class="btn btn-ghost" (click)="openNotifPanel(false)" style="padding:4px 9px;font-size:11px;display:flex;align-items:center;gap:5px"><ic name="bell" [size]="13"></ic> Notifier</button>
           <button class="btn btn-ghost" (click)="exportUsers()" [disabled]="!filteredUsers().length" style="margin-left:auto;padding:4px 9px;font-size:11px"><ic name="copy" [size]="13"></ic> {{ i18n.t('tx_export') }}</button>
         </div>
         <!-- Bulk action bar -->
@@ -374,36 +375,78 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
             @if (bulkAssignMsg() === 'done') {
               <span style="font-size:11.5px;color:var(--success);font-weight:700">{{ i18n.t('user_bulk_assigned') }}</span>
             }
-            <!-- Send notification to selection -->
-            <button class="btn btn-ghost" (click)="notifPanelOpen.set(!notifPanelOpen())" style="padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:5px">
+            <!-- Send notification — initialise avec la sélection courante -->
+            <button class="btn btn-ghost" (click)="openNotifPanel(true)" style="padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:5px">
               <ic name="bell" [size]="14"></ic> Notifier
             </button>
             <button class="btn btn-ghost" (click)="clearSelection()" style="padding:5px 10px;font-size:12px;margin-left:auto">{{ i18n.t('cancel_short') }}</button>
           </div>
-          @if (notifPanelOpen()) {
-            <div style="padding:14px;margin-bottom:10px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
-              <div style="font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:6px">
-                <ic name="bell" [size]="15" style="color:var(--primary)"></ic>
-                Envoyer une notification &mdash; {{ selectedUserIds().size }} destinataire(s)
-              </div>
-              <div style="display:flex;flex-direction:column;gap:8px">
-                <input class="input" placeholder="Objet de la notification" [(ngModel)]="notifTitle" style="font-size:13px" />
-                <textarea class="input" placeholder="Message (optionnel)" [(ngModel)]="notifBody" rows="3" style="font-size:13px;resize:vertical"></textarea>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
-                <button class="btn btn-primary" [disabled]="!notifTitle.trim() || notifBusy()" (click)="sendNotification()" style="padding:6px 14px;font-size:12.5px">
-                  @if (notifBusy()) { <spinner [size]="14"></spinner> } @else { <ic name="send" [size]="13"></ic> &nbsp;Envoyer }
-                </button>
-                @if (notifMsg() === 'done') {
-                  <span style="font-size:12px;color:var(--success);font-weight:700">Notification envoyée !</span>
+        }
+
+        <!-- ===== Panneau de composition de notification ===== -->
+        @if (notifPanelOpen()) {
+          <div style="padding:16px;margin-bottom:12px;background:var(--surface);border-radius:10px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(0,0,0,.06)">
+
+            <!-- En-tête -->
+            <div style="font-size:13px;font-weight:800;margin-bottom:14px;display:flex;align-items:center;gap:6px">
+              <ic name="bell" [size]="15" style="color:var(--primary)"></ic>
+              Composer une notification
+            </div>
+
+            <!-- Chips de rôles -->
+            <div style="margin-bottom:10px">
+              <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:7px">Destinataires — sélection multiple</div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px">
+                @for (rc of notifRoleChips; track rc.role) {
+                  <button
+                    (click)="toggleNotifRole(rc.role)"
+                    [disabled]="countByRole(rc.role) === 0"
+                    [style]="isRoleFullySelected(rc.role)
+                      ? 'padding:5px 12px;font-size:12px;font-weight:700;border-radius:99px;border:none;cursor:pointer;background:var(--primary);color:#fff;display:flex;align-items:center;gap:5px'
+                      : 'padding:5px 12px;font-size:12px;font-weight:600;border-radius:99px;border:1.5px solid var(--border);cursor:pointer;background:var(--surface-2);color:var(--fg);display:flex;align-items:center;gap:5px'">
+                    {{ rc.label }}
+                    <span style="font-size:11px;opacity:.75">({{ countByRole(rc.role) }})</span>
+                  </button>
                 }
-                @if (notifMsg() === 'error') {
-                  <span style="font-size:12px;color:var(--accent);font-weight:700">Erreur lors de l&#x2019;envoi.</span>
-                }
-                <button class="btn btn-ghost" (click)="notifPanelOpen.set(false)" style="padding:5px 10px;font-size:12px;margin-left:auto">Fermer</button>
               </div>
             </div>
-          }
+
+            <!-- Résumé destinataires -->
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 10px;background:var(--surface-2);border-radius:6px;min-height:32px">
+              @if (notifRecipientIds().size > 0) {
+                <span style="font-size:12px;font-weight:700;color:var(--primary)">{{ notifRecipientIds().size }} destinataire(s)</span>
+                <button (click)="notifRecipientIds.set(new Set())"
+                        style="font-size:11px;color:var(--accent);font-weight:700;background:none;border:none;cursor:pointer;padding:0">
+                  Effacer
+                </button>
+              } @else {
+                <span style="font-size:12px;color:var(--muted)">Aucun destinataire — cliquez sur un ou plusieurs groupes ci-dessus</span>
+              }
+            </div>
+
+            <!-- Formulaire -->
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <input class="input" placeholder="Objet de la notification" [(ngModel)]="notifTitle" style="font-size:13px" />
+              <textarea class="input" placeholder="Message (optionnel)" [(ngModel)]="notifBody" rows="3" style="font-size:13px;resize:vertical"></textarea>
+            </div>
+
+            <!-- Actions -->
+            <div style="display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap">
+              <button class="btn btn-primary"
+                      [disabled]="!notifTitle.trim() || !notifRecipientIds().size || notifBusy()"
+                      (click)="sendNotification()"
+                      style="padding:6px 14px;font-size:12.5px">
+                @if (notifBusy()) { <spinner [size]="14"></spinner> } @else { <ic name="send" [size]="13"></ic> &nbsp;Envoyer }
+              </button>
+              @if (notifMsg() === 'done') {
+                <span style="font-size:12px;color:var(--success);font-weight:700">Notification envoyée !</span>
+              }
+              @if (notifMsg() === 'error') {
+                <span style="font-size:12px;color:var(--accent);font-weight:700">Erreur lors de l&#x2019;envoi.</span>
+              }
+              <button class="btn btn-ghost" (click)="notifPanelOpen.set(false)" style="padding:5px 10px;font-size:12px;margin-left:auto">Fermer</button>
+            </div>
+          </div>
         }
         @if (usersLoading()) {
         <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
@@ -1408,16 +1451,60 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
     this.bulkAssignMsg.set('');
   }
-  clearSelection() { this.selectedUserIds.set(new Set()); this.bulkAssignRole.set(null); this.bulkAssignMsg.set(''); this.notifPanelOpen.set(false); this.notifMsg.set(''); }
+  clearSelection() { this.selectedUserIds.set(new Set()); this.bulkAssignRole.set(null); this.bulkAssignMsg.set(''); this.notifMsg.set(''); }
 
   // --- notification compose ---
-  notifPanelOpen = signal(false);
+  notifPanelOpen    = signal(false);
+  notifRecipientIds = signal<Set<string>>(new Set());
   notifTitle = '';
-  notifBody = '';
-  notifBusy = signal(false);
-  notifMsg = signal('');
+  notifBody  = '';
+  notifBusy  = signal(false);
+  notifMsg   = signal('');
+
+  readonly notifRoleChips: { role: string; label: string }[] = [
+    { role: 'ALL',         label: 'Tous' },
+    { role: 'AGENT',       label: 'Agents' },
+    { role: 'CASHIER',     label: 'Caissiers' },
+    { role: 'PRINT_AGENT', label: 'Imprimeurs' },
+    { role: 'ADMIN',       label: 'Admins' },
+    { role: 'SUPERVISEUR', label: 'Superviseurs' },
+    { role: 'COLLECTEUR',  label: 'Collecteurs' },
+  ];
+
+  usersForRole(role: string) {
+    const all = this.usersList().filter(u => u.enabled !== false);
+    if (role === 'ALL') return all;
+    return all.filter(u => (u.roles ?? [u.role]).includes(role as Role));
+  }
+
+  countByRole(role: string): number { return this.usersForRole(role).length; }
+
+  isRoleFullySelected(role: string): boolean {
+    const users = this.usersForRole(role);
+    if (!users.length) return false;
+    const sel = this.notifRecipientIds();
+    return users.every(u => sel.has(u.id));
+  }
+
+  toggleNotifRole(role: string) {
+    const users = this.usersForRole(role);
+    const allIn = this.isRoleFullySelected(role);
+    this.notifRecipientIds.update(s => {
+      const n = new Set(s);
+      allIn ? users.forEach(u => n.delete(u.id)) : users.forEach(u => n.add(u.id));
+      return n;
+    });
+  }
+
+  openNotifPanel(seedFromSelection: boolean) {
+    this.notifRecipientIds.set(seedFromSelection && this.selectedUserIds().size > 0
+      ? new Set(this.selectedUserIds()) : new Set());
+    this.notifPanelOpen.set(true);
+    this.notifMsg.set('');
+  }
+
   sendNotification() {
-    const ids = [...this.selectedUserIds()];
+    const ids = [...this.notifRecipientIds()];
     if (!this.notifTitle.trim() || !ids.length || this.notifBusy()) return;
     this.notifBusy.set(true); this.notifMsg.set('');
     this.api.sendNotification({ title: this.notifTitle.trim(), body: this.notifBody.trim(), recipientIds: ids }).subscribe({
