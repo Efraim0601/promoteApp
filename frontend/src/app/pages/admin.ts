@@ -17,6 +17,7 @@ import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
 import { NotifBellComponent } from '../shared/notif-bell';
 import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
+import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'page-admin',
@@ -1073,6 +1074,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
           <ic name="chart" [size]="16" style="color:var(--primary)"></ic>
           <h3 style="font-size:14.5px">{{ i18n.t('col_stats_title') }}</h3>
           <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ collectes().length }} {{ i18n.t('col_total') }}</span>
+          <button class="btn btn-ghost" (click)="exportCollecteStatsExcel()" [disabled]="!collectes().length" style="padding:4px 9px;font-size:11px"><ic name="download" [size]="13"></ic> {{ i18n.t('col_export_xl') }}</button>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           @for (b of statByProduct(); track b.key) {
@@ -2141,6 +2143,69 @@ export class AdminComponent implements OnInit, OnDestroy {
       c.accountNumber ?? '', c.cardNumber ?? '', c.cardType ? this.i18n.t('ct_' + c.cardType) : '', this.fmtDateTime(c.createdAt),
     ].map((v) => esc(String(v))).join(','));
     this.downloadCsv('collectes.csv', '﻿' + [header.join(','), ...rows].join('\r\n'));
+  }
+
+  exportCollecteStatsExcel() {
+    const all = this.collectes();
+    if (!all.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const total = all.length;
+
+    // Sheet 1: Résumé par produit
+    const resumeRows: (string | number)[][] = [
+      ['Statistiques de la Collecte — Afriland Carte Promote'],
+      [`Exporté le : ${today}`],
+      [],
+      ['Produit', 'Nombre', 'Part (%)'],
+      ...this.statByProduct().map(b => [
+        this.i18n.t('prod_' + b.key), b.count,
+        total > 0 ? Math.round(b.count / total * 100) : 0,
+      ]),
+      [],
+      ['TOTAL', total, 100],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(resumeRows);
+    ws1['!cols'] = [{ wch: 28 }, { wch: 10 }, { wch: 10 }];
+    ws1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+
+    // Sheet 2: Classement des commerciaux (tous)
+    const comMap = new Map<string, { label: string; count: number }>();
+    for (const c of all) {
+      const id = c.collectedById ?? '—';
+      const e = comMap.get(id) ?? { label: c.collectedByName ?? '—', count: 0 };
+      e.count++; comMap.set(id, e);
+    }
+    const comRanked = [...comMap.values()].sort((a, b) => b.count - a.count);
+    const comRows: (string | number)[][] = [
+      ['Rang', 'Commercial', 'Nombre'],
+      ...comRanked.map((b, i) => [i + 1, b.label, b.count]),
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(comRows);
+    ws2['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 10 }];
+
+    // Sheet 3: Détail des collectes
+    const detailRows: (string | number)[][] = [
+      ['Référence', 'Commercial', 'Produit', 'Nom client', 'Téléphone', 'N° compte', 'N° carte', 'Type carte', 'Date'],
+      ...all.map(c => [
+        c.ref,
+        c.collectedByName ?? '',
+        this.i18n.t('prod_' + c.product),
+        c.clientNom ?? '',
+        c.clientPhone ?? '',
+        c.accountNumber ?? '',
+        c.cardNumber ?? '',
+        c.cardType ? this.i18n.t('ct_' + c.cardType) : '',
+        this.fmtDateTime(c.createdAt),
+      ]),
+    ];
+    const ws3 = XLSX.utils.aoa_to_sheet(detailRows);
+    ws3['!cols'] = [{ wch: 12 }, { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Résumé');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Commerciaux');
+    XLSX.utils.book_append_sheet(wb, ws3, 'Détail');
+    XLSX.writeFile(wb, `collecte-stats_${today}.xlsx`);
   }
 
   // --- login audit (journal des connexions) ---

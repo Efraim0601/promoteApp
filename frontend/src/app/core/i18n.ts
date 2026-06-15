@@ -175,6 +175,7 @@ const FR: Record<string, string> = {
   cs_sub: 'Vue d’ensemble des ventes de produits bancaires (tous les commerciaux).',
   cs_total: 'Collectes au total', cs_by_product: 'Par produit', cs_by_commercial: 'Par commercial',
   cs_empty: 'Aucune collecte pour l’instant.', cs_error: 'Impossible de charger les statistiques.',
+  cs_export_xl: 'Exporter Excel', col_export_xl: 'Exporter Excel',
   // ---- Audit des connexions (admin) ----
   nav_audit: 'Connexions', audit_title: 'Journal des connexions',
   audit_sub: 'Toutes les tentatives de connexion (réussies et échouées).',
@@ -730,6 +731,7 @@ const EN: Record<string, string> = {
   cs_sub: 'Overview of bank-product sales (all commercials).',
   cs_total: 'Collections total', cs_by_product: 'By product', cs_by_commercial: 'By commercial',
   cs_empty: 'No collections yet.', cs_error: 'Could not load statistics.',
+  cs_export_xl: 'Export Excel', col_export_xl: 'Export Excel',
   // ---- Login audit (admin) ----
   nav_audit: 'Logins', audit_title: 'Login log',
   audit_sub: 'All login attempts (successful and failed).',

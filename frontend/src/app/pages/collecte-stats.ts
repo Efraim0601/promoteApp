@@ -1,4 +1,5 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
+import * as XLSX from 'xlsx';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
@@ -28,6 +29,9 @@ import { SpinnerComponent } from '../shared/spinner';
           <p class="muted" style="font-size:12.5px;line-height:1.5;margin-top:3px">{{ i18n.t('cs_sub') }}</p>
         </div>
         <button class="icon-btn" (click)="load()" [title]="i18n.t('map_reload')" style="flex-shrink:0"><ic name="refresh" [size]="16"></ic></button>
+        @if (stats() && !loading()) {
+          <button class="btn btn-outline" (click)="exportExcel()" style="font-size:12px;padding:6px 11px;flex-shrink:0"><ic name="download" [size]="13"></ic> {{ i18n.t('cs_export_xl') }}</button>
+        }
       </div>
 
       @if (loading()) {
@@ -96,4 +100,38 @@ export class CollecteStatsComponent implements OnInit {
   }
 
   pct(part: number, total: number) { return total > 0 ? Math.round((part / total) * 100) : 0; }
+
+  exportExcel() {
+    const s = this.stats();
+    if (!s) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const total = s.total;
+
+    // Sheet 1: Résumé par produit
+    const resumeRows: (string | number)[][] = [
+      ['Statistiques de la Collecte — Afriland Carte Promote'],
+      [`Exporté le : ${today}`],
+      [],
+      ['Produit', 'Nombre', 'Part (%)'],
+      ...s.byProduct.map(b => [this.i18n.t('prod_' + b.key), b.count, this.pct(b.count, total)]),
+      [],
+      ['TOTAL', total, 100],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(resumeRows);
+    ws1['!cols'] = [{ wch: 28 }, { wch: 10 }, { wch: 10 }];
+    ws1['!merges'] = [{ s: { r: 0, c: 0 }, e: { r: 0, c: 2 } }];
+
+    // Sheet 2: Classement des commerciaux
+    const comRows: (string | number)[][] = [
+      ['Rang', 'Commercial', 'Nombre'],
+      ...s.byCommercial.map((b, i) => [i + 1, b.label || '—', b.count]),
+    ];
+    const ws2 = XLSX.utils.aoa_to_sheet(comRows);
+    ws2['!cols'] = [{ wch: 6 }, { wch: 32 }, { wch: 10 }];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Résumé');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Commerciaux');
+    XLSX.writeFile(wb, `collecte-stats_${today}.xlsx`);
+  }
 }
