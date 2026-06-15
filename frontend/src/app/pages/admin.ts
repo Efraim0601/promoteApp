@@ -2367,7 +2367,8 @@ export class AdminComponent implements OnInit, OnDestroy {
         t.delivery,
         t.channel === 'self' ? 'En ligne' : 'Agent',
         t.channel === 'self' ? '' : (this.agentName(t.agentId) ?? ''),
-        t.cardNumber ?? '', t.pan ?? '',
+        t.cardNumber ?? '',
+        t.pan || t.cardNumber || '',  // PAN = pan si saisi, sinon cardNumber (les agents saisissent le PAN dans ce champ)
         t.status, String(t.amount),
       ].map((v) => esc(String(v))).join(',')),
     );
