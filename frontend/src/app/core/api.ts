@@ -2,11 +2,11 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import {
-  AdminStats, Agency, Agent, AgentStats, CardConfig, CashierStats, ClaimResult,
+  AdminStats, Agency, Agent, AgentStats, AppNotification, CardConfig, CashierStats, ClaimResult,
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, DashboardStats, ImportAgenciesResult, ImportAgencyRow,
   ImportUserRow, ImportUsersResult, LoginAudit, Role,
-  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Profile, ProfileRequest, Recharge, Subscription, UpdateUserRequest, User,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -276,6 +276,23 @@ export class Api {
     if (from) params['from'] = from;
     if (to)   params['to']   = to;
     return this.http.get<DashboardStats>(`${this.base}/stats/dashboard`, { params });
+  }
+
+  // ---- notifications ----
+  myNotifications(): Observable<AppNotification[]> {
+    return this.http.get<AppNotification[]>(`${this.base}/notifications/mine`);
+  }
+  unreadCount(): Observable<{ count: number }> {
+    return this.http.get<{ count: number }>(`${this.base}/notifications/unread-count`);
+  }
+  markNotificationRead(id: number): Observable<void> {
+    return this.http.patch<void>(`${this.base}/notifications/${id}/read`, {});
+  }
+  markAllNotificationsRead(): Observable<void> {
+    return this.http.post<void>(`${this.base}/notifications/read-all`, {});
+  }
+  sendNotification(req: SendNotificationRequest): Observable<void> {
+    return this.http.post<void>(`${this.base}/notifications`, req);
   }
 
   // ---- profile / habilitation management ----

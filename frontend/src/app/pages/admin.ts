@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -14,15 +15,17 @@ import { SpinnerComponent } from '../shared/spinner';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
+import { NotifBellComponent } from '../shared/notif-bell';
 import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
 
 @Component({
   selector: 'page-admin',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent, NotifBellComponent, FormsModule],
   template: `
   <div class="scr">
     <app-bar class="appbar-wide">
+      <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
 
@@ -371,8 +374,36 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
             @if (bulkAssignMsg() === 'done') {
               <span style="font-size:11.5px;color:var(--success);font-weight:700">{{ i18n.t('user_bulk_assigned') }}</span>
             }
+            <!-- Send notification to selection -->
+            <button class="btn btn-ghost" (click)="notifPanelOpen.set(!notifPanelOpen())" style="padding:5px 10px;font-size:12px;display:flex;align-items:center;gap:5px">
+              <ic name="bell" [size]="14"></ic> Notifier
+            </button>
             <button class="btn btn-ghost" (click)="clearSelection()" style="padding:5px 10px;font-size:12px;margin-left:auto">{{ i18n.t('cancel_short') }}</button>
           </div>
+          @if (notifPanelOpen()) {
+            <div style="padding:14px;margin-bottom:10px;background:var(--surface);border-radius:8px;border:1px solid var(--border)">
+              <div style="font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:6px">
+                <ic name="bell" [size]="15" style="color:var(--primary)"></ic>
+                Envoyer une notification &mdash; {{ selectedUserIds().size }} destinataire(s)
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <input class="input" placeholder="Objet de la notification" [(ngModel)]="notifTitle" style="font-size:13px" />
+                <textarea class="input" placeholder="Message (optionnel)" [(ngModel)]="notifBody" rows="3" style="font-size:13px;resize:vertical"></textarea>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-top:10px">
+                <button class="btn btn-primary" [disabled]="!notifTitle.trim() || notifBusy()" (click)="sendNotification()" style="padding:6px 14px;font-size:12.5px">
+                  @if (notifBusy()) { <spinner [size]="14"></spinner> } @else { <ic name="send" [size]="13"></ic> &nbsp;Envoyer }
+                </button>
+                @if (notifMsg() === 'done') {
+                  <span style="font-size:12px;color:var(--success);font-weight:700">Notification envoyée !</span>
+                }
+                @if (notifMsg() === 'error') {
+                  <span style="font-size:12px;color:var(--accent);font-weight:700">Erreur lors de l&#x2019;envoi.</span>
+                }
+                <button class="btn btn-ghost" (click)="notifPanelOpen.set(false)" style="padding:5px 10px;font-size:12px;margin-left:auto">Fermer</button>
+              </div>
+            </div>
+          }
         }
         @if (usersLoading()) {
         <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
@@ -1377,7 +1408,23 @@ export class AdminComponent implements OnInit, OnDestroy {
     }
     this.bulkAssignMsg.set('');
   }
-  clearSelection() { this.selectedUserIds.set(new Set()); this.bulkAssignRole.set(null); this.bulkAssignMsg.set(''); }
+  clearSelection() { this.selectedUserIds.set(new Set()); this.bulkAssignRole.set(null); this.bulkAssignMsg.set(''); this.notifPanelOpen.set(false); this.notifMsg.set(''); }
+
+  // --- notification compose ---
+  notifPanelOpen = signal(false);
+  notifTitle = '';
+  notifBody = '';
+  notifBusy = signal(false);
+  notifMsg = signal('');
+  sendNotification() {
+    const ids = [...this.selectedUserIds()];
+    if (!this.notifTitle.trim() || !ids.length || this.notifBusy()) return;
+    this.notifBusy.set(true); this.notifMsg.set('');
+    this.api.sendNotification({ title: this.notifTitle.trim(), body: this.notifBody.trim(), recipientIds: ids }).subscribe({
+      next: () => { this.notifBusy.set(false); this.notifMsg.set('done'); this.notifTitle = ''; this.notifBody = ''; },
+      error: () => { this.notifBusy.set(false); this.notifMsg.set('error'); },
+    });
+  }
   applyBulkAssign() {
     const role = this.bulkAssignRole();
     const ids = [...this.selectedUserIds()];

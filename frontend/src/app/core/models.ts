@@ -473,3 +473,19 @@ export interface CollecteStats {
   byProduct: CollecteBucket[];
   byCommercial: CollecteBucket[];
 }
+
+// ---- notifications ----
+export interface AppNotification {
+  id: number;
+  title: string;
+  body: string | null;
+  senderName: string;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface SendNotificationRequest {
+  title: string;
+  body: string;
+  recipientIds: string[];
+}

@@ -15,14 +15,16 @@ import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
 import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
 import { ReceiptService } from '../shared/receipt';
+import { NotifBellComponent } from '../shared/notif-bell';
 
 @Component({
   selector: 'page-agent-home',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, StatusBadgeComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, StatusBadgeComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent, NotifBellComponent],
   template: `
   <div class="scr">
     <app-bar>
+      <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
     <div class="scr-body">

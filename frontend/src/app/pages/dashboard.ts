@@ -7,11 +7,12 @@ import { Api } from '../core/api';
 import { I18n } from '../core/i18n';
 import { AgentKpi, DailyBucket, DashboardStats } from '../core/models';
 import { IconComponent } from '../shared/icon';
+import { NotifBellComponent } from '../shared/notif-bell';
 
 @Component({
   selector: 'page-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, IconComponent],
+  imports: [CommonModule, FormsModule, IconComponent, NotifBellComponent],
   template: `
 <div class="dash-page">
 
@@ -39,6 +40,7 @@ import { IconComponent } from '../shared/icon';
           <ic name="download" [size]="15"></ic> Export Excel
         </button>
       }
+      <notif-bell style="margin-left:4px"></notif-bell>
     </div>
   </div>
 

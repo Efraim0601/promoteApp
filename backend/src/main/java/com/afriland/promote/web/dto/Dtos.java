@@ -367,6 +367,20 @@ public final class Dtos {
             // — card lifecycle (window): activated = PAN assigned —
             long totalActivated) {}
 
+    // ---- notifications ----
+
+    public record NotificationDto(
+            Long id, String title, String body,
+            String senderName, java.time.Instant createdAt, boolean read) {
+        public static NotificationDto of(com.afriland.promote.model.AppNotification n) {
+            return new NotificationDto(n.getId(), n.getTitle(), n.getBody(),
+                    n.getSenderName(), n.getCreatedAt(), n.getReadAt() != null);
+        }
+    }
+
+    public record SendNotificationRequest(
+            String title, String body, java.util.List<String> recipientIds) {}
+
     // ---- geolocation ----
     /** Browser-reported position; posted by a logged-in user right after login. */
     public record LocationUpdate(double latitude, double longitude, Double accuracy) {}

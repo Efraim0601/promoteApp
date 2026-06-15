@@ -85,6 +85,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/stats/admin").hasRole("ADMIN")
                 .requestMatchers("/api/stats/payments").hasRole("ADMIN")
                 .requestMatchers("/api/stats/dashboard").hasAnyRole("ADMIN", "SUPERVISEUR")
+                // Notifications: send = admin/supervisor; read/mark = any authenticated user
+                .requestMatchers(HttpMethod.POST, "/api/notifications").hasAnyRole("ADMIN", "SUPERVISEUR")
                 .requestMatchers("/api/map/**").hasRole("ADMIN")
                 // Cashier validates the effective recharge, so it needs to list recharges + the queue.
                 .requestMatchers(HttpMethod.GET, "/api/recharges").hasAnyRole("CASHIER", "ADMIN")

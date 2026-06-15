@@ -14,16 +14,18 @@ import { FieldComponent } from '../shared/fields';
 import { PhotoCaptureComponent } from '../shared/photo-capture';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
+import { NotifBellComponent } from '../shared/notif-bell';
 
 /** Print point — retrieve a KYC file by reference, then print & hand over the card. */
 @Component({
   selector: 'page-print-point',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent, ClientPhotoComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent, ClientPhotoComponent, NotifBellComponent],
   template: `
   <div class="scr">
     <app-bar>
       <button appbar-left class="back-link" (click)="exit()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
+      <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
     <div class="scr-body">

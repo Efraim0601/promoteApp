@@ -13,17 +13,19 @@ import { FieldComponent } from '../shared/fields';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
 import { PhotoCaptureComponent } from '../shared/photo-capture';
+import { NotifBellComponent } from '../shared/notif-bell';
 
 /** Cashier — retrieve a subscription, verify the client's identity, then validate the in-person
  *  cash payment (cash → paid). The printed card is then handed over at the print point. */
 @Component({
   selector: 'page-cashier',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent, NotifBellComponent],
   template: `
   <div class="scr">
     <app-bar>
       <button appbar-left class="back-link" (click)="exit()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
+      <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
     <div class="scr-body">
