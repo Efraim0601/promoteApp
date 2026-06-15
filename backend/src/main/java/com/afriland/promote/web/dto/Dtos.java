@@ -378,6 +378,18 @@ public final class Dtos {
             // — card lifecycle (window): activated = PAN assigned —
             long totalActivated) {}
 
+    // ---- pickup-agency stats ----
+
+    /** One pickup-branch bucket in the agency stats ranking. */
+    public record AgencyPickupBucket(String id, String name, long count) {}
+
+    /** Admin overview of delivery-mode choices and pickup-branch ranking. */
+    public record AgencyPickupStats(
+            long totalAgence,
+            long totalPromote,
+            long totalHome,
+            List<AgencyPickupBucket> byAgency) {}
+
     // ---- notifications ----
 
     public record NotificationDto(

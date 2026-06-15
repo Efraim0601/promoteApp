@@ -308,4 +308,18 @@ public class StatsService {
         long pendingAmount = subs.sumAmountByPayStatus(PayStatus.cash);
         return new CashierStats(myCount, myCollected, myToday, pendingCount, pendingAmount);
     }
+
+    /** Pickup-agency stats: delivery-mode breakdown + ranking of branches, with optional date window. */
+    public AgencyPickupStats agencyStats(LocalDate from, LocalDate to) {
+        ZoneId zone = ZoneId.systemDefault();
+        Instant fromInst = from != null ? from.atStartOfDay(zone).toInstant() : null;
+        Instant toInst   = to   != null ? to.plusDays(1).atStartOfDay(zone).toInstant() : null;
+        long totalAgence  = subs.countByDeliveryInWindow("agence",   fromInst, toInst);
+        long totalPromote = subs.countByDeliveryInWindow("promote",  fromInst, toInst);
+        long totalHome    = subs.countByDeliveryInWindow("home",     fromInst, toInst);
+        List<AgencyPickupBucket> byAgency = subs.countGroupedByPickupAgency(fromInst, toInst).stream()
+                .map(r -> new AgencyPickupBucket((String) r[0], (String) r[1], (Long) r[2]))
+                .toList();
+        return new AgencyPickupStats(totalAgence, totalPromote, totalHome, byAgency);
+    }
 }

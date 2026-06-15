@@ -2,6 +2,7 @@ package com.afriland.promote.web;
 
 import com.afriland.promote.service.StatsService;
 import com.afriland.promote.web.dto.Dtos.AdminStats;
+import com.afriland.promote.web.dto.Dtos.AgencyPickupStats;
 import com.afriland.promote.web.dto.Dtos.AgentStats;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
 import com.afriland.promote.web.dto.Dtos.DashboardStats;
@@ -49,6 +50,16 @@ public class StatsController {
     @GetMapping("/payments")
     public PaymentStats payments() {
         return stats.paymentStats();
+    }
+
+    /** Admin — pickup-agency stats: delivery breakdown + branch ranking, with optional date window. */
+    @GetMapping("/agencies")
+    public AgencyPickupStats agencies(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        LocalDate fromDate = (from != null && !from.isBlank()) ? LocalDate.parse(from) : null;
+        LocalDate toDate   = (to   != null && !to.isBlank())   ? LocalDate.parse(to)   : null;
+        return stats.agencyStats(fromDate, toDate);
     }
 
     /** Director / sales manager monitoring dashboard (last 30 days by default). */
