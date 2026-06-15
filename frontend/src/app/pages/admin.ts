@@ -481,6 +481,7 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                 }
                 @if (!isSupervisor()) {
                   <button class="icon-btn" (click)="startEditUser(u)" [title]="i18n.t('user_edit_info')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
+                  <button class="icon-btn" (click)="startEditRoles(u)" title="Modifier les rôles" style="flex-shrink:0"><ic name="award" [size]="15"></ic></button>
                   <button class="icon-btn" (click)="startAssignProfiles(u)" [title]="i18n.t('hab_assign_profiles')" style="flex-shrink:0"><ic name="shield" [size]="15"></ic></button>
                 }
                 @if (!isSupervisor() || userRoles(u).includes('COLLECTEUR')) {
@@ -526,6 +527,31 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
                       @if (assignProfilesSaving()) { <spinner></spinner> } @else { {{ i18n.t('hab_assign_save') }} }
                     </button>
                     <button class="btn btn-ghost" (click)="assignProfilesId.set(null)" [disabled]="assignProfilesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
+                  </div>
+                </div>
+              }
+              @if (editRolesId() === u.id) {
+                <div style="flex-basis:100%;border-top:1px dashed var(--border);margin-top:6px;padding-top:8px;display:flex;flex-direction:column;gap:8px">
+                  <div class="kicker">Rôles de l'utilisateur</div>
+                  <div style="display:flex;flex-wrap:wrap;gap:7px">
+                    @for (r of allRoles; track r) {
+                      <button type="button" (click)="toggleEditRole(r)"
+                              [class.btn-primary]="editRoles().includes(r)"
+                              [class.btn-outline]="!editRoles().includes(r)"
+                              class="btn" style="padding:5px 10px;font-size:11.5px">{{ roleLabel(r) }}</button>
+                    }
+                  </div>
+                  @if (!editRoles().length) {
+                    <span class="err" style="font-size:11.5px">Au moins un rôle requis</span>
+                  }
+                  @if (editRolesErr()) {
+                    <span class="err" style="font-size:11.5px">{{ i18n.t(editRolesErr()) }}</span>
+                  }
+                  <div style="display:flex;gap:8px">
+                    <button class="btn btn-primary" (click)="saveRoles(u)" [disabled]="!editRoles().length || editRolesSaving()" style="padding:7px 12px;font-size:12.5px">
+                      @if (editRolesSaving()) { <spinner></spinner> } @else { {{ i18n.t('save') }} }
+                    </button>
+                    <button class="btn btn-ghost" (click)="editRolesId.set(null)" [disabled]="editRolesSaving()" style="padding:7px 12px;font-size:12.5px">{{ i18n.t('cancel_short') }}</button>
                   </div>
                 </div>
               }
@@ -1721,6 +1747,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   startAssignProfiles(u: User) {
     this.editUserId.set(null);
     this.userActionsId.set(null);
+    this.editRolesId.set(null);
     this.assignProfilesId.set(u.id);
     this.assignProfileIds.set([...(u.profileIds ?? [])]);
     this.assignProfilesErr.set('');
@@ -1782,6 +1809,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   startEditUser(u: User) {
     this.assignProfilesId.set(null);
     this.userActionsId.set(null);
+    this.editRolesId.set(null);
     this.editUserId.set(u.id);
     this.editUser.set({ name: u.name, email: u.email, agency: u.agency ?? '', phone: u.phone ?? '' });
     this.editUserErr.set('');
@@ -1840,6 +1868,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   startEditRoles(u: User) {
     this.editUserId.set(null);
     this.userActionsId.set(null);
+    this.assignProfilesId.set(null);
     this.editRolesId.set(u.id);
     this.editRoles.set([...this.userRoles(u)]);
     this.editRolesErr.set('');
