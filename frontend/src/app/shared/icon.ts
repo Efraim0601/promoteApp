@@ -4,6 +4,7 @@ import { Component, Input } from '@angular/core';
 export const ICONS: Record<string, string | string[]> = {
   chevR: 'M9 6l6 6-6 6',
   chevL: 'M15 6l-6 6 6 6',
+  chevD: 'M6 9l6 6 6-6',
   arrowR: ['M5 12h14', 'M13 6l6 6-6 6'],
   check: 'M20 6L9 17l-5-5',
   phone: 'M5 4h3l2 5-2.5 1.5a11 11 0 005 5L14 13l5 2v3a2 2 0 01-2 2A16 16 0 013 6a2 2 0 012-2z',

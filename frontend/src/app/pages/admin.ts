@@ -1,11 +1,11 @@
-import { Component, OnDestroy, OnInit, computed, effect, inject, signal } from '@angular/core';
+import { Component, OnDestroy, OnInit, Signal, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
-import { ActionAudit, AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, PERM_MATRIX, Profile, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
+import { ActionAudit, AdminStats, Agency, AgencyPickupStats, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, PERM_MATRIX, Profile, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -359,6 +359,7 @@ import * as XLSX from 'xlsx';
             <span class="badge" style="background:var(--primary-soft,#e8f0fe);color:var(--primary);font-size:11px">{{ selectedUserIds().size }} {{ i18n.t('user_selected_n') }}</span>
           }
           <button class="btn btn-ghost" (click)="openNotifPanel(false)" style="padding:4px 9px;font-size:11px;display:flex;align-items:center;gap:5px"><ic name="bell" [size]="13"></ic> Notifier</button>
+          <button class="btn btn-ghost" (click)="refreshSection('users')" style="padding:4px 9px;font-size:11px" [title]="i18n.t('dash_refresh')"><ic name="refresh" [size]="13"></ic></button>
           <button class="btn btn-ghost" (click)="exportUsers()" [disabled]="!filteredUsers().length" style="margin-left:auto;padding:4px 9px;font-size:11px"><ic name="copy" [size]="13"></ic> {{ i18n.t('tx_export') }}</button>
         </div>
         <!-- Bulk action bar -->
@@ -450,7 +451,19 @@ import * as XLSX from 'xlsx';
           </div>
         }
         @if (usersLoading()) {
-        <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
+        <div style="display:flex;flex-direction:column">
+          @for (n of skeletonRows; track n) {
+            <div style="display:flex;align-items:center;gap:10px;padding:9px 2px;border-top:1px solid var(--border)">
+              <span class="skel" style="width:22px;height:22px;border-radius:3px;flex-shrink:0"></span>
+              <span class="skel" style="width:30px;height:30px;border-radius:50%;flex-shrink:0"></span>
+              <div style="flex:1;min-width:0">
+                <span class="skel" style="width:55%;height:13px;display:block;margin-bottom:5px"></span>
+                <span class="skel" style="width:38%;height:10px;display:block"></span>
+              </div>
+              <span class="skel" style="width:64px;height:20px;border-radius:99px"></span>
+            </div>
+          }
+        </div>
         } @else if (!filteredUsers().length) {
         <p class="muted" style="font-size:13px;text-align:center;padding:24px 8px">{{ i18n.t('users_no_match') }}</p>
         } @else {
@@ -758,6 +771,163 @@ import * as XLSX from 'xlsx';
       @if (section() === 'agencies') {
       <h1 style="font-size:21px">{{ i18n.t('nav_agencies') }}</h1>
 
+      <!-- Pickup-agency statistics -->
+      <div class="card" style="padding:16px">
+        <!-- Header -->
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+          <ic name="chart" [size]="16" style="color:var(--primary)"></ic>
+          <h3 style="font-size:14.5px">{{ i18n.t('ag_stats_title') }}</h3>
+          @if (agPickupStats(); as s) {
+            <span class="muted" style="margin-left:auto;font-size:11.5px;font-weight:700">{{ agPickupTotal() }} {{ i18n.t('tx_count') }}</span>
+          }
+          <button class="icon-btn" (click)="refreshAgencies()" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="14"></ic></button>
+        </div>
+
+        <!-- Period filter -->
+        <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+          @for (p of [{v:'all',l:'ag_period_all'},{v:'week',l:'ag_period_week'},{v:'month',l:'ag_period_month'},{v:'custom',l:'ag_period_custom'}]; track p.v) {
+            <button class="btn" style="padding:4px 11px;font-size:12px"
+              [class.btn-primary]="agStatsPeriod() === p.v"
+              [class.btn-outline]="agStatsPeriod() !== p.v"
+              (click)="agStatsPeriod.set($any(p.v))">{{ i18n.t(p.l) }}</button>
+          }
+        </div>
+        @if (agStatsPeriod() === 'custom') {
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <input class="input" type="date" [value]="agStatsFrom()" (change)="agStatsFrom.set($any($event.target).value)" style="flex:1;min-width:105px" />
+            <span class="muted" style="font-size:12px">→</span>
+            <input class="input" type="date" [value]="agStatsTo()" (change)="agStatsTo.set($any($event.target).value)" style="flex:1;min-width:105px" />
+          </div>
+        }
+
+        @if (agStatsLoading()) {
+          <!-- Skeleton -->
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px">
+            @for (n of [1,2,3]; track n) {
+              <div class="kpi"><span class="skel" style="width:40px;height:28px;display:block;margin-bottom:6px"></span><span class="skel" style="width:70%;height:11px;display:block"></span></div>
+            }
+          </div>
+          @for (n of [1,2,3,4,5]; track n) {
+            <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)">
+              <span class="skel" style="width:20px;height:12px;display:block"></span>
+              <div style="flex:1;min-width:0"><span class="skel" style="width:65%;height:13px;display:block;margin-bottom:5px"></span><span class="skel" style="width:100%;height:5px;display:block"></span></div>
+              <span class="skel" style="width:24px;height:16px;display:block"></span>
+            </div>
+          }
+        } @else if (agPickupStats(); as s) {
+          <!-- Delivery-mode KPIs -->
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:14px">
+            <div class="kpi" [style.borderColor]="'var(--primary)'" style="border-width:2px">
+              <div class="kv" style="font-size:20px;color:var(--primary)">{{ s.totalAgence }}</div>
+              <div class="kl">{{ i18n.t('ag_delivery_agence') }}</div>
+              @if (agPickupTotal() > 0) {
+                <div style="margin-top:6px;height:4px;border-radius:2px;background:var(--surface-2);overflow:hidden">
+                  <div [style.width.%]="s.totalAgence * 100 / agPickupTotal()" style="height:100%;background:var(--primary);border-radius:2px"></div>
+                </div>
+                <div style="font-size:10.5px;font-weight:700;color:var(--primary);margin-top:3px">{{ (s.totalAgence * 100 / agPickupTotal()).toFixed(1) }}%</div>
+              }
+            </div>
+            <div class="kpi">
+              <div class="kv" style="font-size:20px;color:var(--success)">{{ s.totalPromote }}</div>
+              <div class="kl">{{ i18n.t('ag_delivery_promote') }}</div>
+              @if (agPickupTotal() > 0) {
+                <div style="margin-top:6px;height:4px;border-radius:2px;background:var(--surface-2);overflow:hidden">
+                  <div [style.width.%]="s.totalPromote * 100 / agPickupTotal()" style="height:100%;background:var(--success);border-radius:2px"></div>
+                </div>
+                <div style="font-size:10.5px;font-weight:700;color:var(--success);margin-top:3px">{{ (s.totalPromote * 100 / agPickupTotal()).toFixed(1) }}%</div>
+              }
+            </div>
+            <div class="kpi">
+              <div class="kv" style="font-size:20px;color:var(--af-gold)">{{ s.totalHome }}</div>
+              <div class="kl">{{ i18n.t('ag_delivery_home') }}</div>
+              @if (agPickupTotal() > 0) {
+                <div style="margin-top:6px;height:4px;border-radius:2px;background:var(--surface-2);overflow:hidden">
+                  <div [style.width.%]="s.totalHome * 100 / agPickupTotal()" style="height:100%;background:var(--af-gold);border-radius:2px"></div>
+                </div>
+                <div style="font-size:10.5px;font-weight:700;color:var(--af-gold);margin-top:3px">{{ (s.totalHome * 100 / agPickupTotal()).toFixed(1) }}%</div>
+              }
+            </div>
+          </div>
+
+          <!-- Branch ranking -->
+          @if (s.byAgency.length) {
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <div class="kicker" style="margin:0">{{ i18n.t('ag_stats_ranking') }}</div>
+              <span class="muted" style="font-size:11px">{{ i18n.t('ag_stats_click_hint') }}</span>
+            </div>
+            @for (b of s.byAgency; track b.id; let i = $index) {
+              <!-- Agency row — clickable -->
+              <div (click)="toggleAgency(b.id)"
+                   [style.background]="agSelectedId() === b.id ? 'var(--accent-soft)' : 'transparent'"
+                   style="cursor:pointer;border-top:1px solid var(--border);border-radius:4px">
+                <div style="display:flex;align-items:center;gap:10px;padding:9px 6px">
+                  <span style="font-size:12px;font-weight:800;color:var(--muted);width:22px;text-align:right;flex-shrink:0">{{ i + 1 }}</span>
+                  <div style="flex:1;min-width:0">
+                    <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+                         [style.color]="agSelectedId() === b.id ? 'var(--accent)' : 'var(--text)'">{{ b.name }}</div>
+                    <div style="margin-top:4px;height:5px;border-radius:3px;background:var(--surface-2);overflow:hidden">
+                      <div [style.width.%]="b.count * 100 / s.byAgency[0].count"
+                           [style.background]="agSelectedId() === b.id ? 'var(--accent)' : 'var(--primary)'"
+                           style="height:100%;border-radius:3px;transition:width .3s"></div>
+                    </div>
+                  </div>
+                  <div style="text-align:right;flex-shrink:0">
+                    <div style="font-size:15px;font-weight:800" [style.color]="agSelectedId() === b.id ? 'var(--accent)' : 'var(--primary)'">{{ b.count }}</div>
+                    @if (s.totalAgence > 0) {
+                      <div style="font-size:10px;font-weight:600;color:var(--muted)">{{ (b.count * 100 / s.totalAgence).toFixed(1) }}%</div>
+                    }
+                  </div>
+                  <ic [name]="agSelectedId() === b.id ? 'chevD' : 'chevR'" [size]="14" style="color:var(--muted);flex-shrink:0"></ic>
+                </div>
+
+                <!-- Drilldown: subscriptions for this agency -->
+                @if (agSelectedId() === b.id) {
+                  <div style="padding:0 6px 12px">
+                    @if (!agSelectedSubs().length) {
+                      <p class="muted" style="font-size:12.5px;text-align:center;padding:12px 0">{{ i18n.t('ag_drilldown_empty') }}</p>
+                    } @else {
+                      <div style="overflow-x:auto">
+                        <table class="tx-table" style="margin-top:4px">
+                          <thead>
+                            <tr>
+                              <th>{{ i18n.t('client') }}</th>
+                              <th>{{ i18n.t('phone') }}</th>
+                              <th>{{ i18n.t('tx_date') }}</th>
+                              <th>{{ i18n.t('tx_status') }}</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            @for (t of agSelectedPaged(); track t.ref) {
+                              <tr class="tx-tr" (click)="openRef(t.ref); $event.stopPropagation()">
+                                <td><div class="cell-name">{{ t.fullName }}</div><div class="cell-sub">{{ t.ref }}</div></td>
+                                <td>{{ t.phone || '—' }}</td>
+                                <td class="nowrap">{{ txDate(t.createdAt) }}</td>
+                                <td><status-badge [status]="rowStatus(t)"></status-badge></td>
+                              </tr>
+                            }
+                          </tbody>
+                        </table>
+                      </div>
+                      @if (agSelectedPageCount() > 1) {
+                        <div class="tx-pager" style="margin-top:8px">
+                          <span class="muted" style="font-size:11.5px">{{ agSelectedSubs().length }} · p.{{ agSelectedPage() + 1 }}/{{ agSelectedPageCount() }}</span>
+                          <div style="display:flex;gap:6px">
+                            <button class="btn btn-outline" (click)="agSelectedPage()>0&&agSelectedPage.set(agSelectedPage()-1);$event.stopPropagation()" [disabled]="agSelectedPage()===0" style="padding:5px 10px;font-size:13px"><ic name="chevL" [size]="15"></ic></button>
+                            <button class="btn btn-outline" (click)="agSelectedPage()<agSelectedPageCount()-1&&agSelectedPage.set(agSelectedPage()+1);$event.stopPropagation()" [disabled]="agSelectedPage()>=agSelectedPageCount()-1" style="padding:5px 10px;font-size:13px"><ic name="chevR" [size]="15"></ic></button>
+                          </div>
+                        </div>
+                      }
+                    }
+                  </div>
+                }
+              </div>
+            }
+          } @else {
+            <p class="muted" style="font-size:12.5px;text-align:center;padding:8px 0">{{ i18n.t('ag_stats_empty') }}</p>
+          }
+        }
+      </div>
+
       <!-- Import pickup agencies -->
       <div class="card" style="padding:16px;margin-top:12px">
         <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
@@ -831,14 +1001,31 @@ import * as XLSX from 'xlsx';
       </div>
 
       <!-- Current pickup agencies -->
-      <div class="kicker" style="margin-top:16px;margin-bottom:6px">{{ i18n.t('ag_list') }} · {{ agencies().length }}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:16px;margin-bottom:6px">
+        <div class="kicker" style="margin:0">{{ i18n.t('ag_list') }} · {{ filteredAgencies().length }}@if (agSearch().trim()) { / {{ agencies().length }} }</div>
+        <button class="btn btn-ghost" (click)="refreshSection('agencies')" style="padding:4px 9px;font-size:11px;margin-left:auto" [title]="i18n.t('dash_refresh')"><ic name="refresh" [size]="13"></ic></button>
+      </div>
+      <div class="input-prefix" style="margin-bottom:8px">
+        <span class="pfx"><ic name="search" [size]="15"></ic></span>
+        <input [placeholder]="i18n.t('user_search_ph')" [value]="agSearch()" (input)="agSearch.set($any($event.target).value)" />
+      </div>
       @if (agLoading()) {
-        <div class="load-center"><spinner tone="primary"></spinner></div>
-      } @else if (!agencies().length) {
+        <div class="card" style="padding:4px 0;overflow:hidden">
+          @for (n of skeletonRows; track n) {
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
+              <span class="skel" style="width:16px;height:16px;border-radius:3px;flex-shrink:0"></span>
+              <div style="flex:1;min-width:0">
+                <span class="skel" style="width:60%;height:13px;display:block;margin-bottom:4px"></span>
+                <span class="skel" style="width:35%;height:10px;display:block"></span>
+              </div>
+            </div>
+          }
+        </div>
+      } @else if (!filteredAgencies().length) {
         <p class="muted" style="font-size:12.5px">{{ i18n.t('ag_empty') }}</p>
       } @else {
         <div class="card" style="padding:4px 0;overflow:hidden">
-          @for (a of agencies(); track a.id) {
+          @for (a of filteredAgencies(); track a.id) {
             <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border)">
               <ic name="pin" [size]="16" style="color:var(--primary);flex-shrink:0"></ic>
               <div style="min-width:0;flex:1">
@@ -860,7 +1047,8 @@ import * as XLSX from 'xlsx';
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('all_sales') }}</h3>
           <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
-          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredTxs().length }} {{ i18n.t('tx_count') }}</span>
+          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredTxs().length }}@if (txSearch().trim() || txStatuses().size > 0 || txAgent() !== 'all' || txFrom() || txTo()) { / {{ txs().length }} } {{ i18n.t('tx_count') }}</span>
+          <button class="icon-btn" (click)="refreshSection('transactions')" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
         </div>
         <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
           <div class="input-prefix">
@@ -917,7 +1105,24 @@ import * as XLSX from 'xlsx';
           </div>
         </div>
         @if (txLoading()) {
-          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+          <div style="overflow-x:auto;padding:0 2px">
+            <table class="tx-table" aria-hidden="true">
+              <tbody>
+                @for (n of skeletonRows; track n) {
+                  <tr>
+                    <td><span class="skel" style="width:38px;height:38px;border-radius:50%;display:block"></span></td>
+                    <td><span class="skel" style="width:80%;height:13px;display:block;margin-bottom:5px"></span><span class="skel" style="width:50%;height:10px;display:block"></span></td>
+                    <td><span class="skel" style="width:75px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:60px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:80px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:70px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:55px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:60px;height:20px;border-radius:99px;display:block"></span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         } @else if (filteredTxs().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('tx_empty') }}</p>
         } @else {
@@ -985,7 +1190,8 @@ import * as XLSX from 'xlsx';
           <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('rch_all') }}</h3>
           <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
-          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredRecharges().length }} {{ i18n.t('tx_count') }}</span>
+          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredRecharges().length }}@if (rSearch().trim() || rStatus() !== 'all' || rPayFilter() !== 'all' || rFrom() || rTo()) { / {{ recharges().length }} } {{ i18n.t('tx_count') }}</span>
+          <button class="icon-btn" (click)="refreshSection('recharges')" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
         </div>
         <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
           <div class="input-prefix">
@@ -1020,7 +1226,23 @@ import * as XLSX from 'xlsx';
           </div>
         </div>
         @if (rLoading()) {
-          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+          <div style="overflow-x:auto;padding:0 2px">
+            <table class="tx-table" aria-hidden="true">
+              <tbody>
+                @for (n of skeletonRows; track n) {
+                  <tr>
+                    <td><span class="skel" style="width:80%;height:13px;display:block;margin-bottom:5px"></span><span class="skel" style="width:50%;height:10px;display:block"></span></td>
+                    <td><span class="skel" style="width:75px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:70px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:80px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:60px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:55px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:60px;height:20px;border-radius:99px;display:block"></span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         } @else if (filteredRecharges().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('rch_empty') }}</p>
         } @else {
@@ -1101,7 +1323,8 @@ import * as XLSX from 'xlsx';
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="store" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('col_all') }}</h3>
-          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredCollectes().length }} {{ i18n.t('tx_count') }}</span>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredCollectes().length }}@if (colSearch().trim() || colProduct() !== 'all' || colCommercial() !== 'all' || colFrom() || colTo()) { / {{ collectes().length }} } {{ i18n.t('tx_count') }}</span>
+          <button class="icon-btn" (click)="refreshSection('collectes')" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
         </div>
         <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
           <div class="input-prefix">
@@ -1129,7 +1352,22 @@ import * as XLSX from 'xlsx';
           </div>
         </div>
         @if (colLoading()) {
-          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+          <div style="overflow-x:auto;padding:0 2px">
+            <table class="tx-table" aria-hidden="true">
+              <tbody>
+                @for (n of skeletonRows; track n) {
+                  <tr>
+                    <td><span class="skel" style="width:70%;height:13px;display:block;margin-bottom:5px"></span><span class="skel" style="width:40%;height:10px;display:block"></span></td>
+                    <td><span class="skel" style="width:65%;height:13px;display:block;margin-bottom:5px"></span><span class="skel" style="width:45%;height:10px;display:block"></span></td>
+                    <td><span class="skel" style="width:80px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:90px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:80px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:24px;height:24px;border-radius:50%;display:block"></span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         } @else if (filteredCollectes().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('col_empty') }}</p>
         } @else {
@@ -1194,7 +1432,8 @@ import * as XLSX from 'xlsx';
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="shield" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('audit_title') }}</h3>
-          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredAudit().length }}</span>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredAudit().length }}@if (auditSearch().trim() || auditFilter() !== 'all') { / {{ loginAudits().length }} }</span>
+          <button class="icon-btn" (click)="refreshSection('audit')" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
         </div>
         <p class="muted" style="font-size:11.5px;padding:0 14px 8px">{{ i18n.t('audit_sub') }}</p>
         <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
@@ -1209,7 +1448,20 @@ import * as XLSX from 'xlsx';
           </div>
         </div>
         @if (auditLoading()) {
-          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+          <div style="overflow-x:auto;padding:0 2px">
+            <table class="tx-table" aria-hidden="true">
+              <tbody>
+                @for (n of skeletonRows; track n) {
+                  <tr>
+                    <td><span class="skel" style="width:80px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:70%;height:13px;display:block;margin-bottom:5px"></span><span class="skel" style="width:50%;height:10px;display:block"></span></td>
+                    <td><span class="skel" style="width:60px;height:20px;border-radius:99px;display:block"></span></td>
+                    <td><span class="skel" style="width:90px;height:12px;display:block"></span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         } @else if (filteredAudit().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('audit_empty') }}</p>
         } @else {
@@ -1271,7 +1523,21 @@ import * as XLSX from 'xlsx';
           </div>
         </div>
         @if (actLoading()) {
-          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+          <div style="overflow-x:auto;padding:0 2px">
+            <table class="tx-table" aria-hidden="true">
+              <tbody>
+                @for (n of skeletonRows; track n) {
+                  <tr>
+                    <td><span class="skel" style="width:80px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:70%;height:13px;display:block;margin-bottom:5px"></span><span class="skel" style="width:40%;height:10px;display:block"></span></td>
+                    <td><span class="skel" style="width:90px;height:20px;border-radius:4px;display:block"></span></td>
+                    <td><span class="skel" style="width:70px;height:12px;display:block"></span></td>
+                    <td><span class="skel" style="width:80%;height:12px;display:block"></span></td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         } @else if (filteredActions().length === 0) {
           <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('act_empty') }}</p>
         } @else {
@@ -1481,6 +1747,29 @@ export class AdminComponent implements OnInit, OnDestroy {
   section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
   auditTab = signal<'logins' | 'actions'>('logins');
 
+  readonly skeletonRows = [1, 2, 3, 4, 5, 6, 7, 8];
+
+  private debouncedOf<T>(src: Signal<T>, delay = 250): Signal<T> {
+    const out = signal<T>(src());
+    effect((onCleanup) => {
+      const v = src();
+      const t = setTimeout(() => out.set(v), delay);
+      onCleanup(() => clearTimeout(t));
+    });
+    return out;
+  }
+
+  loadedSections = new Set<string>();
+  private readonly _sectionEffect = effect(() => {
+    const s = this.section();
+    if (this.loadedSections.has(s)) return;
+    this.loadedSections.add(s);
+    if (s === 'agencies')    this.loadAgencies();
+    if (s === 'recharges')   this.loadRecharges();
+    if (s === 'collectes')   this.loadCollectes();
+    if (s === 'audit')       this.loadAudit();
+  });
+
   /** A supervisor (without ADMIN) gets a restricted view: only collecteur user management. */
   readonly isSupervisor = computed(() => this.auth.hasRole('SUPERVISEUR') && !this.auth.hasRole('ADMIN'));
   goCollecte() { this.router.navigateByUrl('/collecte'); }
@@ -1512,6 +1801,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   // --- user management ---
   usersList = signal<User[]>([]);
   userSearch = signal('');
+  private readonly dbUserSearch = this.debouncedOf(this.userSearch);
   userFilterRole = signal<Role | null>(null);
   userFilterDateFrom = signal('');
   userFilterDateTo = signal('');
@@ -1522,8 +1812,8 @@ export class AdminComponent implements OnInit, OnDestroy {
     !!this.userFilterDateFrom() || !!this.userFilterDateTo()
   );
   filteredUsers = computed(() => {
-    const q = this.userSearch().trim().toLowerCase();
-    const digits = this.userSearch().replace(/\D/g, '');
+    const q = this.dbUserSearch().trim().toLowerCase();
+    const digits = this.dbUserSearch().replace(/\D/g, '');
     const filterRole = this.userFilterRole();
     const dateFrom = this.userFilterDateFrom() ? new Date(this.userFilterDateFrom() + 'T00:00:00') : null;
     const dateTo = this.userFilterDateTo() ? new Date(this.userFilterDateTo() + 'T23:59:59') : null;
@@ -2000,6 +2290,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   // --- transaction filters ---
   txSearch    = signal('');
+  private readonly dbTxSearch = this.debouncedOf(this.txSearch);
   txStatuses  = signal<Set<string>>(new Set());  // multi-sélection de statuts
   txStatusOp  = signal<'OR' | 'AND'>('OR');      // opérateur entre les statuts sélectionnés
   txAgent     = signal('all');
@@ -2026,8 +2317,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   // --- expandable transaction detail (full client file) ---
   expandedRef = signal<string | null>(null);
   filteredTxs = computed(() => {
-    const q = this.txSearch().trim().toLowerCase();
-    const digits = this.txSearch().replace(/\D/g, '');
+    const q = this.dbTxSearch().trim().toLowerCase();
+    const digits = this.dbTxSearch().replace(/\D/g, '');
     const statuses = this.txStatuses(), op = this.txStatusOp();
     const ag = this.txAgent(), from = this.txFrom(), to = this.txTo();
     return this.txs().slice().reverse().filter((t) => {
@@ -2077,6 +2368,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   recharges = signal<Recharge[]>([]);
   rLoading = signal(true);
   rSearch = signal('');
+  private readonly dbRSearch = this.debouncedOf(this.rSearch);
   rStatus = signal('all');   // all | paid | pending | cash | sara_pending | failed
   rPayFilter = signal('all'); // all | om | mtn | sara | cash
   rFrom = signal('');
@@ -2092,8 +2384,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   filteredRecharges = computed(() => {
-    const q = this.rSearch().trim().toLowerCase();
-    const digits = this.rSearch().replace(/\D/g, '');
+    const q = this.dbRSearch().trim().toLowerCase();
+    const digits = this.dbRSearch().replace(/\D/g, '');
     const st = this.rStatus(), pay = this.rPayFilter(), from = this.rFrom(), to = this.rTo();
     return this.recharges().slice().reverse().filter((r) => {
       if (st !== 'all' && r.status !== st && r.payStatus !== st) return false;
@@ -2133,6 +2425,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   colLoading = signal(true);
   colBusy = signal(false);
   colSearch = signal('');
+  private readonly dbColSearch = this.debouncedOf(this.colSearch);
   colProduct = signal('all');     // all | <product code>
   colCommercial = signal('all');  // all | <collectedById>
   colFrom = signal('');
@@ -2174,8 +2467,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   });
 
   filteredCollectes = computed(() => {
-    const q = this.colSearch().trim().toLowerCase();
-    const digits = this.colSearch().replace(/\D/g, '');
+    const q = this.dbColSearch().trim().toLowerCase();
+    const digits = this.dbColSearch().replace(/\D/g, '');
     const prod = this.colProduct(), com = this.colCommercial(), from = this.colFrom(), to = this.colTo();
     return this.collectes().filter((c) => {
       if (prod !== 'all' && c.product !== prod) return false;
@@ -2297,6 +2590,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   loginAudits = signal<LoginAudit[]>([]);
   auditLoading = signal(true);
   auditSearch = signal('');
+  private readonly dbAuditSearch = this.debouncedOf(this.auditSearch);
   auditFilter = signal<'all' | 'ok' | 'ko'>('all');
   auditPage = signal(0);
   readonly auditPageSize = 20;
@@ -2306,7 +2600,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.api.loginAudit().subscribe({ next: (a) => { this.loginAudits.set(a); this.auditLoading.set(false); }, error: () => this.auditLoading.set(false) });
   }
   filteredAudit = computed(() => {
-    const q = this.auditSearch().trim().toLowerCase();
+    const q = this.dbAuditSearch().trim().toLowerCase();
     const f = this.auditFilter();
     return this.loginAudits().filter((a) => {
       if (f === 'ok' && !a.success) return false;
@@ -2338,6 +2632,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   actLoading = signal(false);
   actLoaded = false;
   actSearch = signal('');
+  private readonly dbActSearch = this.debouncedOf(this.actSearch);
   actPage = signal(0);
   readonly actPageSize = 20;
 
@@ -2351,7 +2646,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   filteredActions = computed(() => {
-    const q = this.actSearch().trim().toLowerCase();
+    const q = this.dbActSearch().trim().toLowerCase();
     if (!q) return this.actionAudits();
     return this.actionAudits().filter((a) => {
       const hay = `${a.actorName ?? ''} ${a.actorRoles ?? ''} ${a.action} ${a.entityType ?? ''} ${a.entityRef ?? ''} ${a.details ?? ''}`.toLowerCase();
@@ -2439,10 +2734,12 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.api.allSubscriptions().subscribe({ next: (t) => { this.txs.set(t); this.txLoading.set(false); }, error: () => this.txLoading.set(false) });
     this.api.getConfig().subscribe({ next: (c) => { this.cfg.set({ ...c }); this.original.set({ ...c }); this.cfgLoading.set(false); }, error: () => this.cfgLoading.set(false) });
     this.loadUsers();
-    this.loadAgencies();
-    this.loadRecharges();
-    this.loadCollectes();
-    this.loadAudit();
+    // Mark eagerly-loaded sections so the _sectionEffect doesn't trigger a second load on first visit.
+    this.loadedSections.add('overview');
+    this.loadedSections.add('transactions');
+    this.loadedSections.add('users');
+    this.loadedSections.add('config');
+    // agencies, recharges, collectes, audit are lazy-loaded by _sectionEffect on first visit
     // Silent background refresh of the KPIs + transactions table (no spinner, keeps filters intact).
     this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
   }
@@ -2647,15 +2944,118 @@ export class AdminComponent implements OnInit, OnDestroy {
   // --- pickup agencies (lieux de retrait) ---
   agencies = signal<Agency[]>([]);
   agLoading = signal(true);
+  agPickupStats = signal<AgencyPickupStats | null>(null);
+  agStatsLoading = signal(false);
+  agStatsPeriod = signal<'all' | 'week' | 'month' | 'custom'>('all');
+  agStatsFrom = signal('');
+  agStatsTo = signal('');
+  agSelectedId = signal<string | null>(null);
+  agSelectedPage = signal(0);
+  readonly agSelectedPageSize = 8;
+  agSearch = signal('');
+  private readonly dbAgSearch = this.debouncedOf(this.agSearch);
+
+  agSelectedSubs = computed(() => {
+    const id = this.agSelectedId();
+    if (!id) return [];
+    return this.txs()
+      .filter(t => t.pickupAgencyId === id)
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  });
+  agSelectedPageCount = computed(() => Math.max(1, Math.ceil(this.agSelectedSubs().length / this.agSelectedPageSize)));
+  agSelectedPaged = computed(() => {
+    const all = this.agSelectedSubs();
+    const p = Math.min(this.agSelectedPage(), this.agSelectedPageCount() - 1);
+    return all.slice(p * this.agSelectedPageSize, p * this.agSelectedPageSize + this.agSelectedPageSize);
+  });
+  private readonly _agPageReset = effect(() => { this.agSelectedSubs(); this.agSelectedPage.set(0); });
+
+  private readonly _agStatsEffect = effect(() => {
+    if (this.section() !== 'agencies') return;
+    const period = this.agStatsPeriod();
+    let from = '', to = '';
+    if (period === 'week') {
+      const today = new Date();
+      const d = new Date(today); d.setDate(d.getDate() - 6);
+      from = d.toISOString().slice(0, 10);
+      to = today.toISOString().slice(0, 10);
+    } else if (period === 'month') {
+      const today = new Date();
+      from = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+      to = today.toISOString().slice(0, 10);
+    } else if (period === 'custom') {
+      from = this.agStatsFrom(); to = this.agStatsTo();
+      if (!from && !to) return;
+    }
+    this.loadAgencyStats(from || undefined, to || undefined);
+  });
   agText = signal('');
   agUpdate = signal(false);
   agBusy = signal(false);
   agErr = signal(false);
   agResult = signal<ImportAgenciesResult | null>(null);
 
+  filteredAgencies = computed(() => {
+    const q = this.dbAgSearch().trim().toLowerCase();
+    if (!q) return this.agencies();
+    return this.agencies().filter((a) => {
+      const hay = `${a.name} ${a.city ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  });
+
+  agPickupTotal = computed(() => {
+    const s = this.agPickupStats();
+    return s ? s.totalAgence + s.totalPromote + s.totalHome : 0;
+  });
+
   private loadAgencies() {
     this.agLoading.set(true);
     this.api.getAgencies().subscribe({ next: (a) => { this.agencies.set(a); this.agLoading.set(false); }, error: () => this.agLoading.set(false) });
+    // stats are driven by _agStatsEffect so we don't need to call loadAgencyStats() here
+  }
+
+  private loadAgencyStats(from?: string, to?: string) {
+    this.agStatsLoading.set(true);
+    this.agPickupStats.set(null);
+    this.api.agencyPickupStats(from, to).subscribe({
+      next: (s) => { this.agPickupStats.set(s); this.agStatsLoading.set(false); },
+      error: () => this.agStatsLoading.set(false),
+    });
+  }
+
+  refreshAgencies() {
+    this.loadAgencies();
+    const p = this.agStatsPeriod();
+    let from = '', to = '';
+    const today = new Date();
+    if (p === 'week') {
+      const d = new Date(today); d.setDate(d.getDate() - 6);
+      from = d.toISOString().slice(0, 10); to = today.toISOString().slice(0, 10);
+    } else if (p === 'month') {
+      from = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
+      to = today.toISOString().slice(0, 10);
+    } else if (p === 'custom') {
+      from = this.agStatsFrom(); to = this.agStatsTo();
+    }
+    this.loadAgencyStats(from || undefined, to || undefined);
+  }
+
+  toggleAgency(id: string) {
+    this.agSelectedId.update(cur => cur === id ? null : id);
+  }
+
+  refreshSection(s: string) {
+    if (s === 'users')         this.loadUsers();
+    else if (s === 'agencies') this.refreshAgencies();
+    else if (s === 'transactions') this.api.allSubscriptions().subscribe({ next: (t) => this.txs.set(t), error: () => {} });
+    else if (s === 'recharges')  this.loadRecharges();
+    else if (s === 'collectes')  this.loadCollectes();
+    else if (s === 'audit') {
+      this.loadAudit();
+      this.actLoaded = false;
+      if (this.auditTab() === 'actions') this.loadActionAudit();
+    }
   }
 
   agParsedRows = computed<ImportAgencyRow[]>(() => this.parseAgencies(this.agText()));
