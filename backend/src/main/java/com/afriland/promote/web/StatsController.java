@@ -5,7 +5,6 @@ import com.afriland.promote.web.dto.Dtos.AdminStats;
 import com.afriland.promote.web.dto.Dtos.AgencyPickupStats;
 import com.afriland.promote.web.dto.Dtos.AgentStats;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
-import com.afriland.promote.web.dto.Dtos.DashboardStats;
 import com.afriland.promote.web.dto.Dtos.PaymentStats;
 import com.afriland.promote.web.dto.Dtos.PrintStats;
 import org.springframework.security.core.Authentication;
@@ -62,13 +61,4 @@ public class StatsController {
         return stats.agencyStats(fromDate, toDate);
     }
 
-    /** Director / sales manager monitoring dashboard (last 30 days by default). */
-    @GetMapping("/dashboard")
-    public DashboardStats dashboard(
-            @RequestParam(required = false) String from,
-            @RequestParam(required = false) String to) {
-        LocalDate toDate   = (to   != null && !to.isBlank())   ? LocalDate.parse(to)   : LocalDate.now();
-        LocalDate fromDate = (from != null && !from.isBlank()) ? LocalDate.parse(from) : toDate.minusDays(29);
-        return stats.dashboardStats(fromDate, toDate);
-    }
 }

@@ -4,7 +4,7 @@ import { Observable } from 'rxjs';
 import {
   AdminStats, Agency, AgencyPickupStats, Agent, AgentStats, AppNotification, CardConfig, CashierStats, ClaimResult,
   Collecte, CollecteStats, CreateCollecteRequest,
-  CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, DashboardStats, ImportAgenciesResult, ImportAgencyRow,
+  CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ActionAudit, ImportUserRow, ImportUsersResult, LoginAudit, Role,
   LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
 } from './models';
@@ -279,14 +279,6 @@ export class Api {
   /** Admin — Mobile Money payment funnel (acceptance, latency, failure causes, by network). */
   paymentStats(): Observable<PaymentStats> {
     return this.http.get<PaymentStats>(`${this.base}/stats/payments`);
-  }
-
-  /** Director / sales manager monitoring dashboard. Defaults to the last 30 days. */
-  dashboardStats(from?: string, to?: string): Observable<DashboardStats> {
-    const params: Record<string, string> = {};
-    if (from) params['from'] = from;
-    if (to)   params['to']   = to;
-    return this.http.get<DashboardStats>(`${this.base}/stats/dashboard`, { params });
   }
 
   // ---- notifications ----

@@ -60,8 +60,6 @@ import * as XLSX from 'xlsx';
           }
           <!-- Collecte statistics — reachable by supervisor (and admin) on a page of its own. -->
           <button (click)="goCollecteStats()"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_collecte_stats') }}</button>
-          <!-- Executive monitoring dashboard -->
-          <button (click)="goDashboard()"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_dashboard') }}</button>
         </nav>
         <div class="admin-spacer"></div>
         <nav class="admin-nav admin-logout">
@@ -1185,6 +1183,82 @@ import * as XLSX from 'xlsx';
       <!-- ========== RECHARGES (paiements de recharge de carte prépayée) ========== -->
       @if (section() === 'recharges') {
       <h1 style="font-size:21px">{{ i18n.t('nav_recharges') }}</h1>
+
+      <!-- ===== Recharge KPI dashboard ===== -->
+      @if (rchKpi(); as k) {
+      <div class="card" style="padding:16px;margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+          <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">{{ i18n.t('rch_kpi_title') }}</h3>
+          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
+        </div>
+
+        <!-- 3 headline KPIs -->
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">
+          <div class="kpi" [title]="i18n.t('rch_kpi_total_desc')">
+            <div class="kv">{{ k.total }}</div>
+            <div class="kl">{{ i18n.t('rch_kpi_total') }}</div>
+          </div>
+          <div class="kpi" [title]="i18n.t('rch_kpi_rate_desc')">
+            <div class="kv" style="color:var(--success)">{{ rate(k.paid, k.total) }}%</div>
+            <div class="kl">{{ i18n.t('pay_funnel_success_rate') }}</div>
+          </div>
+          <div class="kpi" [title]="i18n.t('rch_kpi_amount_desc')">
+            <div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(k.amount) }}</div>
+            <div class="kl">{{ i18n.t('rch_kpi_amount') }}</div>
+          </div>
+        </div>
+
+        <!-- Status pills -->
+        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;font-weight:700">
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--success-soft);color:var(--success)" [title]="i18n.t('rch_kpi_paid_desc')">
+            {{ k.paid }} {{ i18n.t('st_paid') }}
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--surface-2);color:var(--muted)" [title]="i18n.t('rch_kpi_pending_desc')">
+            {{ k.pending }} {{ i18n.t('st_pending') }}
+          </span>
+          <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)" [title]="i18n.t('rch_kpi_failed_desc')">
+            {{ k.failed }} {{ i18n.t('pay_funnel_technical_failed') }}
+          </span>
+        </div>
+
+        <!-- 14-day trend chart -->
+        @if (k.trends.length) {
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+          <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px">{{ i18n.t('rch_trend_title') }}</div>
+          <p class="muted" style="font-size:10px;line-height:1.35;margin-bottom:10px">{{ i18n.t('pay_trends_hint') }}</p>
+          <div style="display:flex;align-items:flex-end;gap:3px;height:110px;padding-bottom:2px">
+            @for (b of k.trends; track b.date) {
+              <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end"
+                   [title]="trendDayLabel(b.date) + ' — ' + i18n.t('st_paid') + ': ' + b.paid + ', ' + i18n.t('st_failed') + ': ' + b.failed + ', ' + i18n.t('st_pending') + ': ' + b.pending">
+                <div style="width:100%;max-width:28px;display:flex;flex-direction:column-reverse;gap:1px">
+                  @if (b.paid)    { <div [style.height.px]="rchTrendBarPx(b.paid)"    style="background:var(--success);border-radius:2px 2px 0 0;min-height:2px"></div> }
+                  @if (b.failed)  { <div [style.height.px]="rchTrendBarPx(b.failed)"  style="background:var(--accent);min-height:2px"></div> }
+                  @if (b.pending) { <div [style.height.px]="rchTrendBarPx(b.pending)" style="background:var(--af-gold);border-radius:0 0 2px 2px;min-height:2px"></div> }
+                </div>
+                <span style="font-size:8px;color:var(--muted);margin-top:4px;white-space:nowrap">{{ trendDayLabel(b.date) }}</span>
+              </div>
+            }
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:10.5px;font-weight:600">
+            <span style="color:var(--success)">■ {{ i18n.t('st_paid') }}</span>
+            <span style="color:var(--accent)">■ {{ i18n.t('st_failed') }}</span>
+            <span style="color:var(--af-gold)">■ {{ i18n.t('st_pending') }}</span>
+          </div>
+        </div>
+        }
+
+        <!-- By network -->
+        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+          <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_by_network') }}</div>
+          <div class="srow" style="padding:6px 0"><span class="lbl">Orange Money</span><span class="val">{{ k.om.paid }}/{{ k.om.total }} · {{ rate(k.om.paid, k.om.total) }}%</span></div>
+          <div class="srow" style="padding:6px 0"><span class="lbl">MTN MoMo</span><span class="val">{{ k.mtn.paid }}/{{ k.mtn.total }} · {{ rate(k.mtn.paid, k.mtn.total) }}%</span></div>
+          <div class="srow" style="padding:6px 0"><span class="lbl">SARA Money</span><span class="val">{{ k.sara.paid }}/{{ k.sara.total }} · {{ rate(k.sara.paid, k.sara.total) }}%</span></div>
+          <div class="srow" style="padding:6px 0"><span class="lbl">{{ i18n.t('pay_cash_name') }}</span><span class="val">{{ k.cash.paid }}/{{ k.cash.total }} · {{ rate(k.cash.paid, k.cash.total) }}%</span></div>
+        </div>
+      </div>
+      }
+
       <div class="card" style="overflow:hidden;max-width:1180px">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
@@ -1774,7 +1848,6 @@ export class AdminComponent implements OnInit, OnDestroy {
   readonly isSupervisor = computed(() => this.auth.hasRole('SUPERVISEUR') && !this.auth.hasRole('ADMIN'));
   goCollecte() { this.router.navigateByUrl('/collecte'); }
   goCollecteStats() { this.router.navigateByUrl('/collecte-stats'); }
-  goDashboard() { this.router.navigateByUrl('/dashboard'); }
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
@@ -2410,6 +2483,34 @@ export class AdminComponent implements OnInit, OnDestroy {
   rPrev() { this.rPage.update((p) => Math.max(0, p - 1)); }
   rNext() { this.rPage.update((p) => Math.min(this.rPageCount() - 1, p + 1)); }
   clearRFilters() { this.rSearch.set(''); this.rStatus.set('all'); this.rPayFilter.set('all'); this.rFrom.set(''); this.rTo.set(''); }
+
+  /** Aggregate KPIs computed client-side from the already-loaded recharges list. */
+  rchKpi = computed(() => {
+    const all = this.recharges();
+    if (!all.length) return null;
+    const byPay = (p: string) => ({ total: all.filter(r => r.pay === p).length, paid: all.filter(r => r.pay === p && r.payStatus === 'paid').length });
+    const paid   = all.filter(r => r.payStatus === 'paid').length;
+    const pending = all.filter(r => r.payStatus === 'pending').length;
+    const failed  = all.filter(r => r.payStatus === 'failed').length;
+    const amount  = all.filter(r => r.payStatus === 'paid').reduce((s, r) => s + r.amount, 0);
+    const cutoff  = new Date(); cutoff.setDate(cutoff.getDate() - 13);
+    const cutStr  = cutoff.toISOString().slice(0, 10);
+    const tMap    = new Map<string, { paid: number; failed: number; pending: number }>();
+    for (const r of all) {
+      const d = r.createdAt.slice(0, 10);
+      if (d < cutStr) continue;
+      const e = tMap.get(d) ?? { paid: 0, failed: 0, pending: 0 };
+      if (r.payStatus === 'paid') e.paid++; else if (r.payStatus === 'failed') e.failed++; else e.pending++;
+      tMap.set(d, e);
+    }
+    const trends = [...tMap.entries()].sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, v]) => ({ date, ...v, total: v.paid + v.failed + v.pending }));
+    return { total: all.length, paid, pending, failed, amount, om: byPay('om'), mtn: byPay('mtn'), sara: byPay('sara'), cash: byPay('cash'), trends };
+  });
+  rchTrendBarPx(n: number) {
+    const max = Math.max(1, ...( this.rchKpi()?.trends.map(t => t.paid + t.failed + t.pending) ?? []));
+    return Math.max(2, Math.round((n / max) * 88));
+  }
   exportRecharges() {
     const esc = (v: string) => `"${(v ?? '').replace(/"/g, '""')}"`;
     const header = ['Reference', 'Nom complet', 'PAN', 'Date', 'Paiement', 'Statut', 'Montant'];

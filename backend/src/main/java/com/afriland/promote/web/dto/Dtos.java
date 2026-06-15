@@ -346,38 +346,6 @@ public final class Dtos {
             List<FailureBucket> failuresByCategory,
             List<PaymentTrendBucket> trends) {}
 
-    // ---- monitoring dashboard ----
-
-    /** One day in the executive monitoring trend chart. */
-    public record DailyBucket(String date, long created, long paid, long printed, long failed, long amount) {}
-
-    /** Per-agent KPIs for the monitoring dashboard. */
-    public record AgentKpi(
-            String id, String name, String agency,
-            long total, long paid, long printed, long failed,
-            long todayTotal, long todayPaid,
-            double failureRate, double conversionRate, double printRate) {}
-
-    /** Comprehensive monitoring dashboard for directors and sales managers. */
-    public record DashboardStats(
-            // — today —
-            long todayCreated, long todayPaid, long todayPrinted, long todayFailed,
-            // — totals (in the requested window) —
-            long totalCreated, long totalPaid, long totalPrinted, long totalFailed,
-            long awaitingPrint, long awaitingPayment,
-            // — global rates (window) —
-            double conversionRate, double printRate, double failureRate,
-            // — per-agent breakdown (window) —
-            java.util.List<AgentKpi> perAgent,
-            // — daily trend (window) —
-            java.util.List<DailyBucket> dailyTrend,
-            // — payment method breakdown (window) —
-            long payByOm, long payByMtn, long payByCash, long payBySara,
-            // — channel provenance (window) —
-            long channelAgent, long channelSelf,
-            // — card lifecycle (window): activated = PAN assigned —
-            long totalActivated) {}
-
     // ---- pickup-agency stats ----
 
     /** One pickup-branch bucket in the agency stats ranking. */
