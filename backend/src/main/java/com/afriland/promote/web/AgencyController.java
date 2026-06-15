@@ -2,11 +2,13 @@ package com.afriland.promote.web;
 
 import com.afriland.promote.model.Agency;
 import com.afriland.promote.repo.AgencyRepository;
+import com.afriland.promote.service.ActionAuditService;
 import com.afriland.promote.web.dto.Dtos.AgencyDto;
 import com.afriland.promote.web.dto.Dtos.ImportAgenciesRequest;
 import com.afriland.promote.web.dto.Dtos.ImportAgenciesResult;
 import com.afriland.promote.web.dto.Dtos.ImportAgencyRow;
 import com.afriland.promote.web.dto.Dtos.ImportAgencyRowResult;
+import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,9 +24,11 @@ import java.util.*;
 public class AgencyController {
 
     private final AgencyRepository repo;
+    private final ActionAuditService audit;
 
-    public AgencyController(AgencyRepository repo) {
+    public AgencyController(AgencyRepository repo, ActionAuditService audit) {
         this.repo = repo;
+        this.audit = audit;
     }
 
     /** Public — active pickup points shown on the client form (alphabetical). */
@@ -40,7 +44,7 @@ public class AgencyController {
      */
     @PostMapping("/import")
     @Transactional
-    public ImportAgenciesResult importAgencies(@RequestBody ImportAgenciesRequest req) {
+    public ImportAgenciesResult importAgencies(@RequestBody ImportAgenciesRequest req, Authentication auth) {
         List<ImportAgencyRow> rows = req == null || req.rows() == null ? List.of() : req.rows();
         boolean update = req != null && req.updateExisting();
         List<ImportAgencyRowResult> out = new ArrayList<>();
@@ -88,7 +92,12 @@ public class AgencyController {
             out.add(new ImportAgencyRowResult(name, city, "created", null));
             created++;
         }
-        return new ImportAgenciesResult(created, updated, skipped, invalid, out);
+        ImportAgenciesResult result = new ImportAgenciesResult(created, updated, skipped, invalid, out);
+        if (created + updated > 0) {
+            audit.record(auth, "IMPORT_AGENCIES", "AGENCY", null,
+                    "Import agences : " + created + " créées, " + updated + " mises à jour");
+        }
+        return result;
     }
 
     /** Normalized dedup key — name + city, case/space-insensitive, null-safe. */

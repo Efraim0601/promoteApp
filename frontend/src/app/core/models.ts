@@ -58,6 +58,19 @@ export interface User {
 }
 
 /** One audited login attempt (admin view). */
+export interface ActionAudit {
+  id: string;
+  actorId: string | null;
+  actorName: string | null;
+  actorRoles: string | null;
+  action: string;              // CREATE_USER, DELETE_COLLECTE, …
+  entityType: string | null;
+  entityRef: string | null;
+  details: string | null;
+  ip: string | null;
+  at: string;
+}
+
 export interface LoginAudit {
   id: string;
   userId: string | null;

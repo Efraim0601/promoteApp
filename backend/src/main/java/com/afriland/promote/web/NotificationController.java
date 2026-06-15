@@ -1,5 +1,6 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.service.ActionAuditService;
 import com.afriland.promote.service.NotificationService;
 import com.afriland.promote.web.dto.Dtos.NotificationDto;
 import com.afriland.promote.web.dto.Dtos.SendNotificationRequest;
@@ -14,9 +15,11 @@ import java.util.Map;
 public class NotificationController {
 
     private final NotificationService service;
+    private final ActionAuditService audit;
 
-    public NotificationController(NotificationService service) {
+    public NotificationController(NotificationService service, ActionAuditService audit) {
         this.service = service;
+        this.audit = audit;
     }
 
     /** Logged-in user — their full notification history (newest first). */
@@ -48,5 +51,8 @@ public class NotificationController {
     @PostMapping
     public void send(@RequestBody SendNotificationRequest req, Authentication auth) {
         service.send((String) auth.getPrincipal(), req.title(), req.body(), req.recipientIds());
+        int count = req.recipientIds() == null ? 0 : req.recipientIds().size();
+        audit.record(auth, "SEND_NOTIF", "NOTIFICATION", null,
+                "Notification envoyée à " + count + " destinataire(s) : \"" + req.title() + "\"");
     }
 }

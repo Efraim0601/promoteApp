@@ -5,7 +5,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
-import { AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, PERM_MATRIX, Profile, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
+import { ActionAudit, AdminStats, Agency, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, PERM_MATRIX, Profile, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -1176,6 +1176,20 @@ import * as XLSX from 'xlsx';
       <!-- ========== AUDIT (journal des connexions) ========== -->
       @if (section() === 'audit') {
       <h1 style="font-size:21px">{{ i18n.t('nav_audit') }}</h1>
+      <!-- Sub-tabs: Connexions / Actions -->
+      <div style="display:flex;gap:6px;margin-bottom:12px;max-width:1180px">
+        <button class="btn" [class.btn-primary]="auditTab()==='logins'" [class.btn-outline]="auditTab()!=='logins'"
+                (click)="auditTab.set('logins')" style="flex:1;padding:8px;font-size:13px">
+          <ic name="shield" [size]="14"></ic> {{ i18n.t('act_tab_logins') }}
+        </button>
+        <button class="btn" [class.btn-primary]="auditTab()==='actions'" [class.btn-outline]="auditTab()!=='actions'"
+                (click)="auditTab.set('actions'); loadActionAudit()" style="flex:1;padding:8px;font-size:13px">
+          <ic name="edit" [size]="14"></ic> {{ i18n.t('act_tab_actions') }}
+        </button>
+      </div>
+
+      <!-- ── Connexions ── -->
+      @if (auditTab() === 'logins') {
       <div class="card" style="overflow:hidden;max-width:1180px">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="shield" [size]="17" style="color:var(--primary)"></ic>
@@ -1238,6 +1252,76 @@ import * as XLSX from 'xlsx';
           </div>
         }
       </div>
+      } <!-- end auditTab logins -->
+
+      <!-- ── Actions ── -->
+      @if (auditTab() === 'actions') {
+      <div class="card" style="overflow:hidden;max-width:1180px">
+        <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
+          <ic name="edit" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">{{ i18n.t('act_title') }}</h3>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredActions().length }}</span>
+        </div>
+        <p class="muted" style="font-size:11.5px;padding:0 14px 8px">{{ i18n.t('act_sub') }}</p>
+        <div style="padding:0 14px 12px">
+          <div class="input-prefix">
+            <span class="pfx"><ic name="search" [size]="15"></ic></span>
+            <input [placeholder]="i18n.t('act_search_ph')" [value]="actSearch()"
+                   (input)="actSearch.set($any($event.target).value)" />
+          </div>
+        </div>
+        @if (actLoading()) {
+          <div class="load-center" style="padding:24px 0"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (filteredActions().length === 0) {
+          <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('act_empty') }}</p>
+        } @else {
+          <div style="overflow-y:auto;overflow-x:auto;max-height:min(70vh,640px);padding:0 2px">
+            <table class="tx-table">
+              <colgroup>
+                <col style="width:148px"/><col style="width:160px"/><col style="width:170px"/><col style="width:120px"/><col/>
+              </colgroup>
+              <thead>
+                <tr>
+                  <th>{{ i18n.t('audit_when') }}</th>
+                  <th>{{ i18n.t('act_actor') }}</th>
+                  <th>{{ i18n.t('act_action') }}</th>
+                  <th>{{ i18n.t('act_entity') }}</th>
+                  <th>{{ i18n.t('act_details') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (a of pagedActions(); track a.id) {
+                  <tr class="tx-tr">
+                    <td class="nowrap">{{ txDate(a.at) }}</td>
+                    <td>
+                      <div class="cell-name">{{ a.actorName || '—' }}</div>
+                      <div class="cell-sub">{{ a.actorRoles || '' }}</div>
+                    </td>
+                    <td>
+                      <span class="badge" style="background:color-mix(in srgb,var(--primary) 12%,transparent);color:var(--primary);font-size:10.5px;white-space:nowrap">
+                        {{ actionLabel(a.action) }}
+                      </span>
+                    </td>
+                    <td class="muted" style="font-size:11.5px">
+                      @if (a.entityType) { <span style="font-weight:700">{{ a.entityType }}</span> }
+                      @if (a.entityRef) { <div class="cell-sub">{{ a.entityRef }}</div> }
+                    </td>
+                    <td style="font-size:12px;color:var(--text)">{{ a.details || '—' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+          <div class="tx-pager">
+            <span class="muted" style="font-size:11.5px">{{ filteredActions().length }} · {{ i18n.t('step') }} {{ actPage() + 1 }} {{ i18n.t('of') }} {{ actPageCount() }}</span>
+            <div style="display:flex;gap:6px">
+              <button class="btn btn-outline" (click)="actPrev()" [disabled]="actPage()===0" style="padding:7px 12px;font-size:13px"><ic name="chevL" [size]="16"></ic></button>
+              <button class="btn btn-outline" (click)="actNext()" [disabled]="actPage()>=actPageCount()-1" style="padding:7px 12px;font-size:13px"><ic name="chevR" [size]="16"></ic></button>
+            </div>
+          </div>
+        }
+      </div>
+      } <!-- end auditTab actions -->
       }
 
       <!-- ========== MAP ========== -->
@@ -1395,6 +1479,7 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   /** Active sidebar section. */
   section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
+  auditTab = signal<'logins' | 'actions'>('logins');
 
   /** A supervisor (without ADMIN) gets a restricted view: only collecteur user management. */
   readonly isSupervisor = computed(() => this.auth.hasRole('SUPERVISEUR') && !this.auth.hasRole('ADMIN'));
@@ -2246,6 +2331,47 @@ export class AdminComponent implements OnInit, OnDestroy {
     const key = 'audit_reason_' + (reason || 'ok');
     const t = this.i18n.t(key);
     return t === key ? (reason || '') : t;
+  }
+
+  // --- action audit ---
+  actionAudits = signal<ActionAudit[]>([]);
+  actLoading = signal(false);
+  actLoaded = false;
+  actSearch = signal('');
+  actPage = signal(0);
+  readonly actPageSize = 20;
+
+  loadActionAudit() {
+    if (this.actLoaded) return;
+    this.actLoading.set(true);
+    this.api.actionAudit().subscribe({
+      next: (a) => { this.actionAudits.set(a); this.actLoading.set(false); this.actLoaded = true; },
+      error: () => this.actLoading.set(false),
+    });
+  }
+
+  filteredActions = computed(() => {
+    const q = this.actSearch().trim().toLowerCase();
+    if (!q) return this.actionAudits();
+    return this.actionAudits().filter((a) => {
+      const hay = `${a.actorName ?? ''} ${a.actorRoles ?? ''} ${a.action} ${a.entityType ?? ''} ${a.entityRef ?? ''} ${a.details ?? ''}`.toLowerCase();
+      return hay.includes(q);
+    });
+  });
+  actPageCount = computed(() => Math.max(1, Math.ceil(this.filteredActions().length / this.actPageSize)));
+  pagedActions = computed(() => {
+    const all = this.filteredActions();
+    const p = Math.min(this.actPage(), this.actPageCount() - 1);
+    return all.slice(p * this.actPageSize, p * this.actPageSize + this.actPageSize);
+  });
+  private readonly _actPageReset = effect(() => { this.filteredActions(); this.actPage.set(0); });
+  actPrev() { this.actPage.update((p) => Math.max(0, p - 1)); }
+  actNext() { this.actPage.update((p) => Math.min(this.actPageCount() - 1, p + 1)); }
+
+  actionLabel(action: string): string {
+    const key = 'act_' + action;
+    const t = this.i18n.t(key);
+    return t === key ? action : t;
   }
 
   /** Success rate (%) guarded against division by zero. */

@@ -5,7 +5,7 @@ import {
   AdminStats, Agency, Agent, AgentStats, AppNotification, CardConfig, CashierStats, ClaimResult,
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, DashboardStats, ImportAgenciesResult, ImportAgencyRow,
-  ImportUserRow, ImportUsersResult, LoginAudit, Role,
+  ActionAudit, ImportUserRow, ImportUsersResult, LoginAudit, Role,
   LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
 } from './models';
 
@@ -242,6 +242,10 @@ export class Api {
   /** Admin — recent login attempts (audit trail). */
   loginAudit(): Observable<LoginAudit[]> {
     return this.http.get<LoginAudit[]>(`${this.base}/audit/logins`);
+  }
+  /** Admin — recent application mutations (action audit trail). */
+  actionAudit(): Observable<ActionAudit[]> {
+    return this.http.get<ActionAudit[]>(`${this.base}/audit/actions`);
   }
   /** Admin — bulk-import staff accounts; duplicates skipped or updated per updateExisting. */
   importUsers(rows: ImportUserRow[], updateExisting: boolean): Observable<ImportUsersResult> {

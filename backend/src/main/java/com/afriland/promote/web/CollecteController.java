@@ -3,6 +3,7 @@ package com.afriland.promote.web;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Collecte;
 import com.afriland.promote.repo.AppUserRepository;
+import com.afriland.promote.service.ActionAuditService;
 import com.afriland.promote.service.CollecteService;
 import com.afriland.promote.web.dto.Dtos.CollecteDto;
 import com.afriland.promote.web.dto.Dtos.CollecteStats;
@@ -27,10 +28,12 @@ public class CollecteController {
 
     private final CollecteService service;
     private final AppUserRepository users;
+    private final ActionAuditService audit;
 
-    public CollecteController(CollecteService service, AppUserRepository users) {
+    public CollecteController(CollecteService service, AppUserRepository users, ActionAuditService audit) {
         this.service = service;
         this.users = users;
+        this.audit = audit;
     }
 
     private static boolean isAdmin(Authentication auth) {
@@ -42,7 +45,10 @@ public class CollecteController {
     public CollecteDto create(@Valid @RequestBody CreateCollecteRequest req, Authentication auth) {
         String id = (String) auth.getPrincipal();
         String name = users.findById(id).map(AppUser::getName).orElse(null);
-        return CollecteDto.of(service.create(req, id, name));
+        CollecteDto dto = CollecteDto.of(service.create(req, id, name));
+        audit.record(auth, "CREATE_COLLECTE", "COLLECTE", dto.ref(),
+                "Collecte " + req.product() + " — client : " + req.clientNom());
+        return dto;
     }
 
     /** Admin — every collecte (most recent first). */
@@ -67,7 +73,10 @@ public class CollecteController {
     @PutMapping("/{ref}")
     public CollecteDto update(@PathVariable String ref, @Valid @RequestBody CreateCollecteRequest req, Authentication auth) {
         ownerOrAdmin(ref, auth);
-        return CollecteDto.of(service.update(ref, req));
+        CollecteDto dto = CollecteDto.of(service.update(ref, req));
+        audit.record(auth, "UPDATE_COLLECTE", "COLLECTE", ref,
+                "Modification collecte " + ref + " — produit : " + req.product());
+        return dto;
     }
 
     /** Delete a collecte — admin, or the collecteur who captured it. */
@@ -75,6 +84,7 @@ public class CollecteController {
     public ResponseEntity<Void> delete(@PathVariable String ref, Authentication auth) {
         ownerOrAdmin(ref, auth);
         service.delete(ref);
+        audit.record(auth, "DELETE_COLLECTE", "COLLECTE", ref, "Suppression collecte " + ref);
         return ResponseEntity.noContent().build();
     }
 

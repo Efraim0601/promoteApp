@@ -98,6 +98,17 @@ public final class Dtos {
         }
     }
 
+    /** One audited application action (admin view). */
+    public record ActionAuditDto(String id, String actorId, String actorName, String actorRoles,
+                                 String action, String entityType, String entityRef,
+                                 String details, String ip, String at) {
+        public static ActionAuditDto of(com.afriland.promote.model.ActionAudit a) {
+            return new ActionAuditDto(a.getId(), a.getActorId(), a.getActorName(), a.getActorRoles(),
+                    a.getAction(), a.getEntityType(), a.getEntityRef(), a.getDetails(),
+                    a.getIp(), a.getAt() == null ? null : a.getAt().toString());
+        }
+    }
+
     public record LoginResponse(String token, UserDto user) {}
 
     /** A logged-in user changes their own password. */

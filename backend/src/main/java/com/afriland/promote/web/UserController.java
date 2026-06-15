@@ -5,6 +5,7 @@ import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.security.TempPasswordGenerator;
+import com.afriland.promote.service.ActionAuditService;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -28,11 +29,14 @@ public class UserController {
     private final AppUserRepository users;
     private final PasswordEncoder encoder;
     private final EmailService email;
+    private final ActionAuditService audit;
 
-    public UserController(AppUserRepository users, PasswordEncoder encoder, EmailService email) {
+    public UserController(AppUserRepository users, PasswordEncoder encoder,
+                          EmailService email, ActionAuditService audit) {
         this.users = users;
         this.encoder = encoder;
         this.email = email;
+        this.audit = audit;
     }
 
     /** List staff accounts. Admin sees everyone; a supervisor sees only collecteurs + supervisors. */
@@ -82,13 +86,17 @@ public class UserController {
             }
         }
         u.setEnabled(req.enabled());
-        return ResponseEntity.ok(UserDto.of(users.save(u)));
+        UserDto saved = UserDto.of(users.save(u));
+        audit.record(auth, "TOGGLE_USER", "USER", id,
+                (req.enabled() ? "Activation" : "Désactivation") + " du compte " + u.getEmail());
+        return ResponseEntity.ok(saved);
     }
 
     /** Admin updates an existing account's profile (name, email, phone, agency). Roles and password
      *  are unchanged — use {@code PUT /{id}/roles} and the password-reset flow respectively. */
     @PutMapping("/{id}")
-    public ResponseEntity<?> update(@PathVariable String id, @Valid @RequestBody UpdateUserRequest req) {
+    public ResponseEntity<?> update(@PathVariable String id, @Valid @RequestBody UpdateUserRequest req,
+                                    Authentication auth) {
         AppUser u = users.findById(id).orElse(null);
         if (u == null) return ResponseEntity.notFound().build();
 
@@ -117,13 +125,17 @@ public class UserController {
         u.setEmail(email);
         u.setAgency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim());
         u.setPhone(phone);
-        return ResponseEntity.ok(UserDto.of(users.save(u)));
+        UserDto saved = UserDto.of(users.save(u));
+        audit.record(auth, "UPDATE_USER", "USER", id,
+                "Modification du compte " + email + " (" + name + ")");
+        return ResponseEntity.ok(saved);
     }
 
     /** Admin sets the full role set of an existing account (multi-role). At least one valid role;
      *  removing ADMIN from the last remaining admin is refused. */
     @PutMapping("/{id}/roles")
-    public ResponseEntity<?> setRoles(@PathVariable String id, @RequestBody SetRolesRequest req) {
+    public ResponseEntity<?> setRoles(@PathVariable String id, @RequestBody SetRolesRequest req,
+                                      Authentication auth) {
         AppUser u = users.findById(id).orElse(null);
         if (u == null) return ResponseEntity.notFound().build();
         List<Role> roles;
@@ -142,7 +154,10 @@ public class UserController {
             return ResponseEntity.badRequest().body(new ErrorResponse("agent_phone_required"));
         }
         u.assignRoles(roles);
-        return ResponseEntity.ok(UserDto.of(users.save(u)));
+        UserDto saved = UserDto.of(users.save(u));
+        audit.record(auth, "SET_ROLES", "USER", id,
+                "Rôles de " + u.getEmail() + " → " + String.join(",", roles.stream().map(Role::name).toList()));
+        return ResponseEntity.ok(saved);
     }
 
     /** Split a role cell into individual role tokens (separators: | / or +). */
@@ -188,8 +203,13 @@ public class UserController {
         if (u.getPhone() == null || !u.getPhone().matches("6\\d{8}")) {
             return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
         }
-        return provisionAccount(u, u.getName(), u.getEmail(), u.getAgency(), u.getPhone(),
-                new ArrayList<>(u.effectiveRoles()), true);
+        ResponseEntity<?> resp = provisionAccount(u, u.getName(), u.getEmail(), u.getAgency(),
+                u.getPhone(), new ArrayList<>(u.effectiveRoles()), true);
+        if (resp.getStatusCode().is2xxSuccessful()) {
+            audit.record(auth, "RECREATE_USER", "USER", id,
+                    "Recréation du compte " + u.getEmail());
+        }
+        return resp;
     }
 
     /** Reset login credentials for an active account: new temporary password (and collecteur PIN if
@@ -221,6 +241,8 @@ public class UserController {
         AppUser saved = users.save(u);
         this.email.sendCredentialsReset(saved.getEmail(), saved.getName(), collecteurOnly ? null : temp, pin,
                 saved.getPhone());
+        audit.record(auth, "RESET_CREDS", "USER", id,
+                "Réinitialisation des identifiants de " + saved.getEmail());
         return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), collecteurOnly ? "" : temp, pin));
     }
 
@@ -278,6 +300,9 @@ public class UserController {
         u.assignRoles(roles);
         AppUser saved = users.save(u);
         this.email.sendAccountCreated(saved.getEmail(), saved.getName(), temp);
+        audit.record(auth, "CREATE_USER", "USER", saved.getId(),
+                "Création du compte " + email + " (" + req.name().trim() + ")"
+                + " — rôles : " + String.join(",", roles.stream().map(Role::name).toList()));
         return ResponseEntity.ok(new CreateUserResult(UserDto.of(saved), temp, pin));
     }
 
@@ -309,7 +334,7 @@ public class UserController {
      */
     @PostMapping("/import")
     @Transactional
-    public ImportUsersResult importUsers(@RequestBody ImportUsersRequest req) {
+    public ImportUsersResult importUsers(@RequestBody ImportUsersRequest req, Authentication auth) {
         List<ImportUserRow> rows = req == null || req.rows() == null ? List.of() : req.rows();
         boolean update = req != null && req.updateExisting();
         List<ImportRowResult> out = new ArrayList<>();
@@ -410,7 +435,13 @@ public class UserController {
             out.add(new ImportRowResult(email, name, rolesLabel, "created", null, temp));
             created++;
         }
-        return new ImportUsersResult(created, updated, skipped, invalid, out);
+        ImportUsersResult result = new ImportUsersResult(created, updated, skipped, invalid, out);
+        if (created + updated > 0) {
+            audit.record(auth, "IMPORT_USERS", "USER", null,
+                    "Import utilisateurs : " + created + " créés, " + updated + " mis à jour, "
+                    + skipped + " ignorés, " + invalid + " invalides");
+        }
+        return result;
     }
 
     private static final Pattern EMAIL = Pattern.compile("^\\S+@\\S+\\.\\S+$");

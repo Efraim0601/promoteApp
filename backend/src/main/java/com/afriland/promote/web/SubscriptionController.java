@@ -2,6 +2,7 @@ package com.afriland.promote.web;
 
 import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
+import com.afriland.promote.service.ActionAuditService;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.storage.ImageStorage;
 import com.afriland.promote.web.dto.Dtos.*;
@@ -19,10 +20,13 @@ public class SubscriptionController {
 
     private final SubscriptionService service;
     private final ImageStorage storage;
+    private final ActionAuditService audit;
 
-    public SubscriptionController(SubscriptionService service, ImageStorage storage) {
+    public SubscriptionController(SubscriptionService service, ImageStorage storage,
+                                  ActionAuditService audit) {
         this.service = service;
         this.storage = storage;
+        this.audit = audit;
     }
 
     /** Assisted subscription — created by an authenticated relationship officer. */
@@ -100,8 +104,10 @@ public class SubscriptionController {
     /** Print point — mark a card printed & handed over. */
     @PatchMapping("/{ref}/print")
     public SubscriptionDto print(@PathVariable String ref, @RequestBody PrintRequest req, Authentication auth) {
-        // getName() yields the JWT subject (user id) in production, and stays safe under test principals.
-        return SubscriptionDto.of(service.markPrinted(ref, req.cardNumber(), req.pan(), auth.getName()));
+        SubscriptionDto dto = SubscriptionDto.of(service.markPrinted(ref, req.cardNumber(), req.pan(), auth.getName()));
+        audit.record(auth, "PRINT_SUB", "SUBSCRIPTION", ref,
+                "Impression carte souscription " + ref);
+        return dto;
     }
 
     /** Print point — replace a captured KYC image (e.g. retake a badly-shot photo) before printing. */
@@ -113,27 +119,43 @@ public class SubscriptionController {
     /** Point of sale (staff) — validate or reject a SARA money receipt.
      *  outcome = validate (→ paid) | reject (→ failed, with an optional reason). */
     @PatchMapping("/{ref}/sara-validate")
-    public SubscriptionDto saraValidate(@PathVariable String ref, @RequestBody SaraValidateRequest req) {
-        return SubscriptionDto.of(service.validateSara(ref, req));
+    public SubscriptionDto saraValidate(@PathVariable String ref, @RequestBody SaraValidateRequest req,
+                                        Authentication auth) {
+        SubscriptionDto dto = SubscriptionDto.of(service.validateSara(ref, req));
+        audit.record(auth, "SARA_VALIDATE_SUB", "SUBSCRIPTION", ref,
+                "Validation SARA souscription " + ref + " → " + req.outcome());
+        return dto;
     }
 
-    /** Cashier — validate or reject an in-person cash payment.
-     *  outcome = validate (→ paid, traced to the cashier) | reject (→ failed, with an optional reason). */
+    /** Cashier — validate or reject an in-person cash payment. */
     @PatchMapping("/{ref}/cash-validate")
     public SubscriptionDto cashValidate(@PathVariable String ref, @RequestBody CashValidateRequest req,
                                         Authentication auth) {
-        return SubscriptionDto.of(service.validateCash(ref, req.outcome(), req.reason(), (String) auth.getPrincipal(), req.paymentReference()));
+        SubscriptionDto dto = SubscriptionDto.of(service.validateCash(ref, req.outcome(), req.reason(), (String) auth.getPrincipal(), req.paymentReference()));
+        audit.record(auth, "CASH_VALIDATE_SUB", "SUBSCRIPTION", ref,
+                "Validation espèces souscription " + ref + " → " + req.outcome());
+        return dto;
     }
 
     /** Agent claims a paid, unattributed QR sale (optionally capturing the client's NIU). */
     @PostMapping("/claim")
     public ClaimResult claim(@Valid @RequestBody ClaimRequest req, Authentication auth) {
-        return service.claim((String) auth.getPrincipal(), req.phone(), req.cni(), req.niu());
+        ClaimResult result = service.claim((String) auth.getPrincipal(), req.phone(), req.cni(), req.niu());
+        if (result != null && result.ok() && result.record() != null) {
+            String ref = result.record().ref();
+            audit.record(auth, "CLAIM_SUB", "SUBSCRIPTION", ref,
+                    "Attribution souscription " + ref + " — tél. : " + req.phone());
+        }
+        return result;
     }
 
     /** Agent/admin — add or correct a client's NIU on an existing subscription. */
     @PatchMapping("/{ref}/niu")
-    public SubscriptionDto updateNiu(@PathVariable String ref, @RequestBody NiuUpdateRequest req) {
-        return SubscriptionDto.of(service.updateNiu(ref, req.niu()));
+    public SubscriptionDto updateNiu(@PathVariable String ref, @RequestBody NiuUpdateRequest req,
+                                     Authentication auth) {
+        SubscriptionDto dto = SubscriptionDto.of(service.updateNiu(ref, req.niu()));
+        audit.record(auth, "UPDATE_NIU", "SUBSCRIPTION", ref,
+                "NIU souscription " + ref + " → " + req.niu());
+        return dto;
     }
 }
