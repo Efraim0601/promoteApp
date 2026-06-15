@@ -866,26 +866,39 @@ import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } 
             <span class="pfx"><ic name="search" [size]="15"></ic></span>
             <input [placeholder]="i18n.t('tx_search_ph')" [value]="txSearch()" (input)="txSearch.set($any($event.target).value)" />
           </div>
-          <!-- Quick filter: failed payments in one click -->
-          <button (click)="toggleFailedFilter()"
-                  [style.background]="txStatus() === 'failed' ? 'var(--accent)' : 'var(--accent-soft)'"
-                  [style.color]="txStatus() === 'failed' ? '#fff' : 'var(--accent)'"
-                  style="align-self:flex-start;border:none;border-radius:var(--radius-pill);padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:7px;font-family:var(--font)">
-            <ic name="alert" [size]="15"></ic> {{ i18n.t('tx_quick_failed') }}
-            <span [style.background]="txStatus() === 'failed' ? 'rgba(255,255,255,.25)' : 'var(--accent)'"
-                  [style.color]="txStatus() === 'failed' ? '#fff' : '#fff'"
-                  style="min-width:18px;height:18px;padding:0 5px;border-radius:9px;font-size:11px;display:inline-flex;align-items:center;justify-content:center">{{ failedCount() }}</span>
-          </button>
+          <!-- Filtre statut multi-sélection avec opérateur AND / OR -->
+          <div style="display:flex;flex-direction:column;gap:6px">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Statut</span>
+              <!-- Opérateur -->
+              <div style="display:inline-flex;border:1px solid var(--border);border-radius:6px;overflow:hidden;font-size:11.5px;font-weight:700">
+                <button (click)="txStatusOp.set('OR')"
+                        [style.background]="txStatusOp() === 'OR' ? 'var(--primary)' : 'var(--surface)'"
+                        [style.color]="txStatusOp() === 'OR' ? '#fff' : 'var(--muted)'"
+                        style="border:none;padding:3px 10px;cursor:pointer;font-weight:700;font-size:11.5px;font-family:var(--font)">OU</button>
+                <button (click)="txStatusOp.set('AND')"
+                        [style.background]="txStatusOp() === 'AND' ? 'var(--primary)' : 'var(--surface)'"
+                        [style.color]="txStatusOp() === 'AND' ? '#fff' : 'var(--muted)'"
+                        style="border:none;border-left:1px solid var(--border);padding:3px 10px;cursor:pointer;font-weight:700;font-size:11.5px;font-family:var(--font)">ET</button>
+              </div>
+              @if (txStatuses().size > 0) {
+                <button (click)="txStatuses.set(new Set())" style="font-size:11px;color:var(--muted);background:none;border:none;cursor:pointer;text-decoration:underline;padding:0">Effacer</button>
+              }
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:5px">
+              @for (s of txStatusChips; track s.value) {
+                <button (click)="toggleTxStatus(s.value)"
+                        [style.background]="txStatuses().has(s.value) ? s.color : 'var(--surface-2)'"
+                        [style.color]="txStatuses().has(s.value) ? '#fff' : 'var(--muted)'"
+                        [style.borderColor]="txStatuses().has(s.value) ? s.color : 'var(--border)'"
+                        style="border:1.5px solid;border-radius:99px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);display:inline-flex;align-items:center;gap:5px">
+                  {{ s.label }}
+                  <span style="font-size:10.5px;opacity:.8">({{ s.count() }})</span>
+                </button>
+              }
+            </div>
+          </div>
           <div style="display:flex;gap:8px">
-            <select class="input" [value]="txStatus()" (change)="txStatus.set($any($event.target).value)" style="flex:1">
-              <option value="all">{{ i18n.t('tx_all_status') }}</option>
-              <option value="paid">{{ i18n.t('st_paid') }}</option>
-              <option value="pending">{{ i18n.t('st_pending') }}</option>
-              <option value="cash">{{ i18n.t('st_cash') }}</option>
-              <option value="sara_pending">{{ i18n.t('st_sara_pending') }}</option>
-              <option value="failed">{{ i18n.t('st_failed') }}</option>
-              <option value="printed">{{ i18n.t('st_printed') }}</option>
-            </select>
             <select class="input" [value]="txAgent()" (change)="txAgent.set($any($event.target).value)" style="flex:1">
               <option value="all">{{ i18n.t('tx_all_agents') }}</option>
               <option value="self">{{ i18n.t('tx_self') }}</option>
@@ -1898,19 +1911,43 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   // --- transaction filters ---
-  txSearch = signal('');
-  txStatus = signal('all');   // all | paid | pending | cash | failed | printed
-  txAgent = signal('all');    // all | <agentId> | self
-  txFrom = signal('');        // yyyy-mm-dd
-  txTo = signal('');
+  txSearch    = signal('');
+  txStatuses  = signal<Set<string>>(new Set());  // multi-sélection de statuts
+  txStatusOp  = signal<'OR' | 'AND'>('OR');      // opérateur entre les statuts sélectionnés
+  txAgent     = signal('all');
+  txFrom      = signal('');
+  txTo        = signal('');
+
+  toggleTxStatus(st: string) {
+    this.txStatuses.update(s => { const n = new Set(s); n.has(st) ? n.delete(st) : n.add(st); return n; });
+  }
+
+  private matchesSt(t: Subscription, st: string): boolean {
+    return t.status === st || t.payStatus === st;
+  }
+
+  readonly txStatusChips = [
+    { value: 'paid',         label: 'Encaissé',       color: '#10b981', count: computed(() => this.txs().filter(t => this.matchesSt(t, 'paid')).length) },
+    { value: 'pending',      label: 'En attente',      color: '#f59e0b', count: computed(() => this.txs().filter(t => this.matchesSt(t, 'pending')).length) },
+    { value: 'cash',         label: 'Cash',            color: '#6b7280', count: computed(() => this.txs().filter(t => this.matchesSt(t, 'cash')).length) },
+    { value: 'sara_pending', label: 'SARA',            color: '#8b5cf6', count: computed(() => this.txs().filter(t => this.matchesSt(t, 'sara_pending')).length) },
+    { value: 'failed',       label: 'Échoué',          color: '#ef4444', count: computed(() => this.txs().filter(t => this.matchesSt(t, 'failed')).length) },
+    { value: 'printed',      label: 'Imprimé',         color: '#6366f1', count: computed(() => this.txs().filter(t => this.matchesSt(t, 'printed')).length) },
+  ];
+
   // --- expandable transaction detail (full client file) ---
   expandedRef = signal<string | null>(null);
   filteredTxs = computed(() => {
     const q = this.txSearch().trim().toLowerCase();
     const digits = this.txSearch().replace(/\D/g, '');
-    const st = this.txStatus(), ag = this.txAgent(), from = this.txFrom(), to = this.txTo();
+    const statuses = this.txStatuses(), op = this.txStatusOp();
+    const ag = this.txAgent(), from = this.txFrom(), to = this.txTo();
     return this.txs().slice().reverse().filter((t) => {
-      if (st !== 'all' && t.status !== st && t.payStatus !== st) return false;
+      if (statuses.size > 0) {
+        const tests = [...statuses].map(st => this.matchesSt(t, st));
+        const match = op === 'AND' ? tests.every(Boolean) : tests.some(Boolean);
+        if (!match) return false;
+      }
       if (ag === 'self' ? t.channel !== 'self' : ag !== 'all' && t.agentId !== ag) return false;
       if (from && t.createdAt.slice(0, 10) < from) return false;
       if (to && t.createdAt.slice(0, 10) > to) return false;
@@ -1937,9 +1974,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   /** Number of failed transactions (for the quick "Échouées" filter chip). */
   failedCount = computed(() => this.txs().filter((t) => t.payStatus === 'failed' || t.status === 'failed').length);
   /** One-click toggle of the failed-only view. */
-  toggleFailedFilter() { this.txStatus.set(this.txStatus() === 'failed' ? 'all' : 'failed'); }
+  toggleFailedFilter() { this.toggleTxStatus('failed'); }
   /** Overview KPI → open the transactions table filtered on failed payments. */
-  showFailed() { this.txStatus.set('failed'); this.section.set('transactions'); }
+  showFailed() { this.txStatuses.set(new Set(['failed'])); this.section.set('transactions'); }
   txPrev() { this.txPage.update((p) => Math.max(0, p - 1)); }
   txNext() { this.txPage.update((p) => Math.min(this.txPageCount() - 1, p + 1)); }
 
@@ -2511,7 +2548,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   clearFilters() {
-    this.txSearch.set(''); this.txStatus.set('all'); this.txAgent.set('all'); this.txFrom.set(''); this.txTo.set('');
+    this.txSearch.set(''); this.txStatuses.set(new Set()); this.txStatusOp.set('OR'); this.txAgent.set('all'); this.txFrom.set(''); this.txTo.set('');
   }
   exportCsv() {
     const rows = this.filteredTxs();
