@@ -7,6 +7,7 @@ import { CollecteStats } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { SpinnerComponent } from '../shared/spinner';
+import { NotifBellComponent } from '../shared/notif-bell';
 
 /**
  * Collecte supervisor view: global statistics of bank-product sales (collectes), in a page of its
@@ -15,24 +16,25 @@ import { SpinnerComponent } from '../shared/spinner';
 @Component({
   selector: 'page-collecte-stats',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, SpinnerComponent],
+  imports: [AppBarComponent, IconComponent, SpinnerComponent, NotifBellComponent],
   template: `
   <div class="scr">
     <app-bar>
+      <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
     <div class="scr-body">
-      <div class="kicker"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('cs_kicker') }}</div>
-      <div style="display:flex;align-items:flex-start;gap:10px;margin:2px 0 14px">
-        <div style="min-width:0;flex:1">
-          <h1 style="font-size:21px">{{ i18n.t('cs_title') }}</h1>
-          <p class="muted" style="font-size:12.5px;line-height:1.5;margin-top:3px">{{ i18n.t('cs_sub') }}</p>
-        </div>
+      <div class="kicker" style="margin-bottom:4px"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('cs_kicker') }}</div>
+
+      <!-- Header row: title + action buttons -->
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+        <h1 style="font-size:21px;margin:0;flex:1">{{ i18n.t('cs_title') }}</h1>
         <button class="icon-btn" (click)="load()" [title]="i18n.t('map_reload')" style="flex-shrink:0"><ic name="refresh" [size]="16"></ic></button>
         @if (stats() && !loading()) {
           <button class="btn btn-outline" (click)="exportExcel()" style="font-size:12px;padding:6px 11px;flex-shrink:0"><ic name="download" [size]="13"></ic> {{ i18n.t('cs_export_xl') }}</button>
         }
       </div>
+      <p class="muted" style="font-size:12.5px;line-height:1.5;margin:0 0 16px">{{ i18n.t('cs_sub') }}</p>
 
       @if (loading()) {
         <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
