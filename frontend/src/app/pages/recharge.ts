@@ -210,7 +210,7 @@ interface RechargeForm {
 
         <field [label]="i18n.t('recharge_pan_label')" [hint]="i18n.t('recharge_pan_hint')" [err]="e('pan')">
           <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-            <input inputmode="numeric" maxlength="19" [placeholder]="i18n.t('recharge_pan_ph')" [value]="form.pan" (input)="onPan($any($event.target).value)" style="letter-spacing:.06em" />
+            <input inputmode="numeric" maxlength="19" [placeholder]="i18n.t('recharge_pan_ph')" [value]="panFocused() ? form.pan : panDisplay" (input)="onPan($any($event.target).value)" (focus)="panFocused.set(true)" (blur)="panFocused.set(false)" style="letter-spacing:.06em" />
           </div>
         </field>
 
@@ -294,6 +294,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   private geoFix: GeoFix | null = null;
 
   started = signal(false);
+  panFocused = signal(false);
   proc = signal<null | 'paying' | 'reference' | 'failed'>(null);
   phase = signal<'send' | 'wait'>('send');
   waitLong = signal(false);
@@ -350,6 +351,12 @@ export class RechargeComponent implements OnInit, OnDestroy {
   }
   /** PAN: keep digits only, capped at 16 (grouped in blocks of 4 for display). */
   onPan(v: string) { this.form.pan = formatPan(v); this.persist(); }
+  /** Masked display of the PAN when the field is not focused (middle 8 digits hidden). */
+  get panDisplay(): string {
+    const digits = this.form.pan.replace(/\D/g, '');
+    if (digits.length !== 16) return this.form.pan;
+    return digits.substring(0, 4) + ' **** **** ' + digits.substring(12);
+  }
   /** Amount: digits only. */
   onAmount(v: string) { this.form.amount = v.replace(/\D/g, '').slice(0, 7); this.persist(); }
 

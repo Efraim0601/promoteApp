@@ -267,16 +267,16 @@ import { NotifBellComponent } from '../shared/notif-bell';
                        [err]="cardTouched() && !cardNumberOk ? i18n.t('pp_card_number_required') : null">
                   <div class="input-prefix">
                     <span class="pfx"><ic name="idcard" [size]="16"></ic></span>
-                    <input [placeholder]="i18n.t('pp_card_number_ph')" [value]="cardNumber()"
-                           (input)="cardNumber.set($any($event.target).value)" style="letter-spacing:.04em;font-weight:600" />
+                    <input [placeholder]="i18n.t('pp_card_number_ph')" [value]="cardFocused() ? cardNumber() : cardNumberDisplay"
+                           (input)="cardNumber.set($any($event.target).value)" (focus)="cardFocused.set(true)" (blur)="cardFocused.set(false)" style="letter-spacing:.04em;font-weight:600" />
                   </div>
                 </field>
                 <!-- PAN (Primary Account Number) — captured at activation, optional -->
                 <field [label]="i18n.t('pp_pan')" [hint]="i18n.t('pp_pan_hint')">
                   <div class="input-prefix">
                     <span class="pfx"><ic name="idcard" [size]="16"></ic></span>
-                    <input inputmode="numeric" [placeholder]="i18n.t('pp_pan_ph')" [value]="pan()"
-                           (input)="pan.set(fmtPan($any($event.target).value))" style="letter-spacing:.04em;font-weight:600" />
+                    <input inputmode="numeric" [placeholder]="i18n.t('pp_pan_ph')" [value]="panFocused() ? pan() : panDisplay"
+                           (input)="pan.set(fmtPan($any($event.target).value))" (focus)="panFocused.set(true)" (blur)="panFocused.set(false)" style="letter-spacing:.04em;font-weight:600" />
                   </div>
                 </field>
               </div>
@@ -429,6 +429,8 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   printErr = signal<string | null>(null);
   cardNumber = signal('');
   pan = signal('');
+  cardFocused = signal(false);
+  panFocused = signal(false);
   cardTouched = signal(false);
   private objectUrls: string[] = [];
 
@@ -437,6 +439,13 @@ export class PrintPointComponent implements OnInit, OnDestroy {
 
   pm = (r: Subscription) => payById(r.pay);
   fmtPan = (v: string) => formatPan(v);
+  private maskDigits(raw: string): string {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length !== 16) return raw;
+    return digits.substring(0, 4) + ' **** **** ' + digits.substring(12);
+  }
+  get cardNumberDisplay(): string { return this.maskDigits(this.cardNumber()); }
+  get panDisplay(): string { return this.maskDigits(this.pan()); }
   status = (r: Subscription) => recordStatus(r);
   /** A card may be activated only when the payment is settled (MoMo paid, or cash to collect here). */
   canPrint = (r: Subscription) => r.payStatus === 'paid' || r.payStatus === 'cash';
