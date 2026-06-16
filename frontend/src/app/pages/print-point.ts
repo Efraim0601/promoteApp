@@ -7,7 +7,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { PrintStats, Recharge, Subscription } from '../core/models';
-import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, maskPan, panDigits } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -265,18 +265,28 @@ import { NotifBellComponent } from '../shared/notif-bell';
               <div style="padding:0 16px 16px;border-top:1px solid var(--border);padding-top:14px">
                 <field [label]="i18n.t('pp_card_number')" [hint]="i18n.t('pp_card_number_hint')"
                        [err]="cardTouched() && !cardNumberOk ? i18n.t('pp_card_number_required') : null">
-                  <div class="input-prefix">
-                    <span class="pfx"><ic name="idcard" [size]="16"></ic></span>
-                    <input [placeholder]="i18n.t('pp_card_number_ph')" [value]="cardFocused() ? cardNumber() : cardNumberDisplay"
-                           (input)="cardNumber.set($any($event.target).value)" (focus)="cardFocused.set(true)" (blur)="cardFocused.set(false)" style="letter-spacing:.04em;font-weight:600" />
+                  <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
+                    <ic name="idcard" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
+                    <input #cardPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="cardPrefix()"
+                           (input)="cardPrefix.set($any($event.target).value.replace(/\D/g,'').slice(0,4)); if(cardPrefix().length===4) cardSfx.focus()"
+                           style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;padding:11px 0" />
+                    <span style="color:var(--muted);letter-spacing:.1em;font-size:14px;font-weight:600;user-select:none">**** ****</span>
+                    <input #cardSfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="cardSuffix()"
+                           (input)="cardSuffix.set($any($event.target).value.replace(/\D/g,'').slice(0,4))"
+                           style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;padding:11px 0" />
                   </div>
                 </field>
                 <!-- PAN (Primary Account Number) — captured at activation, optional -->
                 <field [label]="i18n.t('pp_pan')" [hint]="i18n.t('pp_pan_hint')">
-                  <div class="input-prefix">
-                    <span class="pfx"><ic name="idcard" [size]="16"></ic></span>
-                    <input inputmode="numeric" [placeholder]="i18n.t('pp_pan_ph')" [value]="panFocused() ? pan() : panDisplay"
-                           (input)="pan.set(fmtPan($any($event.target).value))" (focus)="panFocused.set(true)" (blur)="panFocused.set(false)" style="letter-spacing:.04em;font-weight:600" />
+                  <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
+                    <ic name="idcard" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
+                    <input #panPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="panPrefix()"
+                           (input)="panPrefix.set($any($event.target).value.replace(/\D/g,'').slice(0,4)); if(panPrefix().length===4) panSfx.focus()"
+                           style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;padding:11px 0" />
+                    <span style="color:var(--muted);letter-spacing:.1em;font-size:14px;font-weight:600;user-select:none">**** ****</span>
+                    <input #panSfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="panSuffix()"
+                           (input)="panSuffix.set($any($event.target).value.replace(/\D/g,'').slice(0,4))"
+                           style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;padding:11px 0" />
                   </div>
                 </field>
               </div>
@@ -427,25 +437,27 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   cniBusy = signal(false);
   printing = signal(false);
   printErr = signal<string | null>(null);
-  cardNumber = signal('');
-  pan = signal('');
-  cardFocused = signal(false);
-  panFocused = signal(false);
+  cardPrefix = signal('');
+  cardSuffix = signal('');
+  panPrefix = signal('');
+  panSuffix = signal('');
   cardTouched = signal(false);
   private objectUrls: string[] = [];
 
-  /** Card number is mandatory before printing (light sanity check on length). */
-  get cardNumberOk() { return this.cardNumber().trim().length >= 4; }
+  /** Card number is mandatory: requires 4 prefix + 4 suffix digits. */
+  get cardNumberOk() { return this.cardPrefix().length === 4 && this.cardSuffix().length === 4; }
 
   pm = (r: Subscription) => payById(r.pay);
   fmtPan = (v: string) => formatPan(v);
-  private maskDigits(raw: string): string {
-    const digits = raw.replace(/\D/g, '');
-    if (digits.length !== 16) return raw;
-    return digits.substring(0, 4) + ' **** **** ' + digits.substring(12);
+
+  /** Extracts prefix (first 4 visible digits) and suffix (last 4 visible digits) from a masked
+   *  or raw PAN — used to pre-fill the split inputs when loading an existing record. */
+  private parsePanParts(v: string | null | undefined): { prefix: string; suffix: string } {
+    if (!v) return { prefix: '', suffix: '' };
+    const d = v.replace(/\D/g, '');
+    if (d.length >= 8) return { prefix: d.slice(0, 4), suffix: d.slice(-4) };
+    return { prefix: d.slice(0, 4), suffix: '' };
   }
-  get cardNumberDisplay(): string { return this.maskDigits(this.cardNumber()); }
-  get panDisplay(): string { return this.maskDigits(this.pan()); }
   status = (r: Subscription) => recordStatus(r);
   /** A card may be activated only when the payment is settled (MoMo paid, or cash to collect here). */
   canPrint = (r: Subscription) => r.payStatus === 'paid' || r.payStatus === 'cash';
@@ -540,7 +552,8 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   again() {
     this.ref.set(''); this.searched.set(false); this.rec.set(null); this.results.set([]); this.clearSelfie();
     this.rRec.set(null); this.rechargeResults.set([]); this.rValidated.set(false);
-    this.cardNumber.set(''); this.pan.set(''); this.cardTouched.set(false); this.retaking.set(false);
+    this.cardPrefix.set(''); this.cardSuffix.set(''); this.panPrefix.set(''); this.panSuffix.set('');
+    this.cardTouched.set(false); this.retaking.set(false);
   }
 
   /** Validate / reject a recharge's SARA receipt (mirrors the subscription SARA flow). */
@@ -582,7 +595,9 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     this.printErr.set(null);
     if (!this.cardNumberOk || this.printing()) return;
     this.printing.set(true);
-    this.api.print(ref, maskPan(this.cardNumber().trim()), maskPan(this.pan()) || undefined).subscribe({
+    const cardNum = `${this.cardPrefix()} **** **** ${this.cardSuffix()}`;
+    const pan = this.panPrefix() && this.panSuffix() ? `${this.panPrefix()} **** **** ${this.panSuffix()}` : undefined;
+    this.api.print(ref, cardNum, pan).subscribe({
       next: (s) => { this.rec.set(s); this.printing.set(false); this.loadStats(); },
       // 409 = the backend refused because the payment is not settled (defence in depth).
       error: (e) => { this.printing.set(false); this.printErr.set(e?.status === 409 ? 'pp_not_payable' : 'pp_print_error'); },
@@ -669,7 +684,9 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     this.rec.set(s);
     this.editingNiu.set(false); this.niuDraft.set('');
     this.retaking.set(false); this.photoBusy.set(false);
-    this.cardTouched.set(false); this.cardNumber.set(s.cardNumber ?? ''); this.pan.set(formatPan(s.pan ?? ''));
+    this.cardTouched.set(false);
+    const cp = this.parsePanParts(s.cardNumber); this.cardPrefix.set(cp.prefix); this.cardSuffix.set(cp.suffix);
+    const pp = this.parsePanParts(s.pan);        this.panPrefix.set(pp.prefix);  this.panSuffix.set(pp.suffix);
     // Prefill the editable SARA receipt fields with what was auto-extracted.
     this.saraRefDraft.set(s.saraRef ?? '');
     this.saraPhoneDraft.set(s.saraPayerPhone ?? '');

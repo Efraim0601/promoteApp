@@ -4,7 +4,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { Collecte, CreateCollecteRequest } from '../core/models';
-import { COLLECTE_PRODUCTS, CARD_TYPES, maskPan } from '../shared/constants';
+import { COLLECTE_PRODUCTS, CARD_TYPES } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -13,9 +13,10 @@ import { SpinnerComponent } from '../shared/spinner';
 
 interface CForm {
   product: string; clientNom: string; clientPhone: string;
-  cniNumber: string; accountNumber: string; cardNumber: string; cardType: string;
+  cniNumber: string; accountNumber: string;
+  cardPrefix: string; cardSuffix: string; cardType: string;
 }
-const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '', accountNumber: '', cardNumber: '', cardType: '' };
+const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '', accountNumber: '', cardPrefix: '', cardSuffix: '', cardType: '' };
 
 /**
  * Collecteur portal: capture bank-product sales (collectes) and manage one's own — the native
@@ -58,8 +59,15 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
 
           @if (form().product === 'carte_bancaire') {
             <field [label]="i18n.t('col_card_number')">
-              <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-                <input inputmode="numeric" [value]="form().cardNumber" (input)="set('cardNumber', $any($event.target).value)" [placeholder]="i18n.t('col_card_number_ph')" />
+              <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
+                <ic name="idcard" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
+                <input #cPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form().cardPrefix"
+                       (input)="set('cardPrefix', $any($event.target).value.replace(/\D/g,'').slice(0,4)); if(form().cardPrefix.length===4) cSfx.focus()"
+                       style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
+                <span style="color:var(--muted);letter-spacing:.1em;font-size:15px;font-weight:600;user-select:none">**** ****</span>
+                <input #cSfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form().cardSuffix"
+                       (input)="set('cardSuffix', $any($event.target).value.replace(/\D/g,'').slice(0,4))"
+                       style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
               </div>
             </field>
             <field [label]="i18n.t('col_card_type')" [err]="touched() && !form().cardType ? i18n.t('required') : null">
@@ -164,7 +172,8 @@ export class CollecteComponent implements OnInit {
       clientNom: f.clientNom.trim(),
       clientPhone: f.clientPhone.trim(),
       cniNumber: (f.product === 'compte_ouvert' || f.product === 'e_first') ? f.cniNumber.trim() : undefined,
-      cardNumber: f.product === 'carte_bancaire' ? maskPan(f.cardNumber.trim()) : undefined,
+      cardNumber: f.product === 'carte_bancaire' && f.cardPrefix && f.cardSuffix
+        ? `${f.cardPrefix} **** **** ${f.cardSuffix}` : undefined,
       cardType: f.product === 'carte_bancaire' ? f.cardType : undefined,
     };
   }
@@ -184,9 +193,12 @@ export class CollecteComponent implements OnInit {
 
   edit(c: Collecte) {
     this.editingRef.set(c.ref);
+    const d = (c.cardNumber ?? '').replace(/\D/g, '');
     this.form.set({
       product: c.product, clientNom: c.clientNom ?? '', clientPhone: c.clientPhone ?? '',
-      cniNumber: c.cniNumber ?? '', accountNumber: c.accountNumber ?? '', cardNumber: c.cardNumber ?? '', cardType: c.cardType ?? '',
+      cniNumber: c.cniNumber ?? '', accountNumber: c.accountNumber ?? '',
+      cardPrefix: d.slice(0, 4), cardSuffix: d.length >= 8 ? d.slice(-4) : '',
+      cardType: c.cardType ?? '',
     });
     this.touched.set(false); this.msg.set(''); this.err.set('');
     if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });

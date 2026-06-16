@@ -7,7 +7,7 @@ import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
 import { Geo, GeoFix } from '../core/geo';
 import { Recharge } from '../core/models';
-import { PAY_METHODS, payById, matchesOperator, formatPhone, formatPan, maskPan, PAN_DIGITS } from '../shared/constants';
+import { PAY_METHODS, payById, matchesOperator, formatPhone, formatPan, PAN_DIGITS } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
@@ -23,8 +23,9 @@ const MIN_AMOUNT = 500;
 const MAX_AMOUNT = 1_000_000;
 
 interface RechargeForm {
-  prenom: string; nom: string; phone: string; pan: string; amount: string;
-  pay: string; payPhone: string;
+  prenom: string; nom: string; phone: string;
+  panPrefix: string; panSuffix: string;
+  amount: string; pay: string; payPhone: string;
   saraReceiptData: string | null; saraReceiptKey: string | null; saraRef: string;
 }
 
@@ -209,8 +210,15 @@ interface RechargeForm {
         <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
 
         <field [label]="i18n.t('recharge_pan_label')" [hint]="i18n.t('recharge_pan_hint')" [err]="e('pan')">
-          <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-            <input inputmode="numeric" maxlength="19" [placeholder]="i18n.t('recharge_pan_ph')" [value]="panFocused() ? form.pan : panDisplay" (input)="onPan($any($event.target).value)" (focus)="panFocused.set(true)" (blur)="panFocused.set(false)" style="letter-spacing:.06em" />
+          <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
+            <ic name="idcard" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
+            <input #panPrefix inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form.panPrefix"
+                   (input)="onPanPrefix($any($event.target).value, panSuffix)"
+                   style="width:56px;text-align:center;letter-spacing:.12em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
+            <span style="color:var(--muted);letter-spacing:.12em;font-size:15px;font-weight:600;user-select:none">**** ****</span>
+            <input #panSuffix inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form.panSuffix"
+                   (input)="onPanSuffix($any($event.target).value)"
+                   style="width:56px;text-align:center;letter-spacing:.12em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
           </div>
         </field>
 
@@ -294,7 +302,6 @@ export class RechargeComponent implements OnInit, OnDestroy {
   private geoFix: GeoFix | null = null;
 
   started = signal(false);
-  panFocused = signal(false);
   proc = signal<null | 'paying' | 'reference' | 'failed'>(null);
   phase = signal<'send' | 'wait'>('send');
   waitLong = signal(false);
@@ -319,7 +326,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   readonly saraSteps = ['sara_step1', 'sara_step2', 'sara_step3', 'sara_step4', 'sara_step5'];
 
   form: RechargeForm = {
-    prenom: '', nom: '', phone: '', pan: '', amount: '',
+    prenom: '', nom: '', phone: '', panPrefix: '', panSuffix: '', amount: '',
     pay: 'om', payPhone: '',
     saraReceiptData: null, saraReceiptKey: null, saraRef: '',
   };
@@ -349,21 +356,21 @@ export class RechargeComponent implements OnInit, OnDestroy {
     if (k === 'pay' && (v === 'om' || v === 'mtn') && !this.form.payPhone) this.form.payPhone = this.form.phone;
     this.persist();
   }
-  /** PAN: keep digits only, capped at 16 (grouped in blocks of 4 for display). */
-  onPan(v: string) { this.form.pan = formatPan(v); this.persist(); }
-  /** Masked display of the PAN when the field is not focused (middle 8 digits hidden). */
-  get panDisplay(): string {
-    const digits = this.form.pan.replace(/\D/g, '');
-    if (digits.length !== 16) return this.form.pan;
-    return digits.substring(0, 4) + ' **** **** ' + digits.substring(12);
+  /** PAN prefix (4 premiers chiffres) — auto-avance vers le champ suffix quand complet. */
+  onPanPrefix(v: string, suffixEl: HTMLInputElement) {
+    this.form.panPrefix = v.replace(/\D/g, '').slice(0, 4);
+    if (this.form.panPrefix.length === 4) suffixEl.focus();
+    this.persist();
   }
+  /** PAN suffix (4 derniers chiffres). */
+  onPanSuffix(v: string) { this.form.panSuffix = v.replace(/\D/g, '').slice(0, 4); this.persist(); }
   /** Amount: digits only. */
   onAmount(v: string) { this.form.amount = v.replace(/\D/g, '').slice(0, 7); this.persist(); }
 
   // ---- derived ----
   get pm() { return payById(this.form.pay); }
   get isMomo() { return this.form.pay === 'om' || this.form.pay === 'mtn'; }
-  get panDigits() { return this.form.pan.replace(/\D/g, ''); }
+  get panDigits() { return this.form.panPrefix + this.form.panSuffix; }
   get amountValue() { return parseInt(this.form.amount || '0', 10) || 0; }
   get isCash() { return this.result()?.payStatus === 'cash'; }
   get isSaraPending() { return this.result()?.payStatus === 'sara_pending'; }
@@ -383,7 +390,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   // ---- validation ----
   get nameOk() { return !!this.form.prenom.trim() && !!this.form.nom.trim(); }
   get phoneOk() { return isValidPhoneNumber(this.form.phone); }
-  get panOk() { return this.panDigits.length === PAN_DIGITS; }
+  get panOk() { return this.form.panPrefix.length === 4 && this.form.panSuffix.length === 4; }
   get amountOk() { const a = this.amountValue; return a >= this.min() && a <= this.max(); }
   get payPhoneOk() {
     const v = this.form.payPhone;
@@ -442,7 +449,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   private payload() {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), phone: this.form.phone,
-      pan: maskPan(this.form.pan), amount: this.amountValue, pay: this.form.pay,
+      pan: `${this.form.panPrefix} **** **** ${this.form.panSuffix}`, amount: this.amountValue, pay: this.form.pay,
       payPhone: this.isMomo ? this.form.payPhone : undefined,
       saraReceiptKey: this.form.pay === 'sara' ? this.form.saraReceiptKey : undefined,
       saraRef: this.form.pay === 'sara' ? (this.form.saraRef.trim() || undefined) : undefined,
