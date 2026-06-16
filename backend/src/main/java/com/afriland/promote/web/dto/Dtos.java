@@ -316,6 +316,7 @@ public final class Dtos {
 
     public record AdminStats(
             long total, long paid, long pending, long collected,
+            long totalPrinted,
             long todayPaid, long todayPrinted, long todayCollected, long todayPending,
             java.util.List<AgentBreakdown> byAgent) {}
 

@@ -113,6 +113,9 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     /** Overview — cash pending subscriptions in a date window (not yet printed). */
     long countByPayStatusAndPrintedFalseAndCreatedAtBetween(PayStatus payStatus, Instant from, Instant to);
 
+    /** Overview — cards actually retrieved (printed) in a date window. */
+    long countByPrintedTrueAndPrintedAtBetween(Instant from, Instant to);
+
     /** Overview — amount collected in a date window. */
     @Query("select coalesce(sum(s.amount), 0) from Subscription s "
             + "where s.payStatus = :st and s.createdAt >= :from and s.createdAt < :to")

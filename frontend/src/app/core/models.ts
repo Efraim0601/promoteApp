@@ -345,6 +345,7 @@ export interface AdminStats {
   paid: number;
   pending: number;
   collected: number;
+  totalPrinted: number;
   todayPaid: number;
   todayPrinted: number;
   todayCollected: number;

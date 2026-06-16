@@ -124,8 +124,9 @@ import * as XLSX from 'xlsx';
       </div>
 
       <!-- ===== KPIs globaux (filtrables par date) ===== -->
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
+        <div class="kpi"><div class="kv" style="color:var(--primary)">{{ stats()?.totalPrinted ?? 0 }}</div><div class="kl">Cartes récupérées{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
         <div class="kpi" style="position:relative;overflow:hidden">
           <div class="kv amount-block" style="color:var(--primary)">
             <span class="amount-main">{{ fmtAmount(stats()?.collected ?? 0) }}</span>

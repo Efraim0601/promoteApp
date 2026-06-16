@@ -47,22 +47,24 @@ public class StatsService {
         Instant todayStart = startOfToday();
 
         // Window-filtered counts — support one-sided ranges (only from OR only to).
-        long total, paid, pending, collected;
+        long total, paid, pending, collected, totalPrinted;
         boolean hasFilter = (from != null || to != null);
         if (hasFilter) {
             // Open lower bound → Instant.EPOCH; open upper bound → far future (today + 10 years).
             Instant fromInst = from != null ? from.atStartOfDay(zone).toInstant() : Instant.EPOCH;
             Instant toInst   = to   != null ? to.plusDays(1).atStartOfDay(zone).toInstant()
                                             : todayStart.plusSeconds(86400L * 3650);
-            total     = subs.countByCreatedAtBetween(fromInst, toInst);
-            paid      = subs.countByPayStatusAndCreatedAtBetween(PayStatus.paid, fromInst, toInst);
-            pending   = subs.countByPayStatusAndPrintedFalseAndCreatedAtBetween(PayStatus.cash, fromInst, toInst);
-            collected = subs.sumAmountByPayStatusAndCreatedAtBetween(PayStatus.paid, fromInst, toInst);
+            total        = subs.countByCreatedAtBetween(fromInst, toInst);
+            paid         = subs.countByPayStatusAndCreatedAtBetween(PayStatus.paid, fromInst, toInst);
+            pending      = subs.countByPayStatusAndPrintedFalseAndCreatedAtBetween(PayStatus.cash, fromInst, toInst);
+            collected    = subs.sumAmountByPayStatusAndCreatedAtBetween(PayStatus.paid, fromInst, toInst);
+            totalPrinted = subs.countByPrintedTrueAndPrintedAtBetween(fromInst, toInst);
         } else {
-            total     = subs.count();
-            paid      = subs.countByPayStatus(PayStatus.paid);
-            pending   = subs.countByPayStatusAndPrintedFalse(PayStatus.cash);
-            collected = subs.sumAmountByPayStatus(PayStatus.paid);
+            total        = subs.count();
+            paid         = subs.countByPayStatus(PayStatus.paid);
+            pending      = subs.countByPayStatusAndPrintedFalse(PayStatus.cash);
+            collected    = subs.sumAmountByPayStatus(PayStatus.paid);
+            totalPrinted = subs.countByPrintedTrue();
         }
 
         // Today's KPIs — use paidAt (not createdAt) so a pending from yesterday confirmed today is counted.
@@ -82,7 +84,7 @@ public class StatsService {
                 subs.countByAgentIdIsNull(), subs.collectedPaidOnline()));
         rows.sort(Comparator.comparingLong(AgentBreakdown::count).reversed());
 
-        return new AdminStats(total, paid, pending, collected, todayPaid, todayPrinted, todayCollected, todayPending, rows);
+        return new AdminStats(total, paid, pending, collected, totalPrinted, todayPaid, todayPrinted, todayCollected, todayPending, rows);
     }
 
     public AgentStats agentStats(String agentId) {
