@@ -7,7 +7,7 @@ import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
 import { Geo, GeoFix } from '../core/geo';
 import { Recharge } from '../core/models';
-import { PAY_METHODS, payById, matchesOperator, formatPhone, formatPan, PAN_DIGITS } from '../shared/constants';
+import { PAY_METHODS, payById, matchesOperator, formatPhone, formatPan, maskPan, PAN_DIGITS } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
@@ -442,7 +442,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   private payload() {
     return {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), phone: this.form.phone,
-      pan: this.panDigits, amount: this.amountValue, pay: this.form.pay,
+      pan: maskPan(this.form.pan), amount: this.amountValue, pay: this.form.pay,
       payPhone: this.isMomo ? this.form.payPhone : undefined,
       saraReceiptKey: this.form.pay === 'sara' ? this.form.saraReceiptKey : undefined,
       saraRef: this.form.pay === 'sara' ? (this.form.saraRef.trim() || undefined) : undefined,

@@ -136,11 +136,16 @@ public class RechargeService {
         if (sara && (req.saraReceiptKey() == null || req.saraReceiptKey().isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sara_receipt_required");
         }
-        // PAN: fixed at 16 digits (defence-in-depth — the form already enforces it).
-        String pan = req.pan() == null ? "" : req.pan().replaceAll("\\D", "");
-        if (pan.length() != PAN_DIGITS) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_pan");
+        // PAN: accept either the already-masked form ("5078 **** **** 5678", sent by the frontend)
+        // or raw 16 digits (fallback for legacy / direct API callers).
+        String rawPan = req.pan() == null ? "" : req.pan().trim();
+        if (!PanUtils.isMasked(rawPan)) {
+            String digits = rawPan.replaceAll("\\D", "");
+            if (digits.length() != PAN_DIGITS) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "invalid_pan");
+            }
         }
+        String pan = PanUtils.mask(rawPan);
         String payPhone = null;
         if (momo) {
             if (req.payPhone() == null || req.payPhone().isBlank()) {
@@ -169,7 +174,7 @@ public class RechargeService {
                 .nom(req.nom().trim())
                 .fullName((req.prenom().trim() + " " + req.nom().trim()).trim())
                 .phone(req.phone() == null ? null : req.phone().trim())
-                .pan(PanUtils.mask(pan))
+                .pan(pan)
                 .amount(amount)
                 .latitude(req.latitude())
                 .longitude(req.longitude())

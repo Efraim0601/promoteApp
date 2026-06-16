@@ -4,7 +4,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { Collecte, CreateCollecteRequest } from '../core/models';
-import { COLLECTE_PRODUCTS, CARD_TYPES } from '../shared/constants';
+import { COLLECTE_PRODUCTS, CARD_TYPES, maskPan } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -164,7 +164,7 @@ export class CollecteComponent implements OnInit {
       clientNom: f.clientNom.trim(),
       clientPhone: f.clientPhone.trim(),
       cniNumber: (f.product === 'compte_ouvert' || f.product === 'e_first') ? f.cniNumber.trim() : undefined,
-      cardNumber: f.product === 'carte_bancaire' ? f.cardNumber.trim() : undefined,
+      cardNumber: f.product === 'carte_bancaire' ? maskPan(f.cardNumber.trim()) : undefined,
       cardType: f.product === 'carte_bancaire' ? f.cardType : undefined,
     };
   }

@@ -7,7 +7,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { PrintStats, Recharge, Subscription } from '../core/models';
-import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, panDigits } from '../shared/constants';
+import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, maskPan, panDigits } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -582,7 +582,7 @@ export class PrintPointComponent implements OnInit, OnDestroy {
     this.printErr.set(null);
     if (!this.cardNumberOk || this.printing()) return;
     this.printing.set(true);
-    this.api.print(ref, this.cardNumber().trim(), panDigits(this.pan()) || undefined).subscribe({
+    this.api.print(ref, maskPan(this.cardNumber().trim()), maskPan(this.pan()) || undefined).subscribe({
       next: (s) => { this.rec.set(s); this.printing.set(false); this.loadStats(); },
       // 409 = the backend refused because the payment is not settled (defence in depth).
       error: (e) => { this.printing.set(false); this.printErr.set(e?.status === 409 ? 'pp_not_payable' : 'pp_print_error'); },

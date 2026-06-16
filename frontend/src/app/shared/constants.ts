@@ -61,6 +61,14 @@ export const formatPan = (v: string): string => {
   if (v.includes('*')) return v.trim();
   return panDigits(v).replace(/(.{4})/g, '$1 ').trim();
 };
+/** Mask the middle 8 digits of a 16-digit PAN before sending it over the wire.
+ *  "5078230012345678" → "5078 **** **** 5678". Returns the value unchanged if not 16 digits. */
+export const maskPan = (v: string): string => {
+  if (!v) return v;
+  const digits = panDigits(v);
+  if (digits.length !== PAN_DIGITS) return v;
+  return digits.substring(0, 4) + ' **** **** ' + digits.substring(12);
+};
 
 /** Retrait/livraison proposé au client. 'promote' (stand Promote) par défaut, ou 'agence'
  *  (retrait dans une agence Afriland à choisir). 'home' n'est plus proposé mais reste toléré
