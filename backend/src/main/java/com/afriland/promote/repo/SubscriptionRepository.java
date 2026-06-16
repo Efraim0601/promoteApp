@@ -125,6 +125,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     long sumAmountByPayStatusAndCreatedAtGreaterThanEqual(
             @Param("st") PayStatus st, @Param("since") Instant since);
 
+    /** Today KPI — cards paid today (paidAt, not createdAt — catches yesterday's pending confirmed today). */
+    long countByPayStatusAndPaidAtGreaterThanEqual(PayStatus payStatus, Instant since);
+
+    /** Today KPI — amount collected today (paidAt >= since). */
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s "
+            + "where s.payStatus = :st and s.paidAt >= :since")
+    long sumAmountByPayStatusAndPaidAtGreaterThanEqual(
+            @Param("st") PayStatus st, @Param("since") Instant since);
+
     /** Monitoring dashboard — count all subscriptions created since a given instant. */
     long countByCreatedAtGreaterThanEqual(Instant since);
 

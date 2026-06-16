@@ -46,11 +46,14 @@ public class StatsService {
         ZoneId zone = ZoneId.systemDefault();
         Instant todayStart = startOfToday();
 
-        // Window-filtered counts (when a date range is provided).
+        // Window-filtered counts — support one-sided ranges (only from OR only to).
         long total, paid, pending, collected;
-        if (from != null && to != null) {
-            Instant fromInst = from.atStartOfDay(zone).toInstant();
-            Instant toInst   = to.plusDays(1).atStartOfDay(zone).toInstant();
+        boolean hasFilter = (from != null || to != null);
+        if (hasFilter) {
+            // Open lower bound → Instant.EPOCH; open upper bound → far future (today + 10 years).
+            Instant fromInst = from != null ? from.atStartOfDay(zone).toInstant() : Instant.EPOCH;
+            Instant toInst   = to   != null ? to.plusDays(1).atStartOfDay(zone).toInstant()
+                                            : todayStart.plusSeconds(86400L * 3650);
             total     = subs.countByCreatedAtBetween(fromInst, toInst);
             paid      = subs.countByPayStatusAndCreatedAtBetween(PayStatus.paid, fromInst, toInst);
             pending   = subs.countByPayStatusAndPrintedFalseAndCreatedAtBetween(PayStatus.cash, fromInst, toInst);
@@ -62,10 +65,10 @@ public class StatsService {
             collected = subs.sumAmountByPayStatus(PayStatus.paid);
         }
 
-        // Today's KPIs — always absolute (independent of the date filter).
-        long todayPaid      = subs.countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.paid, todayStart);
+        // Today's KPIs — use paidAt (not createdAt) so a pending from yesterday confirmed today is counted.
+        long todayPaid      = subs.countByPayStatusAndPaidAtGreaterThanEqual(PayStatus.paid, todayStart);
         long todayPrinted   = subs.countByPrintedTrueAndPrintedAtGreaterThanEqual(todayStart);
-        long todayCollected = subs.sumAmountByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.paid, todayStart);
+        long todayCollected = subs.sumAmountByPayStatusAndPaidAtGreaterThanEqual(PayStatus.paid, todayStart);
 
         List<AgentBreakdown> rows = new ArrayList<>();
         for (AppUser a : users.findByRole(Role.AGENT)) {
