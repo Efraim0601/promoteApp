@@ -1208,13 +1208,24 @@ import * as XLSX from 'xlsx';
           </div>
           <!-- Filtre mode de paiement -->
           <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Mode</span>
+            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Paiement</span>
             @for (pm of [['all','Tous'],['om','Orange Money'],['mtn','MTN MoMo'],['cash','Espèces'],['sara','SARA']]; track pm[0]) {
               <button (click)="txPay.set(pm[0])"
                       [style.background]="txPay() === pm[0] ? 'var(--primary)' : 'var(--surface-2)'"
                       [style.color]="txPay() === pm[0] ? '#fff' : 'var(--muted)'"
                       [style.borderColor]="txPay() === pm[0] ? 'var(--primary)' : 'var(--border)'"
                       style="border:1.5px solid;border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:var(--font)">{{ pm[1] }}</button>
+            }
+          </div>
+          <!-- Filtre mode de retrait -->
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Retrait</span>
+            @for (d of [['all','Tous'],['agence','En agence'],['promote','Stand Promote'],['home','Domicile']]; track d[0]) {
+              <button (click)="txDelivery.set(d[0])"
+                      [style.background]="txDelivery() === d[0] ? 'var(--primary)' : 'var(--surface-2)'"
+                      [style.color]="txDelivery() === d[0] ? '#fff' : 'var(--muted)'"
+                      [style.borderColor]="txDelivery() === d[0] ? 'var(--primary)' : 'var(--border)'"
+                      style="border:1.5px solid;border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:var(--font)">{{ d[1] }}</button>
             }
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -2526,6 +2537,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   txFrom      = signal('');
   txTo        = signal('');
   txPay       = signal('all');  // filtre par mode de paiement (all | om | mtn | cash | sara)
+  txDelivery  = signal('all'); // filtre par mode de retrait (all | agence | promote | home)
 
   // KPIs calculés depuis les données brutes (indépendants des filtres actifs)
   txKpiTotal     = computed(() => this.txs().length);
@@ -2556,7 +2568,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const q = this.dbTxSearch().trim().toLowerCase();
     const digits = this.dbTxSearch().replace(/\D/g, '');
     const statuses = this.txStatuses(), op = this.txStatusOp();
-    const ag = this.txAgent(), from = this.txFrom(), to = this.txTo(), pay = this.txPay();
+    const ag = this.txAgent(), from = this.txFrom(), to = this.txTo(), pay = this.txPay(), delivery = this.txDelivery();
     return this.txs().slice().reverse().filter((t) => {
       if (statuses.size > 0) {
         const tests = [...statuses].map(st => this.matchesSt(t, st));
@@ -2565,6 +2577,7 @@ export class AdminComponent implements OnInit, OnDestroy {
       }
       if (ag === 'self' ? t.channel !== 'self' : ag !== 'all' && t.agentId !== ag) return false;
       if (pay !== 'all' && t.pay !== pay) return false;
+      if (delivery !== 'all' && t.delivery !== delivery) return false;
       if (from && t.createdAt.slice(0, 10) < from) return false;
       if (to && t.createdAt.slice(0, 10) > to) return false;
       if (q) {
@@ -3406,7 +3419,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   clearFilters() {
-    this.txSearch.set(''); this.txStatuses.set(new Set()); this.txStatusOp.set('OR'); this.txAgent.set('all'); this.txFrom.set(''); this.txTo.set(''); this.txPay.set('all');
+    this.txSearch.set(''); this.txStatuses.set(new Set()); this.txStatusOp.set('OR'); this.txAgent.set('all'); this.txFrom.set(''); this.txTo.set(''); this.txPay.set('all'); this.txDelivery.set('all');
   }
 
   clearOverviewFilter() {

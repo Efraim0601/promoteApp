@@ -294,12 +294,14 @@
         @if (touched() && !docsOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }
 
-      <!-- Step 2: client photo (front selfie or rear camera) -->
+      <!-- Step 2: client photo (facultatif) -->
       @else if (step() === 2) {
+        <p class="muted" style="font-size:11.5px;text-align:center;margin-bottom:4px;display:flex;align-items:center;justify-content:center;gap:5px">
+          <ic name="alert" [size]="13"></ic> {{ i18n.t('selfie_optional_hint') }}
+        </p>
         <photo-capture [imageData]="form.selfieData" facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
           [allowGallery]="false"
           [guide]="i18n.t('photo_guide')" (captured)="onSelfie($event)" (retake)="onRetakeSelfie()"></photo-capture>
-        @if (touched() && !selfieOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
       }
 
       <!-- Step 3: payment -->

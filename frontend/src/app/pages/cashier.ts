@@ -1,4 +1,5 @@
 import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { SlicePipe } from '@angular/common';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { ImagePreview } from '../shared/image-preview';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -20,7 +21,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
 @Component({
   selector: 'page-cashier',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent, NotifBellComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent, NotifBellComponent, SlicePipe],
   template: `
   <div class="scr">
     <app-bar>
@@ -43,11 +44,12 @@ import { NotifBellComponent } from '../shared/notif-bell';
         </button>
       }
 
-      <!-- Tabs: cash/GAB collection vs recharge validation. -->
-      <div style="display:flex;gap:8px">
-        <button class="btn" [class.btn-primary]="mode()==='especes'" [class.btn-outline]="mode()!=='especes'" (click)="setMode('especes')" style="flex:1;padding:9px;font-size:13px"><ic name="store" [size]="16"></ic> {{ i18n.t('cash_tab_cash') }}</button>
-        <button class="btn" [class.btn-primary]="mode()==='gab'" [class.btn-outline]="mode()!=='gab'" (click)="setMode('gab')" style="flex:1;padding:9px;font-size:13px"><ic name="hash" [size]="16"></ic> {{ i18n.t('cash_tab_gab') }}</button>
-        <button class="btn" [class.btn-primary]="mode()==='recharges'" [class.btn-outline]="mode()!=='recharges'" (click)="setMode('recharges')" style="flex:1;padding:9px;font-size:13px"><ic name="phone" [size]="16"></ic> {{ i18n.t('cash_tab_recharges') }}@if (pendingRch().length) { <span style="margin-left:5px;background:var(--warning);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ pendingRch().length }}</span> }</button>
+      <!-- Tabs: cash/GAB collection vs recharge validation vs agency pickups. -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <button class="btn" [class.btn-primary]="mode()==='especes'" [class.btn-outline]="mode()!=='especes'" (click)="setMode('especes')" style="flex:1;min-width:100px;padding:9px;font-size:12.5px"><ic name="store" [size]="15"></ic> {{ i18n.t('cash_tab_cash') }}</button>
+        <button class="btn" [class.btn-primary]="mode()==='gab'" [class.btn-outline]="mode()!=='gab'" (click)="setMode('gab')" style="flex:1;min-width:80px;padding:9px;font-size:12.5px"><ic name="hash" [size]="15"></ic> {{ i18n.t('cash_tab_gab') }}</button>
+        <button class="btn" [class.btn-primary]="mode()==='recharges'" [class.btn-outline]="mode()!=='recharges'" (click)="setMode('recharges')" style="flex:1;min-width:100px;padding:9px;font-size:12.5px"><ic name="phone" [size]="15"></ic> {{ i18n.t('cash_tab_recharges') }}@if (pendingRch().length) { <span style="margin-left:5px;background:var(--warning);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ pendingRch().length }}</span> }</button>
+        <button class="btn" [class.btn-primary]="mode()==='agence'" [class.btn-outline]="mode()!=='agence'" (click)="setMode('agence')" style="flex:1;min-width:100px;padding:9px;font-size:12.5px"><ic name="pin" [size]="15"></ic> Retraits agence@if (agencySubs().length) { <span style="margin-left:5px;background:var(--primary);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ agencySubs().length }}</span> }</button>
       </div>
 
       @if (mode() === 'especes' || mode() === 'gab') {
@@ -272,6 +274,38 @@ import { NotifBellComponent } from '../shared/notif-bell';
           </div>
         }
       }
+      } @else if (mode() === 'agence') {
+        <!-- Clients ayant choisi ce point de retrait agence -->
+        <div>
+          <h2 style="font-size:17px;margin-bottom:2px">Retraits en agence</h2>
+          <p class="muted" style="font-size:12.5px;line-height:1.4">Souscriptions dont le point de retrait correspond à votre agence.</p>
+        </div>
+        @if (agenceLoading()) {
+          <div class="card load-center"><spinner tone="primary" [size]="20"></spinner></div>
+        } @else if (!agencySubs().length) {
+          <div class="card" style="padding:20px;text-align:center"><span class="muted" style="font-size:13px">Aucun retrait en attente pour cette agence.</span></div>
+        } @else {
+          @for (r of agencySubs(); track r.ref) {
+            <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:8px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:15px;font-weight:800">{{ r.fullName }}</div>
+                  <div class="muted" style="font-size:11.5px;margin-top:2px">{{ r.ref }} · {{ r.phone }}</div>
+                  <div style="font-size:11px;color:var(--primary);font-weight:700;margin-top:2px">{{ r.pickupAgencyName }}</div>
+                </div>
+                <status-badge [status]="status(r)"></status-badge>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span style="font-size:12px;color:var(--muted)">{{ r.createdAt | slice:0:10 }}</span>
+                <span style="font-size:12px;font-weight:700;color:var(--primary)">{{ i18n.money(r.amount) }}</span>
+                <span class="muted" style="font-size:11px">{{ r.pay === 'om' ? 'Orange Money' : r.pay === 'mtn' ? 'MTN MoMo' : r.pay === 'cash' ? 'Espèces' : r.pay }}</span>
+              </div>
+              <button class="btn btn-outline" (click)="openFromAgency(r.ref)" style="padding:8px;font-size:12.5px;width:auto;align-self:flex-start">
+                <ic name="search" [size]="14"></ic> Voir / Valider
+              </button>
+            </div>
+          }
+        }
       } @else if (mode() === 'recharges') {
         <div>
           <h2 style="font-size:17px;margin-bottom:2px">{{ i18n.t('cash_rch_title') }}</h2>
@@ -400,7 +434,7 @@ export class CashierComponent implements OnInit, OnDestroy {
   private objectUrls: string[] = [];
 
   // ---- recharge fulfillment (cashier credits the card after payment, then validates) ----
-  mode = signal<'especes' | 'gab' | 'recharges'>('especes');
+  mode = signal<'especes' | 'gab' | 'recharges' | 'agence'>('especes');
   rchView = signal<'queue' | 'all'>('queue');
   pendingRch = signal<Recharge[]>([]);     // paid, not yet credited — the validation queue
   allRch = signal<Recharge[]>([]);
@@ -408,8 +442,11 @@ export class CashierComponent implements OnInit, OnDestroy {
   fulfilling = signal<string | null>(null); // ref being validated
   gabPaymentReference = signal('');
   gabTouched = signal(false);
-  newAlert = signal(false);                  // strong alert when a new recharge enters the queue
+  newAlert = signal(false);
   private prevPending = -1;
+
+  agencySubs    = signal<Subscription[]>([]);
+  agenceLoading = signal(false);
 
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
@@ -468,9 +505,34 @@ export class CashierComponent implements OnInit, OnDestroy {
     } catch { /* audio unavailable — the visual banner still shows */ }
   }
 
-  setMode(m: 'especes' | 'gab' | 'recharges') {
+  setMode(m: 'especes' | 'gab' | 'recharges' | 'agence') {
     this.mode.set(m);
     if (m === 'recharges') { this.newAlert.set(false); this.loadPending(); if (this.rchView() === 'all') this.loadAllRch(); }
+    if (m === 'agence') this.loadAgencySubs();
+  }
+
+  private loadAgencySubs() {
+    const userAgency = this.auth.user()?.agency ?? '';
+    this.agenceLoading.set(true);
+    this.api.allSubscriptions().subscribe({
+      next: (list) => {
+        const filtered = list.filter(s =>
+          s.delivery === 'agence' &&
+          s.payStatus === 'paid' &&
+          !s.printed &&
+          (userAgency ? (s.pickupAgencyName ?? '').toLowerCase().includes(userAgency.toLowerCase()) : true)
+        );
+        this.agencySubs.set(filtered.reverse ? filtered.reverse() : filtered);
+        this.agenceLoading.set(false);
+      },
+      error: () => this.agenceLoading.set(false),
+    });
+  }
+
+  openFromAgency(ref: string) {
+    this.mode.set('especes');
+    this.ref.set(ref);
+    this.open(ref);
   }
   goRecharges() { this.rchView.set('queue'); this.setMode('recharges'); }
 
