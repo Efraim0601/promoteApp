@@ -556,7 +556,7 @@ export class RechargeComponent implements OnInit, OnDestroy {
   reset() {
     this.stopPolling();
     this.clearPersist();
-    this.form = { prenom: '', nom: '', phone: '', pan: '', amount: '', pay: 'om', payPhone: '', saraReceiptData: null, saraReceiptKey: null, saraRef: '' };
+    this.form = { prenom: '', nom: '', phone: '', panPrefix: '', panSuffix: '', amount: '', pay: 'om', payPhone: '', saraReceiptData: null, saraReceiptKey: null, saraRef: '' };
     this.touched.set(false); this.result.set(null); this.proc.set(null);
     this.waitLong.set(false); this.refreshing.set(false);
     this.started.set(true);

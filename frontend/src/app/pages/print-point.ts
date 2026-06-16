@@ -268,7 +268,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
                   <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
                     <ic name="idcard" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
                     <input #cardPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="cardPrefix()"
-                           (input)="cardPrefix.set($any($event.target).value.replace(/\D/g,'').slice(0,4)); if(cardPrefix().length===4) cardSfx.focus()"
+                           (input)="onCardPrefix($any($event.target).value, cardSfx)"
                            style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;padding:11px 0" />
                     <span style="color:var(--muted);letter-spacing:.1em;font-size:14px;font-weight:600;user-select:none">**** ****</span>
                     <input #cardSfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="cardSuffix()"
@@ -281,7 +281,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
                   <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
                     <ic name="idcard" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
                     <input #panPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="panPrefix()"
-                           (input)="panPrefix.set($any($event.target).value.replace(/\D/g,'').slice(0,4)); if(panPrefix().length===4) panSfx.focus()"
+                           (input)="onPanPrefix($any($event.target).value, panSfx)"
                            style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:14px;font-weight:600;padding:11px 0" />
                     <span style="color:var(--muted);letter-spacing:.1em;font-size:14px;font-weight:600;user-select:none">**** ****</span>
                     <input #panSfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="panSuffix()"
@@ -449,6 +449,15 @@ export class PrintPointComponent implements OnInit, OnDestroy {
 
   pm = (r: Subscription) => payById(r.pay);
   fmtPan = (v: string) => formatPan(v);
+
+  onCardPrefix(v: string, next: HTMLInputElement) {
+    this.cardPrefix.set(v.replace(/\D/g, '').slice(0, 4));
+    if (this.cardPrefix().length === 4) next.focus();
+  }
+  onPanPrefix(v: string, next: HTMLInputElement) {
+    this.panPrefix.set(v.replace(/\D/g, '').slice(0, 4));
+    if (this.panPrefix().length === 4) next.focus();
+  }
 
   /** Extracts prefix (first 4 visible digits) and suffix (last 4 visible digits) from a masked
    *  or raw PAN — used to pre-fill the split inputs when loading an existing record. */

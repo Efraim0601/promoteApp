@@ -62,7 +62,7 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
               <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
                 <ic name="idcard" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
                 <input #cPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form().cardPrefix"
-                       (input)="set('cardPrefix', $any($event.target).value.replace(/\D/g,'').slice(0,4)); if(form().cardPrefix.length===4) cSfx.focus()"
+                       (input)="onCardPrefix($any($event.target).value, cSfx)"
                        style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
                 <span style="color:var(--muted);letter-spacing:.1em;font-size:15px;font-weight:600;user-select:none">**** ****</span>
                 <input #cSfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form().cardSuffix"
@@ -154,6 +154,11 @@ export class CollecteComponent implements OnInit {
 
   set<K extends keyof CForm>(k: K, v: CForm[K]) { this.form.update((f) => ({ ...f, [k]: v })); this.msg.set(''); }
   setProduct(p: string) { this.form.update((f) => ({ ...f, product: p })); this.msg.set(''); }
+  onCardPrefix(v: string, next: HTMLInputElement) {
+    const d = v.replace(/\D/g, '').slice(0, 4);
+    this.form.update((f) => ({ ...f, cardPrefix: d }));
+    if (d.length === 4) next.focus();
+  }
 
   resetForm() { this.form.set({ ...EMPTY }); this.editingRef.set(null); this.touched.set(false); this.err.set(''); }
 
