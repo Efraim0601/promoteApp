@@ -496,8 +496,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.busy.set(false);
-        const code = err?.error?.error;
-        this.submitError.set(code === 'cni_exists' ? 'cni_exists' : code === 'cni_invalid' ? 'cni_invalid' : 'submit_failed');
+        const code = err?.error?.error as string | undefined;
+        const known = ['cni_exists', 'cni_invalid', 'validation_error', 'server_error'];
+        this.submitError.set(known.includes(code ?? '') ? code! : 'submit_failed');
       },
     });
   }
