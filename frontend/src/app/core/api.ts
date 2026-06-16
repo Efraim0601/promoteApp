@@ -255,8 +255,11 @@ export class Api {
     return this.http.get<Agent | null>(`${this.base}/agents/resolve`, { params: { phone } });
   }
 
-  adminStats(): Observable<AdminStats> {
-    return this.http.get<AdminStats>(`${this.base}/stats/admin`);
+  adminStats(from?: string, to?: string): Observable<AdminStats> {
+    const params: Record<string, string> = {};
+    if (from) params['from'] = from;
+    if (to)   params['to']   = to;
+    return this.http.get<AdminStats>(`${this.base}/stats/admin`, { params });
   }
   /** Admin — pickup-agency delivery breakdown + branch ranking (optional date window). */
   agencyPickupStats(from?: string, to?: string): Observable<AgencyPickupStats> {

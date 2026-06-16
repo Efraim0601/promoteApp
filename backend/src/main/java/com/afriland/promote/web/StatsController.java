@@ -26,8 +26,12 @@ public class StatsController {
     }
 
     @GetMapping("/admin")
-    public AdminStats admin() {
-        return stats.adminStats();
+    public AdminStats admin(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        LocalDate fromDate = (from != null && !from.isBlank()) ? LocalDate.parse(from) : null;
+        LocalDate toDate   = (to   != null && !to.isBlank())   ? LocalDate.parse(to)   : null;
+        return stats.adminStats(fromDate, toDate);
     }
 
     @GetMapping("/agent")

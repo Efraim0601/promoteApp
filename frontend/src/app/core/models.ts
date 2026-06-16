@@ -345,6 +345,9 @@ export interface AdminStats {
   paid: number;
   pending: number;
   collected: number;
+  todayPaid: number;
+  todayPrinted: number;
+  todayCollected: number;
   byAgent: AgentBreakdown[];
 }
 

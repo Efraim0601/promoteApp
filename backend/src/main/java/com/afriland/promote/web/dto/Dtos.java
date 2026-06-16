@@ -314,7 +314,10 @@ public final class Dtos {
 
     public record AgentBreakdown(String id, String name, String agency, String role, long count, long collected) {}
 
-    public record AdminStats(long total, long paid, long pending, long collected, java.util.List<AgentBreakdown> byAgent) {}
+    public record AdminStats(
+            long total, long paid, long pending, long collected,
+            long todayPaid, long todayPrinted, long todayCollected,
+            java.util.List<AgentBreakdown> byAgent) {}
 
     public record AgentStats(long total, long paid, long pending, long collected) {}
 

@@ -72,18 +72,64 @@ import * as XLSX from 'xlsx';
 
       <!-- ========== OVERVIEW ========== -->
       @if (section() === 'overview') {
-      <h1 style="font-size:21px">{{ i18n.t('nav_overview') }}</h1>
+      <!-- En-tête avec filtre date -->
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+        <h1 style="font-size:21px;margin:0;flex:1;min-width:140px">{{ i18n.t('nav_overview') }}</h1>
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <input class="input" type="date" [value]="overviewFrom()" (change)="overviewFrom.set($any($event.target).value)"
+                 style="width:130px;font-size:12px;padding:5px 8px" title="Depuis" />
+          <span class="muted" style="font-size:12px">→</span>
+          <input class="input" type="date" [value]="overviewTo()" (change)="overviewTo.set($any($event.target).value)"
+                 style="width:130px;font-size:12px;padding:5px 8px" title="Jusqu'au" />
+          @if (overviewFrom() || overviewTo()) {
+            <button class="btn btn-ghost" (click)="clearOverviewFilter()" style="padding:5px 10px;font-size:12px">✕ Tout</button>
+          }
+        </div>
+      </div>
+
       @if (statsLoading()) {
       <div class="card load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
       } @else {
+
+      <!-- ===== AUJOURD'HUI — section permanente indépendante du filtre ===== -->
+      <div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--primary)">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
+          <ic name="calendar" [size]="15" style="color:var(--primary)"></ic>
+          <span style="font-size:12px;font-weight:800;color:var(--primary);text-transform:uppercase;letter-spacing:.07em">Aujourd'hui</span>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+          <div style="text-align:center">
+            <div class="kv-anim" style="font-size:28px;font-weight:900;color:var(--success);font-variant-numeric:tabular-nums;line-height:1.1"
+                 [attr.data-val]="stats()?.todayPaid ?? 0">{{ stats()?.todayPaid ?? 0 }}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:4px">Cartes payées</div>
+          </div>
+          <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
+            <div class="kv-anim" style="font-size:28px;font-weight:900;color:var(--primary);font-variant-numeric:tabular-nums;line-height:1.1"
+                 [attr.data-val]="stats()?.todayPrinted ?? 0">{{ stats()?.todayPrinted ?? 0 }}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:4px">Cartes récupérées</div>
+          </div>
+          <div style="text-align:center">
+            <div class="kv-anim amount-anim" style="font-size:18px;font-weight:900;color:var(--af-gold);font-variant-numeric:tabular-nums;line-height:1.2"
+                 [attr.data-val]="stats()?.todayCollected ?? 0">{{ i18n.money(stats()?.todayCollected ?? 0) }}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:4px">Encaissé</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== KPIs globaux (filtrables par date) ===== -->
       <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
-        <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}</div></div>
-        <div class="kpi"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(stats()?.collected ?? 0) }}</div><div class="kl">{{ i18n.t('kpi_collected') }}</div></div>
+        <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
+        <div class="kpi" style="position:relative;overflow:hidden">
+          <div class="kv amount-block" style="color:var(--primary)">
+            <span class="amount-main">{{ fmtAmount(stats()?.collected ?? 0) }}</span>
+            <span class="amount-unit">FCFA</span>
+          </div>
+          <div class="kl">{{ i18n.t('kpi_collected') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div>
+        </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px">
         <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
-        <!-- Failed payments (technical: network + unknown cause) — click to jump to the filtered transactions table. -->
         <div class="kpi" (click)="showFailed()" style="cursor:pointer"
              [style.borderColor]="technicalFailed() ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'"
              [style.background]="technicalFailed() ? 'var(--accent-soft)' : 'var(--surface)'">
@@ -1925,6 +1971,18 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
+
+  // Filtre date pour la vue d'ensemble
+  overviewFrom = signal('');
+  overviewTo   = signal('');
+  private _overviewFilterInitialized = false;
+  private readonly _overviewFilterEffect = effect(() => {
+    const from = this.overviewFrom(), to = this.overviewTo();
+    if (!this._overviewFilterInitialized) { this._overviewFilterInitialized = true; return; }
+    this.statsLoading.set(true);
+    this.api.adminStats(from || undefined, to || undefined)
+      .subscribe({ next: (s) => { this.stats.set(s); this.statsLoading.set(false); }, error: () => this.statsLoading.set(false) });
+  });
   txs = signal<Subscription[]>([]);
   // Per-section loading flags so each panel can show a spinner while its request is in flight.
   statsLoading = signal(true);
@@ -3344,6 +3402,17 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   clearFilters() {
     this.txSearch.set(''); this.txStatuses.set(new Set()); this.txStatusOp.set('OR'); this.txAgent.set('all'); this.txFrom.set(''); this.txTo.set(''); this.txPay.set('all');
+  }
+
+  clearOverviewFilter() {
+    this.overviewFrom.set('');
+    this.overviewTo.set('');
+  }
+
+  fmtAmount(v: number): string {
+    if (v >= 1_000_000) return (v / 1_000_000).toFixed(v % 1_000_000 === 0 ? 0 : 1) + ' M';
+    if (v >= 1_000)     return (v / 1_000).toFixed(v % 1_000 === 0 ? 0 : 1) + ' k';
+    return v.toLocaleString('fr-FR');
   }
   exportCsv() {
     const rows = this.filteredTxs();

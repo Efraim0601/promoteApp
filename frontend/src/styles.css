@@ -387,6 +387,17 @@ html, body { margin: 0; height: 100%; }
 .kpi .kv{ font-size:21px; font-weight:800; font-family:var(--font-head); letter-spacing:-.02em; }
 .kpi .kl{ font-size:11px; color:var(--muted); margin-top:2px; }
 
+/* KPI value slide-in animation (today's numbers) */
+@keyframes kvPop{ 0%{ opacity:0; transform:translateY(6px) scale(.92); } 70%{ transform:translateY(-2px) scale(1.04); } 100%{ opacity:1; transform:none; } }
+.kv-anim{ animation:kvPop .45s cubic-bezier(.2,.8,.3,1.1) both; }
+
+/* Formatted amount display (large number + unit badge) */
+.amount-block{ display:flex; align-items:baseline; gap:5px; flex-wrap:wrap; }
+.amount-main{ font-size:1em; font-weight:900; font-variant-numeric:tabular-nums; }
+.amount-unit{ font-size:.52em; font-weight:700; opacity:.7; letter-spacing:.03em; }
+@keyframes amountGlow{ 0%,100%{ text-shadow:none; } 50%{ text-shadow:0 0 14px currentColor; } }
+.amount-anim{ animation:kvPop .45s cubic-bezier(.2,.8,.3,1.1) both, amountGlow 2.4s ease-in-out 0.5s 2; }
+
 /* live auto-refresh indicator (small pulsing dot) */
 .live-dot{ width:7px; height:7px; border-radius:50%; background:var(--success); display:inline-block; animation:pulse 1.6s ease-in-out infinite; }
 

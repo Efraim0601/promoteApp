@@ -42,13 +42,30 @@ public class StatsService {
                 .mapToLong(Subscription::getAmount).sum();
     }
 
-    public AdminStats adminStats() {
-        // Aggregated in SQL — no longer loads the whole table into memory.
-        long total = subs.count();
-        long paid = subs.countByPayStatus(PayStatus.paid);
-        // "pending" preserves the previous semantics: a cash subscription not yet printed (status == "cash").
-        long pending = subs.countByPayStatusAndPrintedFalse(PayStatus.cash);
-        long collected = subs.sumAmountByPayStatus(PayStatus.paid);
+    public AdminStats adminStats(LocalDate from, LocalDate to) {
+        ZoneId zone = ZoneId.systemDefault();
+        Instant todayStart = startOfToday();
+
+        // Window-filtered counts (when a date range is provided).
+        long total, paid, pending, collected;
+        if (from != null && to != null) {
+            Instant fromInst = from.atStartOfDay(zone).toInstant();
+            Instant toInst   = to.plusDays(1).atStartOfDay(zone).toInstant();
+            total     = subs.countByCreatedAtBetween(fromInst, toInst);
+            paid      = subs.countByPayStatusAndCreatedAtBetween(PayStatus.paid, fromInst, toInst);
+            pending   = subs.countByPayStatusAndPrintedFalseAndCreatedAtBetween(PayStatus.cash, fromInst, toInst);
+            collected = subs.sumAmountByPayStatusAndCreatedAtBetween(PayStatus.paid, fromInst, toInst);
+        } else {
+            total     = subs.count();
+            paid      = subs.countByPayStatus(PayStatus.paid);
+            pending   = subs.countByPayStatusAndPrintedFalse(PayStatus.cash);
+            collected = subs.sumAmountByPayStatus(PayStatus.paid);
+        }
+
+        // Today's KPIs — always absolute (independent of the date filter).
+        long todayPaid      = subs.countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.paid, todayStart);
+        long todayPrinted   = subs.countByPrintedTrueAndPrintedAtGreaterThanEqual(todayStart);
+        long todayCollected = subs.sumAmountByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.paid, todayStart);
 
         List<AgentBreakdown> rows = new ArrayList<>();
         for (AppUser a : users.findByRole(Role.AGENT)) {
@@ -59,7 +76,7 @@ public class StatsService {
                 subs.countByAgentIdIsNull(), subs.collectedPaidOnline()));
         rows.sort(Comparator.comparingLong(AgentBreakdown::count).reversed());
 
-        return new AdminStats(total, paid, pending, collected, rows);
+        return new AdminStats(total, paid, pending, collected, todayPaid, todayPrinted, todayCollected, rows);
     }
 
     public AgentStats agentStats(String agentId) {

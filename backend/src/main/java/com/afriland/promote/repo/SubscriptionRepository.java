@@ -104,6 +104,27 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     /** Monitoring dashboard — cards actually printed in a given window (bucketed by printedAt). */
     List<Subscription> findByPrintedTrueAndPrintedAtBetween(Instant from, Instant to);
 
+    /** Overview — total subscriptions created in a date window. */
+    long countByCreatedAtBetween(Instant from, Instant to);
+
+    /** Overview — paid subscriptions in a date window. */
+    long countByPayStatusAndCreatedAtBetween(PayStatus payStatus, Instant from, Instant to);
+
+    /** Overview — cash pending subscriptions in a date window (not yet printed). */
+    long countByPayStatusAndPrintedFalseAndCreatedAtBetween(PayStatus payStatus, Instant from, Instant to);
+
+    /** Overview — amount collected in a date window. */
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s "
+            + "where s.payStatus = :st and s.createdAt >= :from and s.createdAt < :to")
+    long sumAmountByPayStatusAndCreatedAtBetween(
+            @Param("st") PayStatus st, @Param("from") Instant from, @Param("to") Instant to);
+
+    /** Overview today — amount collected since a given instant. */
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s "
+            + "where s.payStatus = :st and s.createdAt >= :since")
+    long sumAmountByPayStatusAndCreatedAtGreaterThanEqual(
+            @Param("st") PayStatus st, @Param("since") Instant since);
+
     /** Monitoring dashboard — count all subscriptions created since a given instant. */
     long countByCreatedAtGreaterThanEqual(Instant since);
 
