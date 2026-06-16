@@ -1,6 +1,7 @@
 package com.afriland.promote.service;
 
 import com.afriland.promote.model.*;
+import com.afriland.promote.util.PanUtils;
 import com.afriland.promote.payment.GatewayClientMessages;
 import com.afriland.promote.payment.MomoDebitGuard;
 import com.afriland.promote.payment.PaymentGateway;
@@ -556,9 +557,9 @@ public class SubscriptionService {
         if (s.getPayStatus() != PayStatus.paid && s.getPayStatus() != PayStatus.cash) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "payment_not_settled");
         }
-        s.setCardNumber(cardNumber.trim());
+        s.setCardNumber(PanUtils.mask(cardNumber.trim()));
         // PAN (Primary Account Number) — captured at activation, optional.
-        if (pan != null && !pan.isBlank()) s.setPan(pan.trim());
+        if (pan != null && !pan.isBlank()) s.setPan(PanUtils.mask(pan.trim()));
         s.setPrinted(true);
         // Trace who printed and when, for the print-point statistics.
         s.setPrintedById(printerId);

@@ -2,6 +2,7 @@ package com.afriland.promote.service;
 
 import com.afriland.promote.model.Collecte;
 import com.afriland.promote.repo.CollecteRepository;
+import com.afriland.promote.util.PanUtils;
 import com.afriland.promote.web.dto.Dtos.CollecteBucket;
 import com.afriland.promote.web.dto.Dtos.CollecteStats;
 import com.afriland.promote.web.dto.Dtos.CreateCollecteRequest;
@@ -61,7 +62,7 @@ public class CollecteService {
         // Keep only the fields relevant to the chosen product.
         c.setAccountNumber("compte_ouvert".equals(product) ? trim(req.accountNumber()) : null);
         boolean isCard = "carte_bancaire".equals(product);
-        c.setCardNumber(isCard ? trim(req.cardNumber()) : null);
+        c.setCardNumber(isCard ? PanUtils.mask(trim(req.cardNumber())) : null);
         c.setCardType(isCard ? trim(req.cardType()) : null);
     }
 

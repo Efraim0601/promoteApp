@@ -4,6 +4,7 @@ import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Recharge;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.CardConfig;
+import com.afriland.promote.util.PanUtils;
 import com.afriland.promote.payment.GatewayClientMessages;
 import com.afriland.promote.payment.MomoDebitGuard;
 import com.afriland.promote.payment.PaymentGateway;
@@ -168,7 +169,7 @@ public class RechargeService {
                 .nom(req.nom().trim())
                 .fullName((req.prenom().trim() + " " + req.nom().trim()).trim())
                 .phone(req.phone() == null ? null : req.phone().trim())
-                .pan(pan)
+                .pan(PanUtils.mask(pan))
                 .amount(amount)
                 .latitude(req.latitude())
                 .longitude(req.longitude())

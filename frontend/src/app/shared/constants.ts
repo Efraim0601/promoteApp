@@ -55,8 +55,12 @@ export const PAN_MAX_DIGITS = PAN_DIGITS;   // kept for existing callers; same v
 /** PAN digits only, capped at 16 (drops any spaces/separators). */
 export const panDigits = (v: string): string => (v || '').replace(/\D/g, '').slice(0, PAN_DIGITS);
 /** Format a PAN for entry/display: digits grouped in blocks of 4 (e.g. "5078 2300 1234 5678").
- *  Caps at the normal PAN length so no field can exceed it. */
-export const formatPan = (v: string): string => panDigits(v).replace(/(.{4})/g, '$1 ').trim();
+ *  Already-masked PANs from the server (containing "*") are returned as-is. */
+export const formatPan = (v: string): string => {
+  if (!v) return '';
+  if (v.includes('*')) return v.trim();
+  return panDigits(v).replace(/(.{4})/g, '$1 ').trim();
+};
 
 /** Retrait/livraison proposé au client. 'promote' (stand Promote) par défaut, ou 'agence'
  *  (retrait dans une agence Afriland à choisir). 'home' n'est plus proposé mais reste toléré
