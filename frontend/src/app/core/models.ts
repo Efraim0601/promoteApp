@@ -348,6 +348,7 @@ export interface AdminStats {
   todayPaid: number;
   todayPrinted: number;
   todayCollected: number;
+  todayPending: number;
   byAgent: AgentBreakdown[];
 }
 

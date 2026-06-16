@@ -97,21 +97,26 @@ import * as XLSX from 'xlsx';
           <ic name="calendar" [size]="15" style="color:var(--primary)"></ic>
           <span style="font-size:12px;font-weight:800;color:var(--primary);text-transform:uppercase;letter-spacing:.07em">Aujourd'hui</span>
         </div>
-        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
-          <div style="text-align:center">
-            <div class="kv-anim" style="font-size:28px;font-weight:900;color:var(--success);font-variant-numeric:tabular-nums;line-height:1.1"
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--border);border-radius:8px;overflow:hidden">
+          <div style="text-align:center;padding:10px 8px;background:var(--surface)">
+            <div class="kv-anim" style="font-size:26px;font-weight:900;color:var(--success);font-variant-numeric:tabular-nums;line-height:1.1"
                  [attr.data-val]="stats()?.todayPaid ?? 0">{{ stats()?.todayPaid ?? 0 }}</div>
-            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:4px">Cartes payées</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:3px">Cartes payées</div>
           </div>
-          <div style="text-align:center;border-left:1px solid var(--border);border-right:1px solid var(--border)">
-            <div class="kv-anim" style="font-size:28px;font-weight:900;color:var(--primary);font-variant-numeric:tabular-nums;line-height:1.1"
+          <div style="text-align:center;padding:10px 8px;background:var(--surface)">
+            <div class="kv-anim" style="font-size:26px;font-weight:900;color:var(--primary);font-variant-numeric:tabular-nums;line-height:1.1"
                  [attr.data-val]="stats()?.todayPrinted ?? 0">{{ stats()?.todayPrinted ?? 0 }}</div>
-            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:4px">Cartes récupérées</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:3px">Cartes récupérées</div>
           </div>
-          <div style="text-align:center">
-            <div class="kv-anim amount-anim" style="font-size:18px;font-weight:900;color:var(--af-gold);font-variant-numeric:tabular-nums;line-height:1.2"
+          <div style="text-align:center;padding:10px 8px;background:var(--surface)">
+            <div class="kv-anim amount-anim" style="font-size:17px;font-weight:900;color:var(--af-gold);font-variant-numeric:tabular-nums;line-height:1.2"
                  [attr.data-val]="stats()?.todayCollected ?? 0">{{ i18n.money(stats()?.todayCollected ?? 0) }}</div>
-            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:4px">Encaissé</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:3px">Encaissé</div>
+          </div>
+          <div style="text-align:center;padding:10px 8px;background:var(--surface)">
+            <div class="kv-anim" style="font-size:26px;font-weight:900;color:var(--af-gold);font-variant-numeric:tabular-nums;line-height:1.1"
+                 [attr.data-val]="stats()?.todayPending ?? 0">{{ stats()?.todayPending ?? 0 }}</div>
+            <div style="font-size:11px;font-weight:700;color:var(--muted);margin-top:3px">En attente validation</div>
           </div>
         </div>
       </div>

@@ -69,6 +69,9 @@ public class StatsService {
         long todayPaid      = subs.countByPayStatusAndPaidAtGreaterThanEqual(PayStatus.paid, todayStart);
         long todayPrinted   = subs.countByPrintedTrueAndPrintedAtGreaterThanEqual(todayStart);
         long todayCollected = subs.sumAmountByPayStatusAndPaidAtGreaterThanEqual(PayStatus.paid, todayStart);
+        // Cash + SARA created today and still awaiting manual validation.
+        long todayPending   = subs.countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.cash, todayStart)
+                            + subs.countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.sara_pending, todayStart);
 
         List<AgentBreakdown> rows = new ArrayList<>();
         for (AppUser a : users.findByRole(Role.AGENT)) {
@@ -79,7 +82,7 @@ public class StatsService {
                 subs.countByAgentIdIsNull(), subs.collectedPaidOnline()));
         rows.sort(Comparator.comparingLong(AgentBreakdown::count).reversed());
 
-        return new AdminStats(total, paid, pending, collected, todayPaid, todayPrinted, todayCollected, rows);
+        return new AdminStats(total, paid, pending, collected, todayPaid, todayPrinted, todayCollected, todayPending, rows);
     }
 
     public AgentStats agentStats(String agentId) {
