@@ -37,13 +37,19 @@ import { NotifBellComponent } from '../shared/notif-bell';
         </div>
       </div>
 
-      <button class="btn btn-primary" (click)="newSub()"><ic name="plus" [size]="19"></ic> {{ i18n.t('new_sub_btn') }}</button>
-      <button class="btn btn-outline" (click)="newRecharge()" style="margin-top:-4px"><ic name="phone" [size]="18"></ic> {{ i18n.t('new_recharge_btn') }}</button>
-      @if (auth.hasRole('COLLECTEUR')) {
-        <button class="btn btn-outline" (click)="goCollecte()" style="margin-top:-4px"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
-      }
-      <button class="btn btn-outline" (click)="claiming.set(true)" style="margin-top:-4px"><ic name="qr" [size]="18"></ic> {{ i18n.t('claim_btn') }}</button>
-      <button class="btn btn-ghost" (click)="openVerify()" style="margin-top:-4px;font-size:13.5px"><ic name="search" [size]="17"></ic> {{ i18n.t('verify_ref_btn') }}</button>
+      <!-- Deux actions principales côte à côte (menu niveau 1) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <button class="btn btn-primary" (click)="newSub()" style="padding:12px 8px;font-size:13.5px"><ic name="plus" [size]="18"></ic> {{ i18n.t('new_sub_btn') }}</button>
+        <button class="btn btn-outline" (click)="newRecharge()" style="padding:12px 8px;font-size:13.5px"><ic name="phone" [size]="17"></ic> {{ i18n.t('new_recharge_btn') }}</button>
+      </div>
+      <!-- Actions secondaires (menu niveau 2) -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        @if (auth.hasRole('COLLECTEUR')) {
+          <button class="btn btn-outline" (click)="goCollecte()" style="flex:1;padding:9px;font-size:13px"><ic name="store" [size]="16"></ic> {{ i18n.t('nav_collectes') }}</button>
+        }
+        <button class="btn btn-outline" (click)="claiming.set(true)" style="flex:1;padding:9px;font-size:13px"><ic name="qr" [size]="16"></ic> {{ i18n.t('claim_btn') }}</button>
+        <button class="btn btn-ghost" (click)="openVerify()" style="flex:1;padding:9px;font-size:13px"><ic name="search" [size]="16"></ic> {{ i18n.t('verify_ref_btn') }}</button>
+      </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_my_subs') }}</div></div>
