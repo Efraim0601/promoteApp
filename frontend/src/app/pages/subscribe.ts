@@ -265,7 +265,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   get docLabel() { return this.i18n.t('doc_' + this.form.docType); }
   get docNumLabel() { return this.i18n.t('doc_num_' + this.form.docType); }
   get needsVerso() { return this.form.docType !== 'passport'; }
-  get selfieOk() { return true; } // selfie facultatif — la photo reste capturée si prise mais ne bloque plus la progression
+  get selfieOk() { return !!this.form.selfieData || !!this.form.selfieKey; }
   /** Mobile Money methods that need a payment number + USSD push. */
   get isMomo() { return this.form.pay === 'om' || this.form.pay === 'mtn'; }
   /** Valid = a real number for the chosen country; for Cameroon it must also match the operator (MTN/Orange). */
@@ -301,14 +301,15 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     return true;
   }
   get stepValid() {
-    return [this.step0ok, this.docsOk, true, this.payStepOk, true][this.step()];
+    return [this.step0ok, this.docsOk, this.selfieOk, this.payStepOk, true][this.step()];
   }
   /** All steps satisfied — required before the final confirmation can fire. */
-  get formComplete() { return this.step0ok && this.docsOk && this.payStepOk; }
+  get formComplete() { return this.step0ok && this.docsOk && this.selfieOk && this.payStepOk; }
   /** First step still missing something (used to route the client there on confirm). */
   private firstInvalidStep() {
     if (!this.step0ok) return 0;
     if (!this.docsOk) return 1;
+    if (!this.selfieOk) return 2;
     if (!this.payStepOk) return 3;
     return this.lastStep;
   }
@@ -321,7 +322,6 @@ export class SubscribeComponent implements OnInit, OnDestroy {
    *  any missing fields (touched) so the client sees what's left; the final confirm stays guarded. */
   goToStep(i: number) {
     if (i === this.step()) return;
-    // Selfie est facultatif — la navigation libre n'est plus bloquée à cette étape.
     this.touched.set(i > this.step());
     this.step.set(Math.min(this.lastStep, Math.max(0, i)));
     if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
