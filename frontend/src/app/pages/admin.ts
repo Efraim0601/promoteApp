@@ -17,12 +17,13 @@ import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
 import { NotifBellComponent } from '../shared/notif-bell';
 import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
+import { SlicePipe } from '@angular/common';
 import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'page-admin',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent, NotifBellComponent, FormsModule],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent, NotifBellComponent, FormsModule, SlicePipe],
   template: `
   <div class="scr">
     <app-bar class="appbar-wide">
@@ -51,6 +52,7 @@ import * as XLSX from 'xlsx';
           }
           @if (!isSupervisor()) {
           <button [class.active]="section() === 'agencies'" (click)="section.set('agencies')"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_agencies') }}</button>
+          <button [class.active]="section() === 'agence-retrait'" (click)="section.set('agence-retrait'); loadAgenceRetrait()"><ic name="pin" [size]="18"></ic> {{ i18n.t('nav_agence_retrait') }}</button>
           <button [class.active]="section() === 'transactions'" (click)="section.set('transactions')"><ic name="hash" [size]="18"></ic> {{ i18n.t('nav_transactions') }}</button>
           <button [class.active]="section() === 'recharges'" (click)="section.set('recharges')"><ic name="phone" [size]="18"></ic> {{ i18n.t('nav_recharges') }}</button>
           <button [class.active]="section() === 'collectes'" (click)="section.set('collectes')"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
@@ -1125,6 +1127,99 @@ import * as XLSX from 'xlsx';
 
       }
 
+      <!-- ========== RETRAITS AGENCE ========== -->
+      @if (section() === 'agence-retrait') {
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+        <h1 style="font-size:21px;margin:0;flex:1">{{ i18n.t('nav_agence_retrait') }}</h1>
+        <button class="icon-btn" (click)="loadAgenceRetrait()" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
+      </div>
+
+      <!-- KPIs -->
+      @if (!agenceRetraitLoading()) {
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:14px">
+        <div class="kpi" style="padding:10px 12px">
+          <div class="kv" style="font-size:22px">{{ agenceRetrait().length }}</div>
+          <div class="kl">Total demandes</div>
+        </div>
+        <div class="kpi" style="padding:10px 12px;cursor:pointer"
+             [style.borderColor]="agenceRetraitPending() ? 'color-mix(in srgb,var(--warning) 45%,var(--border))' : 'var(--border)'"
+             [style.background]="agenceRetraitPending() ? 'var(--warning-soft)' : 'var(--surface)'"
+             (click)="agenceRetraitStatus.set(agenceRetraitStatus() === 'pending' ? 'all' : 'pending')">
+          <div class="kv" style="font-size:22px;color:var(--warning)">{{ agenceRetraitPending() }}</div>
+          <div class="kl">En attente retrait</div>
+        </div>
+        <div class="kpi" style="padding:10px 12px">
+          <div class="kv" style="font-size:22px;color:var(--success)">{{ agenceRetraitDone() }}</div>
+          <div class="kl">Cartes remises</div>
+        </div>
+      </div>
+      }
+
+      <div class="card" style="overflow:hidden;max-width:900px">
+        <div style="padding:14px 14px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <ic name="pin" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">Demandes de retrait en agence</h3>
+          <span class="muted" style="margin-left:auto;font-size:12px;font-weight:700">{{ filteredAgenceRetrait().length }}@if (agenceRetraitSearch().trim() || agenceRetraitAgency() !== 'all' || agenceRetraitStatus() !== 'all') { / {{ agenceRetrait().length }} } demandes</span>
+        </div>
+        <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
+          <!-- Recherche -->
+          <div class="input-prefix">
+            <span class="pfx"><ic name="search" [size]="15"></ic></span>
+            <input placeholder="Rechercher par nom, ref, téléphone…" [value]="agenceRetraitSearch()" (input)="agenceRetraitSearch.set($any($event.target).value)" />
+          </div>
+          <!-- Filtre par agence -->
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">Agence</span>
+            <button (click)="agenceRetraitAgency.set('all')"
+                    [style.background]="agenceRetraitAgency() === 'all' ? 'var(--primary)' : 'var(--surface-2)'"
+                    [style.color]="agenceRetraitAgency() === 'all' ? '#fff' : 'var(--fg)'"
+                    style="border:none;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer">Toutes</button>
+            @for (ag of agenceRetraitAgencies(); track ag) {
+              <button (click)="agenceRetraitAgency.set(ag)"
+                      [style.background]="agenceRetraitAgency() === ag ? 'var(--primary)' : 'var(--surface-2)'"
+                      [style.color]="agenceRetraitAgency() === ag ? '#fff' : 'var(--fg)'"
+                      style="border:none;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer">{{ ag }}</button>
+            }
+          </div>
+          <!-- Filtre statut -->
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">Statut</span>
+            @for (f of [['all','Tous'],['pending','En attente'],['done','Remises']]; track f[0]) {
+              <button (click)="agenceRetraitStatus.set(f[0])"
+                      [style.background]="agenceRetraitStatus() === f[0] ? 'var(--primary)' : 'var(--surface-2)'"
+                      [style.color]="agenceRetraitStatus() === f[0] ? '#fff' : 'var(--fg)'"
+                      style="border:none;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer">{{ f[1] }}</button>
+            }
+          </div>
+        </div>
+
+        @if (agenceRetraitLoading()) {
+          <div style="padding:32px;text-align:center"><spinner [size]="28"></spinner></div>
+        } @else if (!filteredAgenceRetrait().length) {
+          <div style="padding:24px 14px;text-align:center;color:var(--muted);font-size:13.5px">Aucune demande de retrait en agence.</div>
+        } @else {
+          <div style="border-top:1px solid var(--border)">
+            @for (r of filteredAgenceRetrait(); track r.ref) {
+              <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
+                <div style="flex:1;min-width:160px">
+                  <div style="font-size:13.5px;font-weight:700">{{ r.fullName }}</div>
+                  <div style="font-size:11.5px;color:var(--muted)">{{ r.ref }} · {{ r.phone }}</div>
+                </div>
+                <div style="flex:1;min-width:120px">
+                  <div style="font-size:12px;font-weight:600;color:var(--primary)">{{ r.pickupAgencyName }}</div>
+                  <div style="font-size:11px;color:var(--muted)">{{ r.createdAt | slice:0:10 }}</div>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px">
+                  <status-badge [status]="r.status"></status-badge>
+                  <button class="btn btn-outline" style="padding:4px 12px;font-size:12px" (click)="goToTxFromAgence(r.ref)">Voir</button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+      }
+
       <!-- ========== TRANSACTIONS (wider than the 760px content cap, for the detailed table) ========== -->
       @if (section() === 'transactions') {
       <h1 style="font-size:21px">{{ i18n.t('nav_transactions') }}</h1>
@@ -1954,7 +2049,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private poll?: ReturnType<typeof setInterval>;
 
   /** Active sidebar section. */
-  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
+  section = signal<'overview' | 'config' | 'users' | 'agencies' | 'agence-retrait' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
   auditTab = signal<'logins' | 'actions'>('logins');
 
   readonly skeletonRows = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -3330,6 +3425,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     else if (s === 'transactions') this.api.allSubscriptions().subscribe({ next: (t) => this.txs.set(t), error: () => {} });
     else if (s === 'recharges')  this.loadRecharges();
     else if (s === 'collectes')  this.loadCollectes();
+    else if (s === 'agence-retrait') this.loadAgenceRetrait();
     else if (s === 'audit') {
       this.loadAudit();
       this.actLoaded = false;
@@ -3507,6 +3603,54 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.expandedRef.set(this.expandedRef() === ref ? null : ref);
   }
   agentName(id: string | null) { return this.usersList().find((u) => u.id === id)?.name ?? id ?? '—'; }
+  // ---- Retraits agence (admin view) ----
+  agenceRetrait        = signal<Subscription[]>([]);
+  agenceRetraitLoading = signal(false);
+  agenceRetraitSearch  = signal('');
+  agenceRetraitAgency  = signal('all');
+  agenceRetraitStatus  = signal('all');
+
+  agenceRetraitPending = computed(() => this.agenceRetrait().filter(s => s.payStatus === 'paid' && !s.printed).length);
+  agenceRetraitDone    = computed(() => this.agenceRetrait().filter(s => s.printed).length);
+
+  agenceRetraitAgencies = computed(() => {
+    const names = new Set(this.agenceRetrait().map(s => s.pickupAgencyName ?? '').filter(Boolean));
+    return Array.from(names).sort();
+  });
+
+  filteredAgenceRetrait = computed(() => {
+    const q = this.agenceRetraitSearch().toLowerCase().trim();
+    const ag = this.agenceRetraitAgency();
+    const st = this.agenceRetraitStatus();
+    return this.agenceRetrait().filter(s => {
+      if (q && !s.fullName.toLowerCase().includes(q) && !s.ref.toLowerCase().includes(q) && !(s.phone || '').includes(q) && !(s.pickupAgencyName || '').toLowerCase().includes(q)) return false;
+      if (ag !== 'all' && s.pickupAgencyName !== ag) return false;
+      if (st === 'pending' && s.printed) return false;
+      if (st === 'done' && !s.printed) return false;
+      return true;
+    });
+  });
+
+  goToTxFromAgence(ref: string) {
+    if (!this.txs().length) {
+      this.api.allSubscriptions().subscribe({ next: (t) => this.txs.set(t), error: () => {} });
+    }
+    this.txSearch.set(ref);
+    this.section.set('transactions');
+    this.expandedRef.set(ref);
+  }
+
+  loadAgenceRetrait() {
+    this.agenceRetraitLoading.set(true);
+    this.api.allSubscriptions().subscribe({
+      next: (list) => {
+        this.agenceRetrait.set([...list.filter(s => s.delivery === 'agence')].reverse());
+        this.agenceRetraitLoading.set(false);
+      },
+      error: () => this.agenceRetraitLoading.set(false),
+    });
+  }
+
   /** Format an ISO timestamp as date + time for the CSV export. */
   private fmtDateTime(iso: string) {
     if (!iso) return '';
