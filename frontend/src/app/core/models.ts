@@ -459,10 +459,12 @@ export interface AppNotification {
   senderName: string;
   createdAt: string;
   read: boolean;
+  imageData?: string | null;
 }
 
 export interface SendNotificationRequest {
   title: string;
   body: string;
   recipientIds: string[];
+  imageData?: string | null;
 }

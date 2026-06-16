@@ -39,4 +39,9 @@ public class AppNotification {
 
     @Column(name = "read_at")
     private Instant readAt;
+
+    /** Optional base64-encoded image attached to the notification (data URI ready). */
+    @Lob
+    @Column(name = "image_data", columnDefinition = "TEXT")
+    private String imageData;
 }

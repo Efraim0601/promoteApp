@@ -141,8 +141,18 @@ import * as XLSX from 'xlsx';
           }
           <div style="margin-top:14px">
             <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_by_network') }}</div>
-            <div class="srow" style="padding:6px 0"><span class="lbl">Orange Money</span><span class="val">{{ p.orangePaid }}/{{ p.orangeTotal }} · {{ rate(p.orangePaid, p.orangeTotal) }}%</span></div>
-            <div class="srow" style="padding:6px 0"><span class="lbl">MTN MoMo</span><span class="val">{{ p.mtnPaid }}/{{ p.mtnTotal }} · {{ rate(p.mtnPaid, p.mtnTotal) }}%</span></div>
+            <div class="srow" style="padding:6px 0;cursor:pointer;border-radius:6px;transition:background .15s"
+                 (click)="showPayFilter('om')" title="Voir les transactions Orange Money"
+                 (mouseenter)="$any($event.target).style.background='var(--surface-2)'" (mouseleave)="$any($event.target).style.background=''">
+              <span class="lbl" style="color:var(--primary);text-decoration:underline dotted">Orange Money ↗</span>
+              <span class="val">{{ p.orangePaid }}/{{ p.orangeTotal }} · {{ rate(p.orangePaid, p.orangeTotal) }}%</span>
+            </div>
+            <div class="srow" style="padding:6px 0;cursor:pointer;border-radius:6px;transition:background .15s"
+                 (click)="showPayFilter('mtn')" title="Voir les transactions MTN MoMo"
+                 (mouseenter)="$any($event.target).style.background='var(--surface-2)'" (mouseleave)="$any($event.target).style.background=''">
+              <span class="lbl" style="color:var(--primary);text-decoration:underline dotted">MTN MoMo ↗</span>
+              <span class="val">{{ p.mtnPaid }}/{{ p.mtnTotal }} · {{ rate(p.mtnPaid, p.mtnTotal) }}%</span>
+            </div>
           </div>
           @if (p.failuresByCategory.length) {
             <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:10px">
@@ -172,9 +182,10 @@ import * as XLSX from 'xlsx';
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
           <ic name="award" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('by_agent') }}</h3>
+          <span class="muted" style="font-size:11.5px;margin-left:4px">({{ (stats()?.byAgent?.length ?? 0) }} chargés)</span>
         </div>
         <div style="display:flex;flex-direction:column;gap:14px">
-          @for (r of stats()?.byAgent ?? []; track r.id) {
+          @for (r of pagedAgents(); track r.id) {
             <div style="display:flex;align-items:center;gap:11px">
               @if (r.role === 'online') {
                 <span class="op-logo" style="width:34px;height:34px;border-radius:50%;background:var(--surface-2);color:var(--muted);flex-shrink:0"><ic name="qr" [size]="17"></ic></span>
@@ -194,6 +205,13 @@ import * as XLSX from 'xlsx';
             </div>
           }
         </div>
+        @if (agentPageCount() > 1) {
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <button class="icon-btn" (click)="agentPrev()" [disabled]="agentPage() === 0" style="width:30px;height:30px"><ic name="chevL" [size]="15"></ic></button>
+            <span class="muted" style="font-size:12px;font-weight:700">{{ agentPage() + 1 }} / {{ agentPageCount() }}</span>
+            <button class="icon-btn" (click)="agentNext()" [disabled]="agentPage() === agentPageCount()-1" style="width:30px;height:30px"><ic name="chevR" [size]="15"></ic></button>
+          </div>
+        }
       </div>
       }
 
@@ -428,6 +446,25 @@ import * as XLSX from 'xlsx';
             <div style="display:flex;flex-direction:column;gap:8px">
               <input class="input" placeholder="Objet de la notification" [(ngModel)]="notifTitle" style="font-size:13px" />
               <textarea class="input" placeholder="Message (optionnel)" [(ngModel)]="notifBody" rows="3" style="font-size:13px;resize:vertical"></textarea>
+              <!-- Image jointe -->
+              <div>
+                @if (!notifImageData()) {
+                  <label style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;padding:6px 10px;border:1.5px dashed var(--border);border-radius:7px;font-size:12px;color:var(--muted);background:var(--surface-2)">
+                    <ic name="camera" [size]="14"></ic> Joindre une image (optionnel)
+                    <input type="file" accept="image/*" (change)="onNotifImagePicked($event)" style="display:none" />
+                  </label>
+                } @else {
+                  <div style="display:flex;align-items:flex-start;gap:8px;padding:8px;background:var(--surface-2);border-radius:8px;border:1px solid var(--border)">
+                    <img [src]="notifImageData()!" style="width:72px;height:72px;object-fit:cover;border-radius:6px;flex-shrink:0" alt="aperçu" />
+                    <div style="flex:1;min-width:0">
+                      <div style="font-size:12px;font-weight:700;margin-bottom:4px">Image jointe</div>
+                      <button class="btn btn-ghost" (click)="clearNotifImage()" style="padding:3px 8px;font-size:11px;color:var(--accent)">
+                        <ic name="trash" [size]="12"></ic> Supprimer
+                      </button>
+                    </div>
+                  </div>
+                }
+              </div>
             </div>
 
             <!-- Actions -->
@@ -1040,12 +1077,38 @@ import * as XLSX from 'xlsx';
       <!-- ========== TRANSACTIONS (wider than the 760px content cap, for the detailed table) ========== -->
       @if (section() === 'transactions') {
       <h1 style="font-size:21px">{{ i18n.t('nav_transactions') }}</h1>
+
+      <!-- KPIs synthèse — visibles dès l'arrivée sur la page -->
+      @if (!txLoading()) {
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px">
+        <div class="kpi" style="padding:10px 12px">
+          <div class="kv" style="font-size:22px">{{ txKpiTotal() }}</div>
+          <div class="kl">Total souscriptions</div>
+        </div>
+        <div class="kpi" style="padding:10px 12px">
+          <div class="kv" style="font-size:22px;color:var(--success)">{{ txKpiPaid() }}</div>
+          <div class="kl">Payées avec succès</div>
+        </div>
+        <div class="kpi" style="padding:10px 12px;cursor:pointer"
+             [style.borderColor]="txKpiCash() ? 'color-mix(in srgb,var(--warning) 45%,var(--border))' : 'var(--border)'"
+             [style.background]="txKpiCash() ? 'var(--warning-soft)' : 'var(--surface)'"
+             (click)="showPayFilter('cash')" title="Filtrer les paiements espèces en attente">
+          <div class="kv" style="font-size:22px;color:var(--warning)">{{ txKpiCash() }}</div>
+          <div class="kl">Espèces en attente</div>
+        </div>
+        <div class="kpi" style="padding:10px 12px">
+          <div class="kv" style="font-size:22px;color:var(--primary)">{{ txKpiActivated() }}</div>
+          <div class="kl">Cartes activées (PAN)</div>
+        </div>
+      </div>
+      }
+
       <div class="card" style="overflow:hidden;max-width:1180px">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('all_sales') }}</h3>
           <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
-          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredTxs().length }}@if (txSearch().trim() || txStatuses().size > 0 || txAgent() !== 'all' || txFrom() || txTo()) { / {{ txs().length }} } {{ i18n.t('tx_count') }}</span>
+          <span class="muted" style="font-size:12px;font-weight:700">{{ filteredTxs().length }}@if (txSearch().trim() || txStatuses().size > 0 || txAgent() !== 'all' || txFrom() || txTo() || txPay() !== 'all') { / {{ txs().length }} } {{ i18n.t('tx_count') }}</span>
           <button class="icon-btn" (click)="refreshSection('transactions')" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
         </div>
         <div style="padding:0 14px 12px;display:flex;flex-direction:column;gap:8px">
@@ -1091,6 +1154,17 @@ import * as XLSX from 'xlsx';
               <option value="self">{{ i18n.t('tx_self') }}</option>
               @for (a of agentUsers; track a.id) { <option [value]="a.id">{{ a.name }}</option> }
             </select>
+          </div>
+          <!-- Filtre mode de paiement -->
+          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Mode</span>
+            @for (pm of [['all','Tous'],['om','Orange Money'],['mtn','MTN MoMo'],['cash','Espèces'],['sara','SARA']]; track pm[0]) {
+              <button (click)="txPay.set(pm[0])"
+                      [style.background]="txPay() === pm[0] ? 'var(--primary)' : 'var(--surface-2)'"
+                      [style.color]="txPay() === pm[0] ? '#fff' : 'var(--muted)'"
+                      [style.borderColor]="txPay() === pm[0] ? 'var(--primary)' : 'var(--border)'"
+                      style="border:1.5px solid;border-radius:99px;padding:3px 10px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:var(--font)">{{ pm[1] }}</button>
+            }
           </div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input class="input" type="date" [value]="txFrom()" (change)="txFrom.set($any($event.target).value)" style="flex:1;min-width:105px" />
@@ -1949,6 +2023,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   notifBody  = '';
   notifBusy  = signal(false);
   notifMsg   = signal('');
+  notifImageData = signal<string | null>(null);
 
   readonly notifRoleChips: { role: string; label: string }[] = [
     { role: 'ALL',         label: 'Tous' },
@@ -1995,12 +2070,30 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.notifMsg.set('');
   }
 
+  onNotifImagePicked(event: Event) {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => this.notifImageData.set(e.target?.result as string ?? null);
+    reader.readAsDataURL(file);
+  }
+
+  clearNotifImage() { this.notifImageData.set(null); }
+
   sendNotification() {
     const ids = [...this.notifRecipientIds()];
     if (!this.notifTitle.trim() || !ids.length || this.notifBusy()) return;
     this.notifBusy.set(true); this.notifMsg.set('');
-    this.api.sendNotification({ title: this.notifTitle.trim(), body: this.notifBody.trim(), recipientIds: ids }).subscribe({
-      next: () => { this.notifBusy.set(false); this.notifMsg.set('done'); this.notifTitle = ''; this.notifBody = ''; },
+    this.api.sendNotification({
+      title: this.notifTitle.trim(),
+      body: this.notifBody.trim(),
+      recipientIds: ids,
+      imageData: this.notifImageData() ?? undefined,
+    }).subscribe({
+      next: () => {
+        this.notifBusy.set(false); this.notifMsg.set('done');
+        this.notifTitle = ''; this.notifBody = ''; this.notifImageData.set(null);
+      },
       error: () => { this.notifBusy.set(false); this.notifMsg.set('error'); },
     });
   }
@@ -2369,6 +2462,13 @@ export class AdminComponent implements OnInit, OnDestroy {
   txAgent     = signal('all');
   txFrom      = signal('');
   txTo        = signal('');
+  txPay       = signal('all');  // filtre par mode de paiement (all | om | mtn | cash | sara)
+
+  // KPIs calculés depuis les données brutes (indépendants des filtres actifs)
+  txKpiTotal     = computed(() => this.txs().length);
+  txKpiPaid      = computed(() => this.txs().filter(t => t.payStatus === 'paid').length);
+  txKpiCash      = computed(() => this.txs().filter(t => t.payStatus === 'cash').length);
+  txKpiActivated = computed(() => this.txs().filter(t => t.pan && t.pan.trim()).length);
 
   toggleTxStatus(st: string) {
     this.txStatuses.update(s => { const n = new Set(s); n.has(st) ? n.delete(st) : n.add(st); return n; });
@@ -2393,7 +2493,7 @@ export class AdminComponent implements OnInit, OnDestroy {
     const q = this.dbTxSearch().trim().toLowerCase();
     const digits = this.dbTxSearch().replace(/\D/g, '');
     const statuses = this.txStatuses(), op = this.txStatusOp();
-    const ag = this.txAgent(), from = this.txFrom(), to = this.txTo();
+    const ag = this.txAgent(), from = this.txFrom(), to = this.txTo(), pay = this.txPay();
     return this.txs().slice().reverse().filter((t) => {
       if (statuses.size > 0) {
         const tests = [...statuses].map(st => this.matchesSt(t, st));
@@ -2401,6 +2501,7 @@ export class AdminComponent implements OnInit, OnDestroy {
         if (!match) return false;
       }
       if (ag === 'self' ? t.channel !== 'self' : ag !== 'all' && t.agentId !== ag) return false;
+      if (pay !== 'all' && t.pay !== pay) return false;
       if (from && t.createdAt.slice(0, 10) < from) return false;
       if (to && t.createdAt.slice(0, 10) > to) return false;
       if (q) {
@@ -2429,6 +2530,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   toggleFailedFilter() { this.toggleTxStatus('failed'); }
   /** Overview KPI → open the transactions table filtered on failed payments. */
   showFailed() { this.txStatuses.set(new Set(['failed'])); this.section.set('transactions'); }
+  /** Par réseau → filtre sur le mode de paiement et bascule vers la liste. */
+  showPayFilter(pay: string) { this.txPay.set(pay); this.txStatuses.set(new Set()); this.section.set('transactions'); }
   txPrev() { this.txPage.update((p) => Math.max(0, p - 1)); }
   txNext() { this.txPage.update((p) => Math.min(this.txPageCount() - 1, p + 1)); }
 
@@ -2776,10 +2879,9 @@ export class AdminComponent implements OnInit, OnDestroy {
   /** MoMo technical failures (network + unknown) for dashboard KPIs. */
   technicalFailed = computed(() => this.payStats()?.networkOrUnknownFailed ?? 0);
 
-  /** Failure-bar percentage: technical bucket vs technical total; others vs all MoMo failures. */
+  /** Failure-bar percentage: count vs total MoMo attempts (taux relatif au trafic total). */
   failRate(b: { category: string; count: number }, p: PaymentStats) {
-    const denom = b.category === 'NETWORK_OR_UNKNOWN' ? p.networkOrUnknownFailed : p.momoFailed;
-    return this.rate(b.count, denom);
+    return this.rate(b.count, p.momoTotal);
   }
 
   private trendMax(buckets: PaymentTrendBucket[]) {
@@ -3241,7 +3343,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
 
   clearFilters() {
-    this.txSearch.set(''); this.txStatuses.set(new Set()); this.txStatusOp.set('OR'); this.txAgent.set('all'); this.txFrom.set(''); this.txTo.set('');
+    this.txSearch.set(''); this.txStatuses.set(new Set()); this.txStatusOp.set('OR'); this.txAgent.set('all'); this.txFrom.set(''); this.txTo.set(''); this.txPay.set('all');
   }
   exportCsv() {
     const rows = this.filteredTxs();
@@ -3278,6 +3380,21 @@ export class AdminComponent implements OnInit, OnDestroy {
     const max = Math.max(1, ...(this.stats()?.byAgent ?? []).map((r) => r.count));
     return (count / max) * 100;
   }
+
+  // Pagination "Ventes par chargé de clientèle"
+  readonly AGENT_PAGE_SIZE = 8;
+  agentPage = signal(0);
+  agentPageCount = computed(() => {
+    const n = this.stats()?.byAgent?.length ?? 0;
+    return n === 0 ? 1 : Math.ceil(n / this.AGENT_PAGE_SIZE);
+  });
+  pagedAgents = computed(() => {
+    const all = this.stats()?.byAgent ?? [];
+    const p = this.agentPage();
+    return all.slice(p * this.AGENT_PAGE_SIZE, (p + 1) * this.AGENT_PAGE_SIZE);
+  });
+  agentPrev() { this.agentPage.update(p => p > 0 ? p - 1 : 0); }
+  agentNext() { const max = this.agentPageCount() - 1; this.agentPage.update(p => p < max ? p + 1 : max); }
   onCfg(k: keyof CardConfig, e: Event) {
     const n = Number((e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, 8)) || 0;
     this.cfg.update((v) => ({ ...v, [k]: n }));

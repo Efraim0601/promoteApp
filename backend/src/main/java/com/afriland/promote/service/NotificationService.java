@@ -29,7 +29,7 @@ public class NotificationService {
     }
 
     @Transactional
-    public void send(String senderId, String title, String body, List<String> recipientIds) {
+    public void send(String senderId, String title, String body, List<String> recipientIds, String imageData) {
         String senderName = users.findById(senderId).map(u -> u.getName()).orElse("Admin");
         List<AppNotification> notifs = recipientIds.stream()
                 .distinct()
@@ -38,6 +38,7 @@ public class NotificationService {
                         .senderName(senderName)
                         .title(title)
                         .body(body)
+                        .imageData(imageData)
                         .recipientId(rid)
                         .build())
                 .toList();

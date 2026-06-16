@@ -50,7 +50,7 @@ public class NotificationController {
     /** Admin / supervisor — send a notification to one or more users. */
     @PostMapping
     public void send(@RequestBody SendNotificationRequest req, Authentication auth) {
-        service.send((String) auth.getPrincipal(), req.title(), req.body(), req.recipientIds());
+        service.send((String) auth.getPrincipal(), req.title(), req.body(), req.recipientIds(), req.imageData());
         int count = req.recipientIds() == null ? 0 : req.recipientIds().size();
         audit.record(auth, "SEND_NOTIF", "NOTIFICATION", null,
                 "Notification envoyée à " + count + " destinataire(s) : \"" + req.title() + "\"");

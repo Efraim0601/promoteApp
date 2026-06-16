@@ -362,15 +362,15 @@ public final class Dtos {
 
     public record NotificationDto(
             Long id, String title, String body,
-            String senderName, java.time.Instant createdAt, boolean read) {
+            String senderName, java.time.Instant createdAt, boolean read, String imageData) {
         public static NotificationDto of(com.afriland.promote.model.AppNotification n) {
             return new NotificationDto(n.getId(), n.getTitle(), n.getBody(),
-                    n.getSenderName(), n.getCreatedAt(), n.getReadAt() != null);
+                    n.getSenderName(), n.getCreatedAt(), n.getReadAt() != null, n.getImageData());
         }
     }
 
     public record SendNotificationRequest(
-            String title, String body, java.util.List<String> recipientIds) {}
+            String title, String body, java.util.List<String> recipientIds, String imageData) {}
 
     // ---- geolocation ----
     /** Browser-reported position; posted by a logged-in user right after login. */
