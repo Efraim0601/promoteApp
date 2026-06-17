@@ -1573,12 +1573,13 @@ import * as XLSX from 'xlsx';
           <div style="overflow-y:auto;overflow-x:auto;max-height:min(68vh,600px);padding:0 2px">
             <table class="tx-table">
               <colgroup>
-                <col /><col style="width:170px" /><col style="width:140px" /><col style="width:140px" /><col style="width:96px" /><col style="width:116px" />
+                <col /><col style="width:170px" /><col style="width:126px" /><col style="width:140px" /><col style="width:140px" /><col style="width:96px" /><col style="width:116px" />
               </colgroup>
               <thead>
                 <tr>
                   <th>{{ i18n.t('client') }}</th>
                   <th>{{ i18n.t('recharge_pan_short') }}</th>
+                  <th>{{ i18n.t('phone') }}</th>
                   <th>{{ i18n.t('tx_date') }}</th>
                   <th>{{ i18n.t('pay_method_label') }}</th>
                   <th class="num">{{ i18n.t('tx_amount') }}</th>
@@ -1590,6 +1591,7 @@ import * as XLSX from 'xlsx';
                   <tr class="tx-tr">
                     <td><div class="cell-name">{{ r.fullName }}</div><div class="cell-sub">{{ r.ref }}</div></td>
                     <td class="brk" [attr.data-label]="i18n.t('recharge_pan_short')">{{ fmtPan(r.pan) }}</td>
+                    <td class="nowrap" [attr.data-label]="i18n.t('phone')">{{ r.phone || '—' }}</td>
                     <td class="nowrap" [attr.data-label]="i18n.t('tx_date')">{{ txDate(r.createdAt) }}</td>
                     <td [attr.data-label]="i18n.t('pay_method_label')"><span style="display:flex;align-items:center;gap:6px;min-width:0"><span class="op-logo" [style.background]="rpm(r).bg" [style.color]="rpm(r).fg" style="width:20px;height:20px;font-size:8px;border-radius:5px;overflow:hidden;flex-shrink:0">@if (rpm(r).logo) { <img [src]="rpm(r).logo" [alt]="rpm(r).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ rpm(r).short }} }</span><span style="overflow-wrap:anywhere;line-height:1.25">{{ r.pay === 'cash' ? i18n.t('pay_cash_short') : rpm(r).name }}</span></span></td>
                     <td class="num" [attr.data-label]="i18n.t('tx_amount')">{{ i18n.money(r.amount) }}</td>
