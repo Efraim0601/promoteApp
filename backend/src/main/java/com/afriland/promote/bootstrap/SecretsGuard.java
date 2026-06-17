@@ -63,6 +63,9 @@ public class SecretsGuard {
             return;
         }
 
+        // Hard violations — live, high-value secrets that are used on every request / connection:
+        //   JWT secret signs every token, the DB password authenticates the datasource, and the
+        //   admin password gates the highest-privilege account. A default here is a real exposure.
         List<String> violations = new java.util.ArrayList<>();
 
         if (jwtSecret == null || jwtSecret.startsWith("change-me")) {
@@ -71,14 +74,24 @@ public class SecretsGuard {
         if ("promote".equalsIgnoreCase(adminPassword)) {
             violations.add("ADMIN_PASSWORD is still 'promote' — set a strong unique password");
         }
-        if ("promote".equalsIgnoreCase(printPassword)) {
-            violations.add("PRINT_PASSWORD is still 'promote' — set a strong unique password");
-        }
-        if ("promote".equalsIgnoreCase(cashierPassword)) {
-            violations.add("CASHIER_PASSWORD is still 'promote' — set a strong unique password");
-        }
         if ("promote".equalsIgnoreCase(dbPassword)) {
             violations.add("SPRING_DATASOURCE_PASSWORD is still 'promote' — set a strong unique DB password");
+        }
+
+        // Soft warnings — print/cashier passwords only seed their accounts at first creation
+        // (DataSeeder is idempotent by email). On an existing deployment the accounts already exist
+        // with their own (possibly long-since-changed) password, so the env default no longer
+        // reflects the live login. We warn but never block startup on these to avoid bricking prod.
+        List<String> warnings = new java.util.ArrayList<>();
+        if ("promote".equalsIgnoreCase(printPassword)) {
+            warnings.add("PRINT_PASSWORD is still 'promote' — only seeds the print account at first creation; set a strong unique value for new deployments");
+        }
+        if ("promote".equalsIgnoreCase(cashierPassword)) {
+            warnings.add("CASHIER_PASSWORD is still 'promote' — only seeds the cashier account at first creation; set a strong unique value for new deployments");
+        }
+        if (!warnings.isEmpty()) {
+            log.warn("SecretsGuard: seed-only default secrets detected (non-blocking):\n  - {}",
+                    String.join("\n  - ", warnings));
         }
 
         if (!violations.isEmpty()) {
@@ -89,6 +102,6 @@ public class SecretsGuard {
             throw new IllegalStateException(msg);
         }
 
-        log.info("SecretsGuard: all secrets look non-default — OK");
+        log.info("SecretsGuard: critical secrets look non-default — OK");
     }
 }
