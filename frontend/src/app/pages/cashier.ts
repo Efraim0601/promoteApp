@@ -256,6 +256,11 @@ import { NotifBellComponent } from '../shared/notif-bell';
               } @else {
                 <div class="srow total"><span class="lbl">{{ i18n.t('amount_paid') }}</span><span class="val">{{ i18n.money(r.amount) }}</span></div>
               }
+              <!-- Ventilation lecture seule : la caissière dissocie la recharge de la vente carte. -->
+              @if (r.rechargeAmount != null) {
+                <div class="srow" style="font-size:12px"><span class="lbl" style="color:var(--muted)">{{ i18n.t('cash_part_recharge') }}</span><span class="val">{{ i18n.money(r.rechargeAmount) }}</span></div>
+                <div class="srow" style="font-size:12px"><span class="lbl" style="color:var(--muted)">{{ i18n.t('cash_part_card') }}</span><span class="val">{{ i18n.money(r.cardSaleAmount ?? 0) }}</span></div>
+              }
               @if (r.cashCollectedBy) {
                 <div class="srow"><span class="lbl">{{ i18n.t('cash_collected_by') }}</span><span class="val">{{ r.cashCollectedBy }}</span></div>
               }

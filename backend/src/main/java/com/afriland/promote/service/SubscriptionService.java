@@ -130,9 +130,14 @@ public class SubscriptionService {
     private int total(CardConfig cfg, String delivery, String cardType) {
         int transport = "home".equals(delivery) ? cfg.getTransport() : 0;
         // Carte bancaire (défaut) et carte prépayée ont chacune leur couple de montants configurables.
-        int rechargeInitiale = "prepaid".equals(cardType) ? cfg.rechargeInitialeOr() : cfg.rechargeInitialeBancaireOr();
         int passPremium = "prepaid".equals(cardType) ? cfg.passPremiumOr() : cfg.passPremiumBancaireOr();
-        return rechargeInitiale + passPremium + transport;
+        return rechargePortion(cfg, cardType) + passPremium + transport;
+    }
+
+    /** Part « recharge initiale » du total selon le type de carte (le reste = vente de la carte) ;
+     *  figée sur la souscription pour que la caisse puisse dissocier recharge et vente. */
+    private int rechargePortion(CardConfig cfg, String cardType) {
+        return "prepaid".equals(cardType) ? cfg.rechargeInitialeOr() : cfg.rechargeInitialeBancaireOr();
     }
 
     /** Resolve a referrer (sales agent) by phone — ports app.jsx:findAgentByPhone. */
@@ -163,6 +168,7 @@ public class SubscriptionService {
         String cardType = "prepaid".equals(req.cardType()) ? "prepaid" : "bancaire";
         int transport = "home".equals(delivery) ? cfg.getTransport() : 0;
         int amount = total(cfg, delivery, cardType);
+        int rechargeAmount = rechargePortion(cfg, cardType);
         boolean isSelf = "self".equals(channel);
 
         // Pickup branch: only meaningful when delivery == agence. Snapshot the name so it survives
@@ -246,6 +252,7 @@ public class SubscriptionService {
                 .pickupAgencyName(pickupAgencyName)
                 .amount(amount)
                 .transport(transport)
+                .rechargeAmount(rechargeAmount)
                 .channel(channel)
                 .agentId(isSelf ? (referrer != null ? referrer.getId() : null) : agentId)
                 .referrerName(referrer != null ? referrer.getName() : null)

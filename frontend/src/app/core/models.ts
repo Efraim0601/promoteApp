@@ -280,6 +280,8 @@ export interface Subscription {
   cardType?: string;  // bancaire | prepaid
   amount: number;
   transport: number;
+  rechargeAmount?: number | null;   // part recharge initiale du total (null sur dossiers anciens)
+  cardSaleAmount?: number | null;   // part vente carte = amount - rechargeAmount
   channel: string;    // agent | self
   agentId: string | null;
   referrerName: string | null;

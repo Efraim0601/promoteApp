@@ -280,6 +280,7 @@ public final class Dtos {
             String ref, String prenom, String nom, String fullName, String sexe, String email,
             String docType, String cni, String niu, String cniExp, String phone, String quartier, String region, String ville,
             String pay, String payPhone, String delivery, String pickupAgencyName, int amount, int transport,
+            Integer rechargeAmount, Integer cardSaleAmount,
             String cardType,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
@@ -291,10 +292,15 @@ public final class Dtos {
             // Failure category (for the failure-analysis view) — only meaningful on a failed payment.
             String failCat = s.getPayStatus() == com.afriland.promote.model.PayStatus.failed
                     ? com.afriland.promote.service.PaymentFailures.classify(s).name() : null;
+            // Ventilation lecture seule : part recharge (figée à la création) vs vente carte (le reste).
+            // Null sur les dossiers antérieurs à cette évolution → l'écran caisse masque la ventilation.
+            Integer rechargePart = s.getRechargeAmount();
+            Integer cardSalePart = rechargePart == null ? null : Math.max(0, s.getAmount() - rechargePart);
             return new SubscriptionDto(
                     s.getRef(), s.getPrenom(), s.getNom(), s.getFullName(), s.getSexe(), s.getEmail(),
                     s.getDocType(), s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
                     s.getPay(), s.getPayPhone(), s.getDelivery(), s.getPickupAgencyName(), s.getAmount(), s.getTransport(),
+                    rechargePart, cardSalePart,
                     s.getCardType(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),

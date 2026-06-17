@@ -71,6 +71,12 @@ public class Subscription implements Payable {
     private int amount;             // total paid/due
     private int transport;          // transport fee portion (0 unless home)
 
+    /** Part « recharge initiale » figée dans {@link #amount} à la création (selon le type de carte) :
+     *  c'est l'argent qui crédite le solde de la carte. Le reste ({@code amount - rechargeAmount} =
+     *  Pass Premium + transport) est la vente de la carte. Permet à la caisse de dissocier les deux
+     *  montants. Nullable (ddl-auto: update) : null sur les dossiers antérieurs à cette évolution. */
+    private Integer rechargeAmount;
+
     private String channel;         // agent | self
 
     private String agentId;         // owning officer (nullable for unattributed self sales)
