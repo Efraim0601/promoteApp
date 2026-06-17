@@ -191,7 +191,7 @@ public class TrustPayWayGateway implements PaymentGateway {
     }
 
     @Override
-    public Optional<PayStatus> queryStatus(Payable sub) {
+    public Optional<GatewayStatus> queryDetailedStatus(Payable sub) {
         // TrustPayWay accepts either the aggregator transaction id or our orderId (gatewayRef).
         // After a 500→400 Duplicate push the tx id is often missing locally while the order is live.
         String id = sub.getPaymentTxId();
@@ -218,12 +218,14 @@ public class TrustPayWayGateway implements PaymentGateway {
                             return null;
                         }
                     });
-            Optional<PayStatus> mapped = resp == null ? Optional.empty() : map(resp.status());
-            if (mapped.isPresent()) {
-                log.debug("TrustPayWay get-status ref={} id={} status={} -> {}",
-                        sub.getRef(), lookupId, resp.status(), mapped.get());
-            }
-            return mapped;
+            if (resp == null) return Optional.empty();
+            Optional<PayStatus> mapped = map(resp.effectiveStatus());
+            if (mapped.isEmpty()) return Optional.empty();
+            // Surface the aggregator's reason only on a non-success terminal state.
+            String message = mapped.get() == PayStatus.paid ? null : resp.effectiveMessage();
+            log.debug("TrustPayWay get-status ref={} id={} status={} message={} -> {}",
+                    sub.getRef(), lookupId, resp.effectiveStatus(), message, mapped.get());
+            return Optional.of(new GatewayStatus(mapped.get(), message));
         } catch (RuntimeException ex) {
             log.warn("TrustPayWay get-status failed ref={}: {}", sub.getRef(), ex.getMessage());
             return Optional.empty();
@@ -324,5 +326,15 @@ public class TrustPayWayGateway implements PaymentGateway {
                        String orderId, String subscriberMsisdn) {}
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record StatusResponse(String status) {}
+    record StatusResponse(String status, String message, ProcessData data) {
+        /** Status from the top level, falling back to the nested {@code data.status} envelope. */
+        String effectiveStatus() {
+            if (status != null && !status.isBlank()) return status;
+            return data != null ? data.status() : null;
+        }
+        /** Aggregator reason, top level or nested. */
+        String effectiveMessage() {
+            return message != null && !message.isBlank() ? message : null;
+        }
+    }
 }

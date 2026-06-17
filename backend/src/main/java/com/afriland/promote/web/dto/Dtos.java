@@ -339,13 +339,22 @@ public final class Dtos {
     /** Tells the frontend which gateway is live, so the UI can adapt (e.g. demo buttons). */
     public record PaymentProviderDto(String provider) {}
 
-    /** Result of pulling a live TrustPayWay status for one order (manual reconciliation). */
+    /** Result of pulling a live TrustPayWay status for one order (manual reconciliation).
+     *  {@code reason} carries the aggregator's current decline message that was applied to the
+     *  portal (null when paid / unchanged / not applicable). */
     public record ReconcilePullResult(
             String ref,
             String statusBefore,
             String statusAfter,
             boolean changed,
-            String note) {}
+            String note,
+            String reason) {
+        /** Back-compat ctor for results that carry no reason. */
+        public ReconcilePullResult(String ref, String statusBefore, String statusAfter,
+                                   boolean changed, String note) {
+            this(ref, statusBefore, statusAfter, changed, note, null);
+        }
+    }
 
     /** Summary of a manual reconciliation run (admin script / API). */
     public record ReconcileReport(

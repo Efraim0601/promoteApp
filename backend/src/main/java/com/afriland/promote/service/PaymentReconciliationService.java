@@ -49,8 +49,10 @@ public class PaymentReconciliationService {
     private int batch;
     @Value("${app.payment.reconcile.batch-timeout-seconds:120}")
     private long batchTimeoutSeconds;
-    @Value("${app.payment.reconcile.lookback-seconds:3600}")
-    private long lookbackSeconds;
+    /** Manual-reconcile window cap, in hours — independent of the scheduled sweep's lookback so an
+     *  operator can reconcile the last 24 h / 48 h on demand. The batch cap still bounds the work. */
+    @Value("${app.payment.reconcile.manual-max-hours:168}")
+    private int manualMaxHours;
 
     public PaymentReconciliationService(SubscriptionRepository subs, RechargeRepository recharges,
                                         SubscriptionService subscriptionService,
@@ -82,8 +84,9 @@ public class PaymentReconciliationService {
             throw new ResponseStatusException(CONFLICT, "reconcile_already_running");
         }
         try {
-            int windowHours = Math.max(1, Math.min(hours, 168));
-            long windowSeconds = Math.min(windowHours * 3600L, Math.max(60, lookbackSeconds));
+            int maxHours = Math.max(1, manualMaxHours);
+            int windowHours = Math.max(1, Math.min(hours, maxHours));
+            long windowSeconds = windowHours * 3600L;
             Instant since = Instant.now().minusSeconds(windowSeconds);
             var page = PageRequest.of(0, Math.max(1, batch));
 

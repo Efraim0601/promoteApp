@@ -347,12 +347,14 @@ public class RechargeService {
         if (blank(r.getGatewayRef()) && blank(r.getPaymentTxId())) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, "no_gateway_id");
         }
-        PayStatus pulled;
+        PaymentGateway.GatewayStatus detail;
         try {
-            pulled = gateway.queryStatus(r).orElse(null);
+            detail = gateway.queryDetailedStatus(r).orElse(null);
         } catch (RuntimeException ex) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, ex.getMessage());
         }
+        PayStatus pulled = detail == null ? null : detail.status();
+        String reason = detail == null ? null : trimToNull(detail.message());
         if (pulled == null || pulled == PayStatus.pending) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
         }
@@ -368,10 +370,25 @@ public class RechargeService {
         }
         if (pulled == PayStatus.failed && before == PayStatus.pending) {
             r.setPayStatus(PayStatus.failed);
+            if (reason != null) r.setPaymentMessage(reason);
             recharges.save(r);
-            return new ReconcilePullResult(ref, before.name(), PayStatus.failed.name(), true, null);
+            return new ReconcilePullResult(ref, before.name(), PayStatus.failed.name(), true, null, reason);
+        }
+        // Still failed on both sides: refresh the aggregator's (possibly changed) decline reason.
+        if (pulled == PayStatus.failed && before == PayStatus.failed
+                && reason != null && !reason.equals(trimToNull(r.getPaymentMessage()))) {
+            r.setPaymentMessage(reason);
+            recharges.save(r);
+            log.info("Manual reconciliation updated failure reason for recharge {}: {}", ref, reason);
+            return new ReconcilePullResult(ref, before.name(), before.name(), true, "reason_updated", reason);
         }
         return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+    }
+
+    private static String trimToNull(String v) {
+        if (v == null) return null;
+        String t = v.trim();
+        return t.isEmpty() ? null : t;
     }
 
     private static boolean blank(String v) {

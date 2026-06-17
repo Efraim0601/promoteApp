@@ -27,8 +27,22 @@ public interface PaymentGateway {
      * any provider without a status API simply return empty.
      */
     default Optional<PayStatus> queryStatus(Payable order) {
+        return queryDetailedStatus(order).map(GatewayStatus::status);
+    }
+
+    /**
+     * Like {@link #queryStatus} but also carries the aggregator's current reason/message — so manual
+     * reconciliation can refresh the failure reason shown on the portal, even when the status itself
+     * is unchanged (the aggregator's reason for a failed order can change over time). Default:
+     * unknown — providers without a status API return empty.
+     */
+    default Optional<GatewayStatus> queryDetailedStatus(Payable order) {
         return Optional.empty();
     }
+
+    /** A live status pulled from the aggregator: the mapped {@link PayStatus} plus the raw reason
+     *  message (e.g. "Solde insuffisant"), null when none was provided. */
+    record GatewayStatus(PayStatus status, String message) {}
 
     /** Result of a payment request initiation. {@code message} carries the aggregator's
      *  reason on rejection (e.g. "Solde insuffisant"), null/empty when accepted. */

@@ -509,12 +509,14 @@ public class SubscriptionService {
         if (blank(s.getGatewayRef()) && blank(s.getPaymentTxId())) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, "no_gateway_id");
         }
-        PayStatus pulled;
+        PaymentGateway.GatewayStatus detail;
         try {
-            pulled = gateway.queryStatus(s).orElse(null);
+            detail = gateway.queryDetailedStatus(s).orElse(null);
         } catch (RuntimeException ex) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, ex.getMessage());
         }
+        PayStatus pulled = detail == null ? null : detail.status();
+        String reason = detail == null ? null : trimToNull(detail.message());
         if (pulled == null || pulled == PayStatus.pending) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
         }
@@ -531,10 +533,25 @@ public class SubscriptionService {
         }
         if (pulled == PayStatus.failed && before == PayStatus.pending) {
             s.markFailed();
+            if (reason != null) s.setPaymentMessage(reason);
             subs.save(s);
-            return new ReconcilePullResult(ref, before.name(), PayStatus.failed.name(), true, null);
+            return new ReconcilePullResult(ref, before.name(), PayStatus.failed.name(), true, null, reason);
+        }
+        // Still failed on both sides: the aggregator's reason can change over time — refresh it.
+        if (pulled == PayStatus.failed && before == PayStatus.failed
+                && reason != null && !reason.equals(trimToNull(s.getPaymentMessage()))) {
+            s.setPaymentMessage(reason);
+            subs.save(s);
+            log.info("Manual reconciliation updated failure reason for subscription {}: {}", ref, reason);
+            return new ReconcilePullResult(ref, before.name(), before.name(), true, "reason_updated", reason);
         }
         return new ReconcilePullResult(ref, before.name(), before.name(), false, null);
+    }
+
+    private static String trimToNull(String v) {
+        if (v == null) return null;
+        String t = v.trim();
+        return t.isEmpty() ? null : t;
     }
 
     private static boolean blank(String v) {

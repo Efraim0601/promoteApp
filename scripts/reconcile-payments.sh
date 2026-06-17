@@ -6,7 +6,10 @@
 #
 # Usage:
 #   ./scripts/reconcile-payments.sh           # last 1 hour (default)
-#   ./scripts/reconcile-payments.sh 2         # last 2 hours (capped by PAYMENT_RECONCILE_LOOKBACK_SECONDS)
+#   ./scripts/reconcile-payments.sh 24        # last 24 hours
+#   ./scripts/reconcile-payments.sh 48        # last 48 hours
+# The window is capped by PAYMENT_RECONCILE_MANUAL_MAX_HOURS (default 168 h / 7 days), independent
+# of the scheduled sweep's lookback. Each run still processes at most PAYMENT_RECONCILE_BATCH rows.
 #
 # Reads from .env (project root):
 #   APP_PUBLIC_URL or RECONCILE_APP_URL  — base URL, e.g. https://rfprepaidcard.afrilandfirstbank.com
@@ -88,7 +91,9 @@ fi
 cat /tmp/reconcile-result.json | pretty_json
 
 if command -v python3 >/dev/null; then
-  python3 <<'PY' /tmp/reconcile-result.json
+  # NB: `python3 - <file>` reads the script from stdin (the heredoc) and passes <file> as argv[1].
+  # Without the `-`, python would try to RUN the JSON file as a script (NameError: false).
+  python3 - /tmp/reconcile-result.json <<'PY'
 import json, sys
 d = json.load(open(sys.argv[1]))
 print()
@@ -99,7 +104,12 @@ if changed:
     print()
     print("Mises à jour :")
     for x in changed:
-        print(f"  • {x.get('ref')}: {x.get('statusBefore')} → {x.get('statusAfter')}")
+        line = f"  • {x.get('ref')}: {x.get('statusBefore')} → {x.get('statusAfter')}"
+        if x.get('note') == 'reason_updated':
+            line += " (motif corrigé)"
+        if x.get('reason'):
+            line += f" — {x.get('reason')}"
+        print(line)
 PY
 fi
 
