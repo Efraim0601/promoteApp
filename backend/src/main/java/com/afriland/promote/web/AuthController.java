@@ -5,6 +5,7 @@ import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.security.JwtService;
+import com.afriland.promote.security.LoginRateLimiter;
 import com.afriland.promote.security.PasswordPolicy;
 import com.afriland.promote.security.TempPasswordGenerator;
 import com.afriland.promote.service.LoginAuditService;
@@ -25,27 +26,36 @@ public class AuthController {
     private final JwtService jwt;
     private final LoginAuditService audit;
     private final EmailService email;
+    private final LoginRateLimiter rateLimiter;
 
     public AuthController(AppUserRepository users, PasswordEncoder encoder, JwtService jwt,
-                          LoginAuditService audit, EmailService email) {
+                          LoginAuditService audit, EmailService email, LoginRateLimiter rateLimiter) {
         this.users = users;
         this.encoder = encoder;
         this.jwt = jwt;
         this.audit = audit;
         this.email = email;
+        this.rateLimiter = rateLimiter;
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest req, HttpServletRequest request) {
+        String key = req.email().toLowerCase().trim();
+        if (rateLimiter.isLocked(key)) {
+            audit.record(req.email(), null, false, "account_locked", request);
+            return ResponseEntity.status(429).body(new ErrorResponse("account_locked"));
+        }
         AppUser u = users.findByEmailIgnoreCase(req.email()).orElse(null);
         if (u == null || !encoder.matches(req.password(), u.getPasswordHash())) {
+            rateLimiter.recordFailure(key);
             audit.record(req.email(), null, false, "invalid_credentials", request);
-            return ResponseEntity.status(401).body("invalid_credentials");
+            return ResponseEntity.status(401).body(new ErrorResponse("invalid_credentials"));
         }
         if (!u.isEnabled()) {
             audit.record(req.email(), u, false, "account_disabled", request);
-            return ResponseEntity.status(403).body("account_disabled");
+            return ResponseEntity.status(403).body(new ErrorResponse("account_disabled"));
         }
+        rateLimiter.recordSuccess(key);
         audit.record(req.email(), u, true, "ok", request);
         return ResponseEntity.ok(new LoginResponse(jwt.generate(u), UserDto.of(u)));
     }
@@ -57,17 +67,24 @@ public class AuthController {
     public ResponseEntity<?> loginPhone(@Valid @RequestBody PhoneLoginRequest req, HttpServletRequest request) {
         String phone = req.phone().replaceAll("\\D", "");
         if (phone.length() > 9) phone = phone.substring(phone.length() - 9);
+        String key = "phone:" + phone;
+        if (rateLimiter.isLocked(key)) {
+            audit.record(phone, null, false, "account_locked", request);
+            return ResponseEntity.status(429).body(new ErrorResponse("account_locked"));
+        }
         AppUser u = users.findAllByPhone(phone).stream()
                 .filter(x -> x.effectiveRoles().contains(com.afriland.promote.model.Role.COLLECTEUR))
                 .findFirst().orElse(null);
         if (u == null || u.getLoginPin() == null || !encoder.matches(req.pin(), u.getLoginPin())) {
+            rateLimiter.recordFailure(key);
             audit.record(phone, u, false, "invalid_credentials", request);
-            return ResponseEntity.status(401).body("invalid_credentials");
+            return ResponseEntity.status(401).body(new ErrorResponse("invalid_credentials"));
         }
         if (!u.isEnabled()) {
             audit.record(phone, u, false, "account_disabled", request);
-            return ResponseEntity.status(403).body("account_disabled");
+            return ResponseEntity.status(403).body(new ErrorResponse("account_disabled"));
         }
+        rateLimiter.recordSuccess(key);
         audit.record(phone, u, true, "ok", request);
         return ResponseEntity.ok(new LoginResponse(jwt.generate(u), UserDto.of(u)));
     }

@@ -4,6 +4,7 @@ import com.afriland.promote.model.AppProfile;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Permission;
 import com.afriland.promote.model.Subscription;
+import com.afriland.promote.util.PanUtils;
 import jakarta.validation.constraints.NotBlank;
 
 import java.util.List;
@@ -226,7 +227,8 @@ public final class Dtos {
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,
                     s.getSaraReceiptKey() != null,
-                    s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(), s.getCardNumber(), s.getPan(),
+                    s.getSaraRef(), s.getSaraPayerPhone(), s.getSaraAmount(),
+                    PanUtils.mask(s.getCardNumber()), PanUtils.mask(s.getPan()),
                     s.getCashCollectedBy(), s.getCashCollectedAt() == null ? null : s.getCashCollectedAt().toString(),
                     s.getCashPaymentReference(),
                     s.getStatus(), s.getCreatedAt().toString(), s.getPaymentMessage(), failCat);
@@ -418,7 +420,7 @@ public final class Dtos {
             String createdAt, String paymentMessage) {
         public static RechargeDto of(com.afriland.promote.model.Recharge r) {
             return new RechargeDto(
-                    r.getRef(), r.getPrenom(), r.getNom(), r.getFullName(), r.getPhone(), r.getPan(), r.getAmount(),
+                    r.getRef(), r.getPrenom(), r.getNom(), r.getFullName(), r.getPhone(), PanUtils.mask(r.getPan()), r.getAmount(),
                     r.getPay(), r.getPayPhone(), r.getPayStatus().name(), r.getStatus(),
                     r.getSaraReceiptKey() != null, r.getSaraRef(), r.getSaraPayerPhone(), r.getSaraAmount(),
                     r.getCashCollectedBy(), r.getCashCollectedAt() == null ? null : r.getCashCollectedAt().toString(),
