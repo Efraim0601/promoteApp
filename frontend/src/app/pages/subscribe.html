@@ -38,12 +38,6 @@
           </div>
         </div>
 
-        <!-- Choix du type de carte : carte bancaire ou carte prépayée (le motif de paiement et le total en dépendent). -->
-        <div>
-          <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('cardtype_choose_label') }}</div>
-          <tile-choice [options]="cardTypeTiles" [value]="form.cardType" (valueChange)="set('cardType', $any($event))"></tile-choice>
-        </div>
-
         <div class="card" style="padding:6px 14px">
           <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="idcard" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('welcome_step1') }}</span></div>
           <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="phone" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('welcome_step2') }}</span></div>
@@ -303,10 +297,6 @@
 
       <!-- Step 3: payment -->
       @else if (step() === 3) {
-        <!-- Type de carte payée — détermine le total et le motif de paiement (carte bancaire / prépayée). -->
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('cardtype_choose_label') }}</div>
-        <tile-choice [options]="cardTypeTiles" [value]="form.cardType" (valueChange)="set('cardType', $any($event))"></tile-choice>
-        <div style="height:14px"></div>
         <!-- Retrait de la carte : stand Promote (par défaut) ou retrait en agence. -->
         @if (deliveryTiles.length > 1) {
           <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('delivery_choose_label') }}</div>

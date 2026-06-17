@@ -123,7 +123,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
     saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-    pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'bancaire',
+    pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'prepaid',
   };
 
   ngOnInit() {
@@ -202,24 +202,11 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   // ---- derived ----
   get transport() { return this.form.delivery === 'home' ? (this.config.transport || 0) : 0; }
-  /** Carte bancaire (défaut) et carte prépayée ont chacune leur couple de montants configurables. */
-  get isBancaire() { return this.form.cardType !== 'prepaid'; }
-  /** Offre Promote : carte gratuite — le client règle la recharge initiale + le Pass Premium. */
-  get rechargeInitiale() { return (this.isBancaire ? this.config.rechargeInitialeBancaire : this.config.rechargeInitiale) || 0; }
-  get passPremium() { return (this.isBancaire ? this.config.passPremiumBancaire : this.config.passPremium) || 0; }
+  readonly isBancaire = false;
+  get rechargeInitiale() { return this.config.rechargeInitiale || 0; }
+  get passPremium() { return this.config.passPremium || 0; }
   get total() { return this.rechargeInitiale + this.passPremium + this.transport; }
-  /** Libellé de la carte (offre + récap) selon le type choisi. */
-  get cardLabel() { return this.i18n.t(this.isBancaire ? 'offer_card_label_bancaire' : 'offer_card_label'); }
-
-  /** Choix du type de carte : carte bancaire ou carte prépayée. */
-  get cardTypeTiles(): TileOption[] {
-    return [
-      { id: 'bancaire', icon: '💳', bg: 'var(--primary)', color: '#fff',
-        title: this.i18n.t('cardtype_bancaire_title'), desc: this.i18n.t('cardtype_bancaire_desc') },
-      { id: 'prepaid', icon: '★', bg: 'var(--af-gold)', color: '#5a4200',
-        title: this.i18n.t('cardtype_prepaid_title'), desc: this.i18n.t('cardtype_prepaid_desc') },
-    ];
-  }
+  get cardLabel() { return this.i18n.t('offer_card_label'); }
   get fullName() { return (this.form.prenom + ' ' + this.form.nom).trim(); }
   get pm() { return payById(this.form.pay); }
 
@@ -607,7 +594,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-      pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'bancaire',
+      pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'prepaid',
     };
     this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
     this.waitLong.set(false); this.refreshing.set(false);
