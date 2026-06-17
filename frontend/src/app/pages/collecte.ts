@@ -10,6 +10,7 @@ import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
 import { TileChoiceComponent, TileOption } from '../shared/tile-choice';
 import { SpinnerComponent } from '../shared/spinner';
+import * as XLSX from 'xlsx';
 
 interface CForm {
   product: string; clientNom: string; clientPhone: string;
@@ -99,7 +100,12 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
       </div>
 
       <!-- My collectes -->
-      <div class="kicker" style="margin-top:24px;margin-bottom:6px">{{ i18n.t('col_mine') }} · {{ mine().length }}</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:24px;margin-bottom:6px">
+        <div class="kicker" style="flex:1">{{ i18n.t('col_mine') }} · {{ mine().length }}</div>
+        @if (mine().length) {
+          <button class="btn btn-ghost" (click)="exportMine()" style="padding:4px 9px;font-size:11px"><ic name="download" [size]="13"></ic> {{ i18n.t('col_export_xl') }}</button>
+        }
+      </div>
       @if (loading()) {
         <div class="load-center"><spinner tone="primary"></spinner></div>
       } @else if (!mine().length) {
@@ -216,6 +222,31 @@ export class CollecteComponent implements OnInit {
       next: () => { this.busy.set(false); if (this.editingRef() === c.ref) this.resetForm(); this.load(); },
       error: () => { this.busy.set(false); this.err.set(this.i18n.t('col_error')); },
     });
+  }
+
+  exportMine() {
+    const data = this.mine();
+    if (!data.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const locale = this.i18n.lang() === 'fr' ? 'fr-FR' : 'en-GB';
+    const rows: (string | number)[][] = [
+      ['Référence', 'Produit', 'Nom client', 'Téléphone', 'N° compte', 'N° carte', 'Type carte', 'Date'],
+      ...data.map((c) => [
+        c.ref,
+        this.i18n.t('prod_' + c.product),
+        c.clientNom ?? '',
+        c.clientPhone ?? '',
+        c.accountNumber ?? '',
+        c.cardNumber ?? '',
+        c.cardType ? this.i18n.t('ct_' + c.cardType) : '',
+        c.createdAt ? new Date(c.createdAt).toLocaleString(locale) : '',
+      ]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Mes collectes');
+    XLSX.writeFile(wb, `mes-collectes_${today}.xlsx`);
   }
 
   date(iso: string) { try { return new Date(iso).toLocaleDateString(this.i18n.lang() === 'fr' ? 'fr-FR' : 'en-GB'); } catch { return iso; } }

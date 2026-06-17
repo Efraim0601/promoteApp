@@ -1130,28 +1130,34 @@ import * as XLSX from 'xlsx';
 
       <!-- ========== RETRAITS AGENCE ========== -->
       @if (section() === 'agence-retrait') {
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <h1 style="font-size:21px;margin:0;flex:1">{{ i18n.t('nav_agence_retrait') }}</h1>
         <button class="icon-btn" (click)="loadAgenceRetrait()" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
       </div>
 
       <!-- KPIs -->
       @if (!agenceRetraitLoading()) {
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:14px">
-        <div class="kpi" style="padding:10px 12px">
-          <div class="kv" style="font-size:22px">{{ agenceRetrait().length }}</div>
-          <div class="kl">Total demandes</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
+        <div class="kpi" style="padding:12px 14px">
+          <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">Total demandes</div>
+          <div style="font-size:28px;font-weight:800;line-height:1">{{ agenceRetrait().length }}</div>
         </div>
-        <div class="kpi" style="padding:10px 12px;cursor:pointer"
+        <div class="kpi" style="padding:12px 14px;cursor:pointer"
              [style.borderColor]="agenceRetraitPending() ? 'color-mix(in srgb,var(--warning) 45%,var(--border))' : 'var(--border)'"
              [style.background]="agenceRetraitPending() ? 'var(--warning-soft)' : 'var(--surface)'"
              (click)="agenceRetraitStatus.set(agenceRetraitStatus() === 'pending' ? 'all' : 'pending')">
-          <div class="kv" style="font-size:22px;color:var(--warning)">{{ agenceRetraitPending() }}</div>
-          <div class="kl">En attente retrait</div>
+          <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--warning);margin-bottom:6px">En attente retrait</div>
+          <div style="font-size:28px;font-weight:800;line-height:1;color:var(--warning)">{{ agenceRetraitPending() }}</div>
+          @if (agenceRetrait().length) {
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">{{ (agenceRetraitPending() * 100 / agenceRetrait().length).toFixed(0) }}% du total</div>
+          }
         </div>
-        <div class="kpi" style="padding:10px 12px">
-          <div class="kv" style="font-size:22px;color:var(--success)">{{ agenceRetraitDone() }}</div>
-          <div class="kl">Cartes remises</div>
+        <div class="kpi" style="padding:12px 14px">
+          <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--success);margin-bottom:6px">Cartes remises</div>
+          <div style="font-size:28px;font-weight:800;line-height:1;color:var(--success)">{{ agenceRetraitDone() }}</div>
+          @if (agenceRetrait().length) {
+            <div style="font-size:11px;color:var(--muted);margin-top:4px">{{ (agenceRetraitDone() * 100 / agenceRetrait().length).toFixed(0) }}% du total</div>
+          }
         </div>
       </div>
       }
@@ -1168,28 +1174,30 @@ import * as XLSX from 'xlsx';
             <span class="pfx"><ic name="search" [size]="15"></ic></span>
             <input placeholder="Rechercher par nom, ref, téléphone…" [value]="agenceRetraitSearch()" (input)="agenceRetraitSearch.set($any($event.target).value)" />
           </div>
-          <!-- Filtre par agence -->
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">Agence</span>
-            <button (click)="agenceRetraitAgency.set('all')"
-                    [style.background]="agenceRetraitAgency() === 'all' ? 'var(--primary)' : 'var(--surface-2)'"
-                    [style.color]="agenceRetraitAgency() === 'all' ? '#fff' : 'var(--fg)'"
-                    style="border:none;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer">Toutes</button>
-            @for (ag of agenceRetraitAgencies(); track ag) {
-              <button (click)="agenceRetraitAgency.set(ag)"
-                      [style.background]="agenceRetraitAgency() === ag ? 'var(--primary)' : 'var(--surface-2)'"
-                      [style.color]="agenceRetraitAgency() === ag ? '#fff' : 'var(--fg)'"
-                      style="border:none;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer">{{ ag }}</button>
-            }
+          <!-- Filtre par agence - scroll horizontal -->
+          <div>
+            <div style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px">Agence</div>
+            <div style="display:flex;align-items:center;gap:5px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none;-webkit-overflow-scrolling:touch">
+              <button (click)="agenceRetraitAgency.set('all')"
+                      [style.background]="agenceRetraitAgency() === 'all' ? 'var(--primary)' : 'var(--surface-2)'"
+                      [style.color]="agenceRetraitAgency() === 'all' ? '#fff' : 'var(--fg)'"
+                      style="border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">Toutes</button>
+              @for (ag of agenceRetraitAgencies(); track ag) {
+                <button (click)="agenceRetraitAgency.set(ag)"
+                        [style.background]="agenceRetraitAgency() === ag ? 'var(--primary)' : 'var(--surface-2)'"
+                        [style.color]="agenceRetraitAgency() === ag ? '#fff' : 'var(--fg)'"
+                        style="border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0">{{ ag }}</button>
+              }
+            </div>
           </div>
           <!-- Filtre statut -->
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">Statut</span>
+          <div style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:10.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">Statut</span>
             @for (f of [['all','Tous'],['pending','En attente'],['done','Remises']]; track f[0]) {
               <button (click)="agenceRetraitStatus.set(f[0])"
                       [style.background]="agenceRetraitStatus() === f[0] ? 'var(--primary)' : 'var(--surface-2)'"
                       [style.color]="agenceRetraitStatus() === f[0] ? '#fff' : 'var(--fg)'"
-                      style="border:none;border-radius:20px;padding:3px 11px;font-size:12px;font-weight:600;cursor:pointer">{{ f[1] }}</button>
+                      style="border:none;border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer">{{ f[1] }}</button>
             }
           </div>
         </div>
@@ -1197,20 +1205,27 @@ import * as XLSX from 'xlsx';
         @if (agenceRetraitLoading()) {
           <div style="padding:32px;text-align:center"><spinner [size]="28"></spinner></div>
         } @else if (!filteredAgenceRetrait().length) {
-          <div style="padding:24px 14px;text-align:center;color:var(--muted);font-size:13.5px">Aucune demande de retrait en agence.</div>
+          <div style="padding:32px 14px;text-align:center;color:var(--muted);font-size:13.5px">Aucune demande de retrait en agence.</div>
         } @else {
           <div style="border-top:1px solid var(--border)">
             @for (r of filteredAgenceRetrait(); track r.ref) {
-              <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border);flex-wrap:wrap">
-                <div style="flex:1;min-width:160px">
-                  <div style="font-size:13.5px;font-weight:700">{{ r.fullName }}</div>
-                  <div style="font-size:11.5px;color:var(--muted)">{{ r.ref }} · {{ r.phone }}</div>
+              <div style="display:flex;align-items:center;gap:12px;padding:11px 14px;border-bottom:1px solid var(--border)">
+                <!-- Avatar initiale -->
+                <div style="width:38px;height:38px;border-radius:50%;background:color-mix(in srgb,var(--primary) 10%,transparent);color:var(--primary);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0">
+                  {{ r.fullName.charAt(0).toUpperCase() }}
                 </div>
-                <div style="flex:1;min-width:120px">
-                  <div style="font-size:12px;font-weight:600;color:var(--primary)">{{ r.pickupAgencyName }}</div>
-                  <div style="font-size:11px;color:var(--muted)">{{ r.createdAt | slice:0:10 }}</div>
+                <!-- Nom + ref + téléphone -->
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.fullName }}</div>
+                  <div style="font-size:11.5px;color:var(--muted);margin-top:2px">{{ r.ref }} · {{ r.phone }}</div>
                 </div>
-                <div style="display:flex;align-items:center;gap:8px">
+                <!-- Agence + date + montant -->
+                <div style="min-width:110px">
+                  <div style="font-size:12.5px;font-weight:700;color:var(--primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.pickupAgencyName }}</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ r.createdAt | slice:0:10 }} · {{ i18n.money(r.amount) }}</div>
+                </div>
+                <!-- Statut + action -->
+                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0">
                   <status-badge [status]="r.status"></status-badge>
                   <button class="btn btn-outline" style="padding:4px 12px;font-size:12px" (click)="goToTxFromAgence(r.ref)">Voir</button>
                 </div>
