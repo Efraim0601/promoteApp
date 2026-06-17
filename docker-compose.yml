@@ -68,6 +68,9 @@ services:
       PRINT_EMAIL: ${PRINT_EMAIL:-imprimeur.promote@afrilandfirstbank.com}
       PRINT_PASSWORD: ${PRINT_PASSWORD:-promote}
       PRINT_NAME: ${PRINT_NAME:-Point d'impression}
+      CASHIER_EMAIL: ${CASHIER_EMAIL:-caissier.promote@afrilandfirstbank.com}
+      CASHIER_PASSWORD: ${CASHIER_PASSWORD:-promote}
+      CASHIER_NAME: ${CASHIER_NAME:-Caissier Promote}
       APP_PAYMENT_PROVIDER: ${APP_PAYMENT_PROVIDER:-simulated}
       # Push MoMo off the HTTP thread (create returns pending; worker calls TrustPayWay).
       APP_PAYMENT_ASYNC: ${APP_PAYMENT_ASYNC:-false}
