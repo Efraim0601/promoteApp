@@ -1132,6 +1132,9 @@ import * as XLSX from 'xlsx';
       @if (section() === 'agence-retrait') {
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
         <h1 style="font-size:21px;margin:0;flex:1">{{ i18n.t('nav_agence_retrait') }}</h1>
+        @if (filteredAgenceRetrait().length) {
+          <button class="btn btn-ghost" (click)="exportAgenceRetrait()" style="padding:5px 11px;font-size:12px"><ic name="download" [size]="14"></ic> Exporter Excel</button>
+        }
         <button class="icon-btn" (click)="loadAgenceRetrait()" [title]="i18n.t('dash_refresh')" style="color:var(--muted)"><ic name="refresh" [size]="15"></ic></button>
       </div>
 
@@ -3646,6 +3649,40 @@ export class AdminComponent implements OnInit, OnDestroy {
       return true;
     });
   });
+
+  exportAgenceRetrait() {
+    const rows = this.filteredAgenceRetrait();
+    if (!rows.length) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const payLabel: Record<string, string> = { om: 'Orange Money', mtn: 'MTN MoMo', cash: 'Espèces', sara: 'Virement SARA' };
+    const cardLabel: Record<string, string> = { prepaid: 'Prépayée', bancaire: 'Bancaire' };
+    const header = ['Référence', 'Nom complet', 'Téléphone', 'CNI', 'Agence de retrait', 'Type de carte',
+                    'Montant (FCFA)', 'Méthode de paiement', 'Canal', 'Statut', 'Date de souscription'];
+    const data: (string | number)[][] = [
+      header,
+      ...rows.map(r => [
+        r.ref,
+        r.fullName,
+        r.phone,
+        r.cni ?? '',
+        r.pickupAgencyName ?? '',
+        cardLabel[r.cardType ?? ''] ?? (r.cardType ?? ''),
+        r.amount,
+        payLabel[r.pay] ?? r.pay,
+        r.channel === 'agent' ? 'Agent' : 'Client (QR)',
+        r.printed ? 'Remise' : 'En attente',
+        this.fmtDateTime(r.createdAt),
+      ]),
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 24 },
+                  { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 18 }];
+    // Freeze the header row
+    ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Retraits agence');
+    XLSX.writeFile(wb, `retraits-agence_${today}.xlsx`);
+  }
 
   goToTxFromAgence(ref: string) {
     if (!this.txs().length) {
