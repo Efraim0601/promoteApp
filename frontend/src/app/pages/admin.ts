@@ -17,13 +17,13 @@ import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
 import { NotifBellComponent } from '../shared/notif-bell';
 import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
-import { SlicePipe } from '@angular/common';
+import { SlicePipe, NgTemplateOutlet } from '@angular/common';
 import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'page-admin',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent, NotifBellComponent, FormsModule, SlicePipe],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent, NotifBellComponent, FormsModule, SlicePipe, NgTemplateOutlet],
   template: `
   <div class="scr">
     <app-bar class="appbar-wide">
@@ -78,11 +78,94 @@ import * as XLSX from 'xlsx';
       <!-- ===== Main content ===== -->
       <main class="admin-main">
 
+      <!-- ===== Recharge stats card — defined once, rendered in the recharges section
+                 and in the overview "Recharge" tab. ===== -->
+      <ng-template #rchStatsTpl>
+        @if (rLoading()) {
+          <div class="card load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (rchKpi(); as k) {
+        <div class="card" style="padding:16px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
+            <h3 style="font-size:15px">{{ i18n.t('rch_kpi_title') }}</h3>
+            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
+          </div>
+
+          <!-- 3 headline KPIs -->
+          <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">
+            <div class="kpi" [title]="i18n.t('rch_kpi_total_desc')">
+              <div class="kv">{{ k.total }}</div>
+              <div class="kl">{{ i18n.t('rch_kpi_total') }}</div>
+            </div>
+            <div class="kpi" [title]="i18n.t('rch_kpi_rate_desc')">
+              <div class="kv" style="color:var(--success)">{{ rate(k.paid, k.total) }}%</div>
+              <div class="kl">{{ i18n.t('pay_funnel_success_rate') }}</div>
+            </div>
+            <div class="kpi" [title]="i18n.t('rch_kpi_amount_desc')">
+              <div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(k.amount) }}</div>
+              <div class="kl">{{ i18n.t('rch_kpi_amount') }}</div>
+            </div>
+          </div>
+
+          <!-- Status pills -->
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;font-weight:700">
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--success-soft);color:var(--success)" [title]="i18n.t('rch_kpi_paid_desc')">
+              {{ k.paid }} {{ i18n.t('st_paid') }}
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--surface-2);color:var(--muted)" [title]="i18n.t('rch_kpi_pending_desc')">
+              {{ k.pending }} {{ i18n.t('st_pending') }}
+            </span>
+            <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)" [title]="i18n.t('rch_kpi_failed_desc')">
+              {{ k.failed }} {{ i18n.t('pay_funnel_technical_failed') }}
+            </span>
+          </div>
+
+          <!-- 14-day trend chart -->
+          @if (k.trends.length) {
+          <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px">{{ i18n.t('rch_trend_title') }}</div>
+            <p class="muted" style="font-size:10px;line-height:1.35;margin-bottom:10px">{{ i18n.t('pay_trends_hint') }}</p>
+            <div style="display:flex;align-items:flex-end;gap:3px;height:110px;padding-bottom:2px">
+              @for (b of k.trends; track b.date) {
+                <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end"
+                     [title]="trendDayLabel(b.date) + ' — ' + i18n.t('st_paid') + ': ' + b.paid + ', ' + i18n.t('st_failed') + ': ' + b.failed + ', ' + i18n.t('st_pending') + ': ' + b.pending">
+                  <div style="width:100%;max-width:28px;display:flex;flex-direction:column-reverse;gap:1px">
+                    @if (b.paid)    { <div [style.height.px]="rchTrendBarPx(b.paid)"    style="background:var(--success);border-radius:2px 2px 0 0;min-height:2px"></div> }
+                    @if (b.failed)  { <div [style.height.px]="rchTrendBarPx(b.failed)"  style="background:var(--accent);min-height:2px"></div> }
+                    @if (b.pending) { <div [style.height.px]="rchTrendBarPx(b.pending)" style="background:var(--af-gold);border-radius:0 0 2px 2px;min-height:2px"></div> }
+                  </div>
+                  <span style="font-size:8px;color:var(--muted);margin-top:4px;white-space:nowrap">{{ trendDayLabel(b.date) }}</span>
+                </div>
+              }
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:10.5px;font-weight:600">
+              <span style="color:var(--success)">■ {{ i18n.t('st_paid') }}</span>
+              <span style="color:var(--accent)">■ {{ i18n.t('st_failed') }}</span>
+              <span style="color:var(--af-gold)">■ {{ i18n.t('st_pending') }}</span>
+            </div>
+          </div>
+          }
+
+          <!-- By network -->
+          <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_by_network') }}</div>
+            <div class="srow" style="padding:6px 0"><span class="lbl">Orange Money</span><span class="val">{{ k.om.paid }}/{{ k.om.total }} · {{ rate(k.om.paid, k.om.total) }}%</span></div>
+            <div class="srow" style="padding:6px 0"><span class="lbl">MTN MoMo</span><span class="val">{{ k.mtn.paid }}/{{ k.mtn.total }} · {{ rate(k.mtn.paid, k.mtn.total) }}%</span></div>
+            <div class="srow" style="padding:6px 0"><span class="lbl">SARA Money</span><span class="val">{{ k.sara.paid }}/{{ k.sara.total }} · {{ rate(k.sara.paid, k.sara.total) }}%</span></div>
+            <div class="srow" style="padding:6px 0"><span class="lbl">{{ i18n.t('pay_cash_name') }}</span><span class="val">{{ k.cash.paid }}/{{ k.cash.total }} · {{ rate(k.cash.paid, k.cash.total) }}%</span></div>
+          </div>
+        </div>
+        } @else {
+          <p class="muted" style="font-size:13px;padding:20px 14px;text-align:center">{{ i18n.t('rch_empty') }}</p>
+        }
+      </ng-template>
+
       <!-- ========== OVERVIEW ========== -->
       @if (section() === 'overview') {
-      <!-- En-tête avec filtre date -->
+      <!-- En-tête avec filtre date (le filtre ne s'applique qu'à l'onglet Achat) -->
       <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
         <h1 style="font-size:21px;margin:0;flex:1;min-width:140px">{{ i18n.t('nav_overview') }}</h1>
+        @if (overviewTab() === 'achat') {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
           <input class="input" type="date" [value]="overviewFrom()" (change)="overviewFrom.set($any($event.target).value)"
                  style="width:130px;font-size:12px;padding:5px 8px" title="Depuis" />
@@ -93,8 +176,24 @@ import * as XLSX from 'xlsx';
             <button class="btn btn-ghost" (click)="clearOverviewFilter()" style="padding:5px 10px;font-size:12px">✕ Tout</button>
           }
         </div>
+        }
       </div>
 
+      <!-- Onglets : Achat (vue existante, par défaut) / Recharge (stats recharge) -->
+      <div style="display:flex;gap:6px;margin-bottom:14px;max-width:760px">
+        <button class="btn" [class.btn-primary]="overviewTab()==='achat'" [class.btn-outline]="overviewTab()!=='achat'"
+                (click)="overviewTab.set('achat')" style="flex:1;padding:8px;font-size:13px">
+          <ic name="hash" [size]="14"></ic> {{ i18n.t('ov_tab_achat') }}
+        </button>
+        <button class="btn" [class.btn-primary]="overviewTab()==='recharge'" [class.btn-outline]="overviewTab()!=='recharge'"
+                (click)="overviewTab.set('recharge')" style="flex:1;padding:8px;font-size:13px">
+          <ic name="phone" [size]="14"></ic> {{ i18n.t('ov_tab_recharge') }}
+        </button>
+      </div>
+
+      @if (overviewTab() === 'recharge') {
+        <ng-container [ngTemplateOutlet]="rchStatsTpl"></ng-container>
+      } @else {
       @if (statsLoading()) {
       <div class="card load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
       } @else {
@@ -273,6 +372,7 @@ import * as XLSX from 'xlsx';
           </div>
         }
       </div>
+      }
       }
 
       }
@@ -1440,80 +1540,8 @@ import * as XLSX from 'xlsx';
       @if (section() === 'recharges') {
       <h1 style="font-size:21px">{{ i18n.t('nav_recharges') }}</h1>
 
-      <!-- ===== Recharge KPI dashboard ===== -->
-      @if (rchKpi(); as k) {
-      <div class="card" style="padding:16px;margin-bottom:12px">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-          <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
-          <h3 style="font-size:15px">{{ i18n.t('rch_kpi_title') }}</h3>
-          <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
-        </div>
-
-        <!-- 3 headline KPIs -->
-        <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">
-          <div class="kpi" [title]="i18n.t('rch_kpi_total_desc')">
-            <div class="kv">{{ k.total }}</div>
-            <div class="kl">{{ i18n.t('rch_kpi_total') }}</div>
-          </div>
-          <div class="kpi" [title]="i18n.t('rch_kpi_rate_desc')">
-            <div class="kv" style="color:var(--success)">{{ rate(k.paid, k.total) }}%</div>
-            <div class="kl">{{ i18n.t('pay_funnel_success_rate') }}</div>
-          </div>
-          <div class="kpi" [title]="i18n.t('rch_kpi_amount_desc')">
-            <div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(k.amount) }}</div>
-            <div class="kl">{{ i18n.t('rch_kpi_amount') }}</div>
-          </div>
-        </div>
-
-        <!-- Status pills -->
-        <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px;font-weight:700">
-          <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--success-soft);color:var(--success)" [title]="i18n.t('rch_kpi_paid_desc')">
-            {{ k.paid }} {{ i18n.t('st_paid') }}
-          </span>
-          <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--surface-2);color:var(--muted)" [title]="i18n.t('rch_kpi_pending_desc')">
-            {{ k.pending }} {{ i18n.t('st_pending') }}
-          </span>
-          <span style="display:inline-flex;align-items:center;gap:5px;padding:5px 10px;border-radius:99px;background:var(--accent-soft);color:var(--accent)" [title]="i18n.t('rch_kpi_failed_desc')">
-            {{ k.failed }} {{ i18n.t('pay_funnel_technical_failed') }}
-          </span>
-        </div>
-
-        <!-- 14-day trend chart -->
-        @if (k.trends.length) {
-        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-          <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:4px">{{ i18n.t('rch_trend_title') }}</div>
-          <p class="muted" style="font-size:10px;line-height:1.35;margin-bottom:10px">{{ i18n.t('pay_trends_hint') }}</p>
-          <div style="display:flex;align-items:flex-end;gap:3px;height:110px;padding-bottom:2px">
-            @for (b of k.trends; track b.date) {
-              <div style="flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;height:100%;justify-content:flex-end"
-                   [title]="trendDayLabel(b.date) + ' — ' + i18n.t('st_paid') + ': ' + b.paid + ', ' + i18n.t('st_failed') + ': ' + b.failed + ', ' + i18n.t('st_pending') + ': ' + b.pending">
-                <div style="width:100%;max-width:28px;display:flex;flex-direction:column-reverse;gap:1px">
-                  @if (b.paid)    { <div [style.height.px]="rchTrendBarPx(b.paid)"    style="background:var(--success);border-radius:2px 2px 0 0;min-height:2px"></div> }
-                  @if (b.failed)  { <div [style.height.px]="rchTrendBarPx(b.failed)"  style="background:var(--accent);min-height:2px"></div> }
-                  @if (b.pending) { <div [style.height.px]="rchTrendBarPx(b.pending)" style="background:var(--af-gold);border-radius:0 0 2px 2px;min-height:2px"></div> }
-                </div>
-                <span style="font-size:8px;color:var(--muted);margin-top:4px;white-space:nowrap">{{ trendDayLabel(b.date) }}</span>
-              </div>
-            }
-          </div>
-          <div style="display:flex;flex-wrap:wrap;gap:12px;margin-top:8px;font-size:10.5px;font-weight:600">
-            <span style="color:var(--success)">■ {{ i18n.t('st_paid') }}</span>
-            <span style="color:var(--accent)">■ {{ i18n.t('st_failed') }}</span>
-            <span style="color:var(--af-gold)">■ {{ i18n.t('st_pending') }}</span>
-          </div>
-        </div>
-        }
-
-        <!-- By network -->
-        <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
-          <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('pay_funnel_by_network') }}</div>
-          <div class="srow" style="padding:6px 0"><span class="lbl">Orange Money</span><span class="val">{{ k.om.paid }}/{{ k.om.total }} · {{ rate(k.om.paid, k.om.total) }}%</span></div>
-          <div class="srow" style="padding:6px 0"><span class="lbl">MTN MoMo</span><span class="val">{{ k.mtn.paid }}/{{ k.mtn.total }} · {{ rate(k.mtn.paid, k.mtn.total) }}%</span></div>
-          <div class="srow" style="padding:6px 0"><span class="lbl">SARA Money</span><span class="val">{{ k.sara.paid }}/{{ k.sara.total }} · {{ rate(k.sara.paid, k.sara.total) }}%</span></div>
-          <div class="srow" style="padding:6px 0"><span class="lbl">{{ i18n.t('pay_cash_name') }}</span><span class="val">{{ k.cash.paid }}/{{ k.cash.total }} · {{ rate(k.cash.paid, k.cash.total) }}%</span></div>
-        </div>
-      </div>
-      }
+      <!-- ===== Recharge KPI dashboard (shared with the overview "Recharge" tab) ===== -->
+      <ng-container [ngTemplateOutlet]="rchStatsTpl"></ng-container>
 
       <div class="card" style="overflow:hidden;max-width:1180px">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
@@ -2078,6 +2106,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   /** Active sidebar section. */
   section = signal<'overview' | 'config' | 'users' | 'agencies' | 'agence-retrait' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
   auditTab = signal<'logins' | 'actions'>('logins');
+  /** Overview sub-tabs: card purchases (default) vs. recharges. */
+  overviewTab = signal<'achat' | 'recharge'>('achat');
 
   /** Mobile only: the nav collapses behind a toggle so it no longer eats the top of the screen. */
   menuOpen = signal(false);
@@ -2115,6 +2145,14 @@ export class AdminComponent implements OnInit, OnDestroy {
     if (s === 'recharges')   this.loadRecharges();
     if (s === 'collectes')   this.loadCollectes();
     if (s === 'audit')       this.loadAudit();
+  });
+
+  /** The overview "Recharge" tab reuses the recharge dataset — load it lazily on first open. */
+  private readonly _overviewRechargeEffect = effect(() => {
+    if (this.section() !== 'overview' || this.overviewTab() !== 'recharge') return;
+    if (this.loadedSections.has('recharges')) return;
+    this.loadedSections.add('recharges');
+    this.loadRecharges();
   });
 
   /** A supervisor (without ADMIN) gets a restricted view: only collecteur user management. */
