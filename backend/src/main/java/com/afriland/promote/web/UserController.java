@@ -6,6 +6,7 @@ import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.security.TempPasswordGenerator;
 import com.afriland.promote.service.ActionAuditService;
+import com.afriland.promote.service.HierarchyService;
 import com.afriland.promote.web.dto.Dtos.*;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
@@ -30,13 +31,23 @@ public class UserController {
     private final PasswordEncoder encoder;
     private final EmailService email;
     private final ActionAuditService audit;
+    private final HierarchyService hierarchy;
 
     public UserController(AppUserRepository users, PasswordEncoder encoder,
-                          EmailService email, ActionAuditService audit) {
+                          EmailService email, ActionAuditService audit,
+                          HierarchyService hierarchy) {
         this.users = users;
         this.encoder = encoder;
         this.email = email;
         this.audit = audit;
+        this.hierarchy = hierarchy;
+    }
+
+    /** Resolve a requested hierarchy parent: blank → null; an unknown id → null (ignored). */
+    private String resolveParent(String parentUserId) {
+        if (parentUserId == null || parentUserId.isBlank()) return null;
+        String id = parentUserId.trim();
+        return users.existsById(id) ? id : null;
     }
 
     /** List staff accounts. Admin sees everyone; a supervisor sees only collecteurs + supervisors. */
@@ -125,6 +136,11 @@ public class UserController {
         u.setEmail(email);
         u.setAgency(req.agency() == null || req.agency().isBlank() ? null : req.agency().trim());
         u.setPhone(phone);
+        String parent = resolveParent(req.parentUserId());
+        if (parent != null && hierarchy.wouldCreateCycle(id, parent)) {
+            return ResponseEntity.badRequest().body(new ErrorResponse("hierarchy_cycle"));
+        }
+        u.setParentUserId(parent);
         UserDto saved = UserDto.of(users.save(u));
         audit.record(auth, "UPDATE_USER", "USER", id,
                 "Modification du compte " + email + " (" + name + ")");
@@ -204,7 +220,7 @@ public class UserController {
             return ResponseEntity.badRequest().body(new ErrorResponse("phone_required"));
         }
         ResponseEntity<?> resp = provisionAccount(u, u.getName(), u.getEmail(), u.getAgency(),
-                u.getPhone(), new ArrayList<>(u.effectiveRoles()), true);
+                u.getPhone(), new ArrayList<>(u.effectiveRoles()), u.getParentUserId(), true);
         if (resp.getStatusCode().is2xxSuccessful()) {
             audit.record(auth, "RECREATE_USER", "USER", id,
                     "Recréation du compte " + u.getEmail());
@@ -277,7 +293,8 @@ public class UserController {
                 return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
             }
             String agency = req.agency() == null || req.agency().isBlank() ? null : req.agency().trim();
-            return provisionAccount(byEmail, req.name().trim(), email, agency, phone, roles, true);
+            return provisionAccount(byEmail, req.name().trim(), email, agency, phone, roles,
+                    resolveParent(req.parentUserId()), true);
         }
         if (users.findAllByPhone(phone).stream().anyMatch(AppUser::isEnabled)) {
             return ResponseEntity.status(409).body(new ErrorResponse("phone_exists"));
@@ -296,6 +313,7 @@ public class UserController {
                 .phone(phone)
                 .loginPin(pin == null ? null : encoder.encode(pin))
                 .mustChangePassword(!collecteurOnly)
+                .parentUserId(resolveParent(req.parentUserId()))
                 .build();
         u.assignRoles(roles);
         AppUser saved = users.save(u);
@@ -308,7 +326,8 @@ public class UserController {
 
     /** Shared path for creating a fresh account or re-provisioning a disabled one. */
     private ResponseEntity<?> provisionAccount(AppUser u, String name, String emailAddress, String agency,
-                                               String phone, List<Role> roles, boolean reactivated) {
+                                               String phone, List<Role> roles, String parentUserId,
+                                               boolean reactivated) {
         String temp = TempPasswordGenerator.password();
         String pin = roles.contains(Role.COLLECTEUR) ? TempPasswordGenerator.pin() : null;
         boolean collecteurOnly = roles.size() == 1 && roles.get(0) == Role.COLLECTEUR;
@@ -316,6 +335,7 @@ public class UserController {
         u.setEmail(emailAddress);
         u.setAgency(agency);
         u.setPhone(phone);
+        u.setParentUserId(parentUserId);
         u.setPasswordHash(encoder.encode(temp));
         u.setLoginPin(pin == null ? null : encoder.encode(pin));
         u.setMustChangePassword(!collecteurOnly);

@@ -58,7 +58,8 @@ public final class Dtos {
 
     public record UserDto(String id, String name, String email, String role, List<String> roles,
                           String agency, String phone, boolean mustChangePassword, boolean enabled,
-                          String createdAt, List<Long> profileIds, List<String> permissions) {
+                          String createdAt, List<Long> profileIds, List<String> permissions,
+                          String parentUserId) {
         public static UserDto of(AppUser u) {
             List<String> roles = u.effectiveRoles().stream().map(Enum::name).toList();
             String createdAt = u.getCreatedAt() != null ? u.getCreatedAt().toString() : null;
@@ -67,7 +68,7 @@ public final class Dtos {
                     .map(Permission::name).sorted().toList();
             return new UserDto(u.getId(), u.getName(), u.getEmail(), u.getRole().name(), roles,
                     u.getAgency(), u.getPhone(), u.isMustChangePassword(), u.isEnabled(),
-                    createdAt, profileIds, permissions);
+                    createdAt, profileIds, permissions, u.getParentUserId());
         }
     }
 
@@ -130,7 +131,8 @@ public final class Dtos {
             String role,                 // single-role fallback (used when roles is empty)
             List<String> roles,          // one or more roles
             String agency,
-            String phone) {
+            String phone,
+            String parentUserId) {       // hierarchy parent (optional): who this account reports to
         /** Effective requested roles: the list if present, else the single role. */
         public List<String> rolesOrSingle() {
             if (roles != null && !roles.isEmpty()) return roles;
@@ -154,12 +156,83 @@ public final class Dtos {
             @NotBlank String name,
             @NotBlank String email,
             String agency,
-            String phone) {}
+            String phone,
+            String parentUserId) {}      // hierarchy parent (optional)
 
     // ---- config ----
     public record ConfigDto(int price, int fees, int transport, int rechargeMin, int rechargeMax,
                             int rechargeInitiale, int passPremium,
                             int rechargeInitialeBancaire, int passPremiumBancaire) {}
+
+    // ---- products / promotions (catalog) ----
+    public record ProductComponentDto(String ckey, String label, int amount) {
+        public static ProductComponentDto of(com.afriland.promote.model.ProductComponent c) {
+            return new ProductComponentDto(c.getCkey(), c.getLabel(), c.getAmount());
+        }
+    }
+
+    public record PromotionDto(Long id, Long productId, String label, String type, int value,
+                               String startDate, String endDate, boolean active) {
+        public static PromotionDto of(com.afriland.promote.model.Promotion p) {
+            return new PromotionDto(p.getId(), p.getProductId(), p.getLabel(), p.getType().name(),
+                    p.getValue(),
+                    p.getStartDate() == null ? null : p.getStartDate().toString(),
+                    p.getEndDate() == null ? null : p.getEndDate().toString(),
+                    p.isActive());
+        }
+    }
+
+    public record ProductDto(Long id, String code, String label, String description, String groupCode,
+                             String kind, int basePrice, int effectivePrice, boolean builtin,
+                             boolean active, List<ProductComponentDto> components,
+                             List<PromotionDto> promotions) {}
+
+    /** Create/update a product. {@code components} only meaningful for the CARD product. */
+    public record ProductRequest(String code, String label, String description, String groupCode,
+                                 String kind, int basePrice, boolean active,
+                                 List<ProductComponentDto> components) {}
+
+    /** Create/update a promotion (dates ISO yyyy-MM-dd, nullable). */
+    public record PromotionRequest(String label, String type, int value,
+                                   String startDate, String endDate, boolean active) {}
+
+    // ---- commissions ----
+    public record CommissionRuleDto(Long id, String scopeType, String scopeCode, String targetType,
+                                    String targetValue, String rateType, int rateValue,
+                                    String startDate, String endDate, boolean active) {
+        public static CommissionRuleDto of(com.afriland.promote.model.CommissionRule r) {
+            return new CommissionRuleDto(r.getId(), r.getScopeType().name(), r.getScopeCode(),
+                    r.getTargetType().name(), r.getTargetValue(), r.getRateType().name(), r.getRateValue(),
+                    r.getStartDate() == null ? null : r.getStartDate().toString(),
+                    r.getEndDate() == null ? null : r.getEndDate().toString(), r.isActive());
+        }
+    }
+
+    public record CommissionRuleRequest(String scopeType, String scopeCode, String targetType,
+                                        String targetValue, String rateType, int rateValue,
+                                        String startDate, String endDate, boolean active) {}
+
+    // ---- hierarchy-scoped statistics ----
+    /** Sales rollup for one staff member in the caller's scope. */
+    public record MemberStatsDto(String id, String name, String role, long subscriptions,
+                                 long subscriptionsAmount, long collectes, long commissionTotal) {}
+
+    /** Scoped statistics: per-member rollup + totals. {@code scope} is GLOBAL (admin/manager) or
+     *  SUBTREE (superviseur/chef d'équipe). */
+    public record HierarchyStatsDto(String scope, long totalSubscriptions, long totalSubscriptionsAmount,
+                                    long totalCollectes, long totalCommissions,
+                                    List<MemberStatsDto> members) {}
+
+    public record CommissionEntryDto(Long id, String saleType, String saleRef, String productCode,
+                                     String beneficiaryId, String beneficiaryName, int baseAmount,
+                                     int amount, Long ruleId, String status, String createdAt) {
+        public static CommissionEntryDto of(com.afriland.promote.model.CommissionEntry e) {
+            return new CommissionEntryDto(e.getId(), e.getSaleType().name(), e.getSaleRef(),
+                    e.getProductCode(), e.getBeneficiaryId(), e.getBeneficiaryName(), e.getBaseAmount(),
+                    e.getAmount(), e.getRuleId(), e.getStatus().name(),
+                    e.getCreatedAt() == null ? null : e.getCreatedAt().toString());
+        }
+    }
 
     // ---- subscriptions ----
     /** Create payload — used by both assisted (agent) and self (client) flows. */
@@ -377,6 +450,19 @@ public final class Dtos {
 
     public record SendNotificationRequest(
             String title, String body, java.util.List<String> recipientIds, String imageData) {}
+
+    // ---- team (hierarchy roster + messaging) ----
+    /** One member of the caller's team (direct/indirect report). */
+    public record TeamMemberDto(String id, String name, String role, String agency) {
+        public static TeamMemberDto of(AppUser u) {
+            return new TeamMemberDto(u.getId(), u.getName(),
+                    u.getRole() != null ? u.getRole().name() : "", u.getAgency());
+        }
+    }
+
+    /** A team-lead message. {@code recipientIds} empty → the whole team; any id outside the team is
+     *  dropped server-side. */
+    public record TeamMessageRequest(String title, String body, java.util.List<String> recipientIds) {}
 
     // ---- geolocation ----
     /** Browser-reported position; posted by a logged-in user right after login. */

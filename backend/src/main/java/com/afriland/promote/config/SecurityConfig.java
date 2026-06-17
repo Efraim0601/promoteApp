@@ -66,35 +66,49 @@ public class SecurityConfig {
                 // ---- profile / habilitation management (admin only) ----
                 .requestMatchers("/api/profiles/**").hasRole("ADMIN")
 
-                // ---- admin only ----
-                .requestMatchers(HttpMethod.PUT, "/api/config").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/subscriptions").hasRole("ADMIN")
+                // ---- catalog: read = any authenticated staff; write = manager/admin ----
+                .requestMatchers(HttpMethod.GET, "/api/products/**").authenticated()
+                .requestMatchers("/api/products/**").hasAnyRole("ADMIN", "MANAGER")
+
+                // ---- commissions: own ledger = any staff; rules + global ledger = manager/admin ----
+                .requestMatchers(HttpMethod.GET, "/api/commissions/mine").authenticated()
+                .requestMatchers("/api/commissions/**").hasAnyRole("ADMIN", "MANAGER")
+
+                // ---- team roster + messaging: the management chain (server scopes to the sub-tree) ----
+                .requestMatchers("/api/team/**").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR", "CHEF_EQUIPE")
+
+                // ---- admin (+ manager: quasi-admin commercial) ----
+                .requestMatchers(HttpMethod.PUT, "/api/config").hasAnyRole("ADMIN", "MANAGER")
+                .requestMatchers(HttpMethod.GET, "/api/subscriptions").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.GET, "/api/agents").hasRole("ADMIN")
                 .requestMatchers("/api/agencies/**").hasRole("ADMIN")
-                // User management: role changes + import are ADMIN-only; listing, creation and
-                // enable/disable are also open to the SUPERVISEUR (restricted to collecteurs in the controller).
+                // User management: role changes + import are ADMIN-only; listing, creation, update and
+                // enable/disable are also open to the MANAGER (full scope) and the SUPERVISEUR
+                // (restricted to collecteurs in the controller).
                 .requestMatchers(HttpMethod.PUT, "/api/users/*/roles").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/api/users/*").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/api/users/*").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.POST, "/api/users/import").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")
-                .requestMatchers(HttpMethod.POST, "/api/users").hasAnyRole("ADMIN", "SUPERVISEUR")
-                .requestMatchers(HttpMethod.POST, "/api/users/*/recreate").hasAnyRole("ADMIN", "SUPERVISEUR")
-                .requestMatchers(HttpMethod.POST, "/api/users/*/reset-credentials").hasAnyRole("ADMIN", "SUPERVISEUR")
-                .requestMatchers(HttpMethod.PATCH, "/api/users/*/enabled").hasAnyRole("ADMIN", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.GET, "/api/users").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.POST, "/api/users").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.POST, "/api/users/*/recreate").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.POST, "/api/users/*/reset-credentials").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.PATCH, "/api/users/*/enabled").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
                 .requestMatchers("/api/users/**").hasRole("ADMIN")
-                .requestMatchers("/api/stats/admin").hasRole("ADMIN")
+                .requestMatchers("/api/stats/admin").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers("/api/stats/payments").hasRole("ADMIN")
-                .requestMatchers("/api/stats/dashboard").hasAnyRole("ADMIN", "SUPERVISEUR")
-                // Notifications: send = admin/supervisor; read/mark = any authenticated user
-                .requestMatchers(HttpMethod.POST, "/api/notifications").hasAnyRole("ADMIN", "SUPERVISEUR")
+                .requestMatchers("/api/stats/dashboard").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
+                // Hierarchy-scoped stats: the service bounds the data to the caller's sub-tree.
+                .requestMatchers("/api/stats/hierarchy").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR", "CHEF_EQUIPE")
+                // Notifications: send = admin/manager/supervisor/team-lead; read/mark = any authenticated user
+                .requestMatchers(HttpMethod.POST, "/api/notifications").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR", "CHEF_EQUIPE")
                 .requestMatchers("/api/map/**").hasRole("ADMIN")
                 // Cashier validates the effective recharge, so it needs to list recharges + the queue.
                 .requestMatchers(HttpMethod.GET, "/api/recharges").hasAnyRole("CASHIER", "ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/recharges/pending-fulfillment").hasAnyRole("CASHIER", "ADMIN")
                 .requestMatchers("/api/audit/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/collectes").hasRole("ADMIN")
-                // Collecte stats: admin AND the dedicated collecte supervisor (separate stats view).
-                .requestMatchers(HttpMethod.GET, "/api/collectes/stats").hasAnyRole("ADMIN", "SUPERVISEUR")
+                .requestMatchers(HttpMethod.GET, "/api/collectes").hasAnyRole("ADMIN", "MANAGER")
+                // Collecte stats: admin/manager AND the dedicated collecte supervisor (separate stats view).
+                .requestMatchers(HttpMethod.GET, "/api/collectes/stats").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
 
                 // ---- collecteur — capture + manage own bank-product sales (admin: everything) ----
                 .requestMatchers(HttpMethod.GET, "/api/collectes/mine").hasAnyRole("COLLECTEUR", "ADMIN")

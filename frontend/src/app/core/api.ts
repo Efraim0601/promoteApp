@@ -7,6 +7,9 @@ import {
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ActionAudit, ImportUserRow, ImportUsersResult, LoginAudit, Role,
   LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
+  Product, ProductRequest, Promotion, PromotionRequest,
+  CommissionRule, CommissionRuleRequest, CommissionEntry, HierarchyStats,
+  TeamMember, TeamMessageRequest,
 } from './models';
 
 /** Typed wrapper over the backend REST API (base path /api). */
@@ -47,6 +50,63 @@ export class Api {
   }
   updateConfig(c: CardConfig): Observable<CardConfig> {
     return this.http.put<CardConfig>(`${this.base}/config`, c);
+  }
+
+  // ---- catalog: products & promotions (manager) ----
+  listProducts(): Observable<Product[]> {
+    return this.http.get<Product[]>(`${this.base}/products`);
+  }
+  createProduct(req: ProductRequest): Observable<Product> {
+    return this.http.post<Product>(`${this.base}/products`, req);
+  }
+  updateProduct(id: number, req: ProductRequest): Observable<Product> {
+    return this.http.put<Product>(`${this.base}/products/${id}`, req);
+  }
+  deleteProduct(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/products/${id}`);
+  }
+  addPromotion(productId: number, req: PromotionRequest): Observable<Promotion> {
+    return this.http.post<Promotion>(`${this.base}/products/${productId}/promotions`, req);
+  }
+  updatePromotion(promoId: number, req: PromotionRequest): Observable<Promotion> {
+    return this.http.put<Promotion>(`${this.base}/products/promotions/${promoId}`, req);
+  }
+  deletePromotion(promoId: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/products/promotions/${promoId}`);
+  }
+
+  // ---- commissions (manager) ----
+  listCommissionRules(): Observable<CommissionRule[]> {
+    return this.http.get<CommissionRule[]>(`${this.base}/commissions/rules`);
+  }
+  createCommissionRule(req: CommissionRuleRequest): Observable<CommissionRule> {
+    return this.http.post<CommissionRule>(`${this.base}/commissions/rules`, req);
+  }
+  updateCommissionRule(id: number, req: CommissionRuleRequest): Observable<CommissionRule> {
+    return this.http.put<CommissionRule>(`${this.base}/commissions/rules/${id}`, req);
+  }
+  deleteCommissionRule(id: number): Observable<void> {
+    return this.http.delete<void>(`${this.base}/commissions/rules/${id}`);
+  }
+  listCommissionEntries(): Observable<CommissionEntry[]> {
+    return this.http.get<CommissionEntry[]>(`${this.base}/commissions/entries`);
+  }
+  myCommissions(): Observable<CommissionEntry[]> {
+    return this.http.get<CommissionEntry[]>(`${this.base}/commissions/mine`);
+  }
+
+  /** Hierarchy-scoped sales stats (server bounds the data to the caller's sub-tree). */
+  hierarchyStats(productCode?: string | null): Observable<HierarchyStats> {
+    const q = productCode ? `?productCode=${encodeURIComponent(productCode)}` : '';
+    return this.http.get<HierarchyStats>(`${this.base}/stats/hierarchy${q}`);
+  }
+
+  // ---- team roster + messaging ----
+  teamRoster(): Observable<TeamMember[]> {
+    return this.http.get<TeamMember[]>(`${this.base}/team`);
+  }
+  teamMessage(req: TeamMessageRequest): Observable<{ sent: number }> {
+    return this.http.post<{ sent: number }>(`${this.base}/team/message`, req);
   }
 
   /** Public — active pickup branches the client can choose (delivery == agence). */

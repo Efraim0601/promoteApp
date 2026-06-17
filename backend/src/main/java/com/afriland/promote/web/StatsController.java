@@ -1,13 +1,20 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.model.AppUser;
+import com.afriland.promote.model.Role;
+import com.afriland.promote.repo.AppUserRepository;
+import com.afriland.promote.service.HierarchyStatsService;
 import com.afriland.promote.service.StatsService;
 import com.afriland.promote.web.dto.Dtos.AdminStats;
 import com.afriland.promote.web.dto.Dtos.AgencyPickupStats;
 import com.afriland.promote.web.dto.Dtos.AgentStats;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
+import com.afriland.promote.web.dto.Dtos.HierarchyStatsDto;
 import com.afriland.promote.web.dto.Dtos.PaymentStats;
 import com.afriland.promote.web.dto.Dtos.PrintStats;
 import org.springframework.security.core.Authentication;
+
+import java.util.Set;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,9 +27,25 @@ import java.time.LocalDate;
 public class StatsController {
 
     private final StatsService stats;
+    private final HierarchyStatsService hierStats;
+    private final AppUserRepository users;
 
-    public StatsController(StatsService stats) {
+    public StatsController(StatsService stats, HierarchyStatsService hierStats, AppUserRepository users) {
         this.stats = stats;
+        this.hierStats = hierStats;
+        this.users = users;
+    }
+
+    /**
+     * Sales statistics scoped to the caller's place in the org tree (admin/manager: global;
+     * superviseur/chef d'équipe: own sub-tree). Optional {@code productCode} filter.
+     */
+    @GetMapping("/hierarchy")
+    public HierarchyStatsDto hierarchy(@RequestParam(required = false) String productCode, Authentication auth) {
+        String id = (String) auth.getPrincipal();
+        AppUser caller = users.findById(id).orElse(null);
+        Set<Role> roles = caller != null ? caller.effectiveRoles() : Set.of();
+        return hierStats.scopedStats(id, roles, productCode);
     }
 
     @GetMapping("/admin")

@@ -19,6 +19,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class CollecteService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CollecteService.class);
+
     /** Valid product codes (mirror the frontend + the original Kobo questionnaire). */
     public static final Set<String> PRODUCTS = Set.of("compte_ouvert", "carte_bancaire", "sara_money", "e_first");
 
@@ -30,10 +32,12 @@ public class CollecteService {
             "e_first", "E-First");
 
     private final CollecteRepository repo;
+    private final CommissionService commissions;
     private final AtomicInteger seq = new AtomicInteger(0);
 
-    public CollecteService(CollecteRepository repo) {
+    public CollecteService(CollecteRepository repo, CommissionService commissions) {
         this.repo = repo;
+        this.commissions = commissions;
     }
 
     /** Initialise the sequence above the highest existing COL-#### reference. */
@@ -77,7 +81,14 @@ public class CollecteService {
                 .createdAt(Instant.now())
                 .build();
         apply(c, req);
-        return repo.save(c);
+        Collecte saved = repo.save(c);
+        // Award the seller's commission for this bank-product sale (idempotent).
+        try {
+            commissions.recordForCollecte(saved);
+        } catch (RuntimeException e) {
+            log.warn("Commission recording failed for collecte {}: {}", saved.getRef(), e.getMessage());
+        }
+        return saved;
     }
 
     @Transactional

@@ -20,7 +20,17 @@ public enum Permission {
     UTILISATEURS_READ,
     UTILISATEURS_WRITE,
     CONFIG_READ,
-    CONFIG_WRITE;
+    CONFIG_WRITE,
+    PRODUITS_READ,
+    PRODUITS_WRITE,
+    PROMOTIONS_READ,
+    PROMOTIONS_WRITE,
+    COMMISSIONS_READ,
+    COMMISSIONS_WRITE,
+    COMMISSIONS_EXPORT,
+    STATS_READ,
+    MESSAGES_READ,
+    MESSAGES_WRITE;
 
     public static Set<Permission> fromCsv(String csv) {
         if (csv == null || csv.isBlank()) return EnumSet.noneOf(Permission.class);

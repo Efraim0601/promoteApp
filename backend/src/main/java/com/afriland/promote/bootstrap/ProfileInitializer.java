@@ -34,7 +34,9 @@ public class ProfileInitializer implements ApplicationRunner {
 
     private static final Map<Role, String> ROLE_TO_PROFILE = Map.of(
             Role.ADMIN,       "Administrateur",
+            Role.MANAGER,     "Manager",
             Role.SUPERVISEUR, "Superviseur",
+            Role.CHEF_EQUIPE, "Chef d'équipe",
             Role.AGENT,       "Agent commercial",
             Role.CASHIER,     "Caissier",
             Role.PRINT_AGENT, "Imprimeur",
@@ -45,7 +47,9 @@ public class ProfileInitializer implements ApplicationRunner {
     @Transactional
     public void run(ApplicationArguments args) {
         ensureProfile("Administrateur",   "Accès complet à toutes les fonctionnalités",         EnumSet.allOf(Permission.class));
+        ensureProfile("Manager",          "Configuration produits/commissions, utilisateurs, vue commerciale globale", managerPerms());
         ensureProfile("Superviseur",      "Lecture et export globaux, gestion des collecteurs",  superviseurPerms());
+        ensureProfile("Chef d'équipe",    "Statistiques et messagerie de sa propre équipe",      chefEquipePerms());
         ensureProfile("Agent commercial", "Création et suivi des souscriptions",                 agentPerms());
         ensureProfile("Caissier",         "Validation des paiements espèces et GAB",             cashierPerms());
         ensureProfile("Imprimeur",        "Consultation et impression des cartes",               printerPerms());
@@ -79,12 +83,39 @@ public class ProfileInitializer implements ApplicationRunner {
         }
     }
 
+    /** Manager — quasi-admin commercial: configure le catalogue, les commissions, crée les
+     *  utilisateurs et lit toutes les statistiques. Pas d'accès aux outils purement système (audit,
+     *  carte, agences) qui restent réservés à l'Administrateur. */
+    private static Set<Permission> managerPerms() {
+        return EnumSet.of(
+                Permission.SOUSCRIPTIONS_READ, Permission.SOUSCRIPTIONS_EXPORT,
+                Permission.RECHARGES_READ, Permission.RECHARGES_EXPORT,
+                Permission.COLLECTES_READ, Permission.COLLECTES_EXPORT,
+                Permission.UTILISATEURS_READ, Permission.UTILISATEURS_WRITE,
+                Permission.CONFIG_READ, Permission.CONFIG_WRITE,
+                Permission.PRODUITS_READ, Permission.PRODUITS_WRITE,
+                Permission.PROMOTIONS_READ, Permission.PROMOTIONS_WRITE,
+                Permission.COMMISSIONS_READ, Permission.COMMISSIONS_WRITE, Permission.COMMISSIONS_EXPORT,
+                Permission.STATS_READ,
+                Permission.MESSAGES_READ, Permission.MESSAGES_WRITE);
+    }
+
     private static Set<Permission> superviseurPerms() {
         return EnumSet.of(
                 Permission.SOUSCRIPTIONS_READ, Permission.SOUSCRIPTIONS_EXPORT,
                 Permission.RECHARGES_READ, Permission.RECHARGES_EXPORT,
                 Permission.COLLECTES_READ, Permission.COLLECTES_EXPORT,
-                Permission.UTILISATEURS_READ, Permission.CONFIG_READ);
+                Permission.UTILISATEURS_READ, Permission.CONFIG_READ,
+                Permission.STATS_READ, Permission.MESSAGES_READ, Permission.MESSAGES_WRITE);
+    }
+
+    /** Chef d'équipe — lecture des statistiques et messagerie limitées à sa propre équipe (le
+     *  cloisonnement réel est imposé côté serveur par {@code HierarchyService}). */
+    private static Set<Permission> chefEquipePerms() {
+        return EnumSet.of(
+                Permission.SOUSCRIPTIONS_READ, Permission.COLLECTES_READ,
+                Permission.UTILISATEURS_READ, Permission.STATS_READ,
+                Permission.MESSAGES_READ, Permission.MESSAGES_WRITE);
     }
 
     private static Set<Permission> agentPerms() {

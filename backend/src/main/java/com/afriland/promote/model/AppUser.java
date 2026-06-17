@@ -42,6 +42,12 @@ public class AppUser {
 
     private String agency;        // null for admin
 
+    /** Hierarchy link: id of the manager/supervisor/team-lead this account reports to. Null for the
+     *  top of the tree (admin/manager) and for legacy accounts. Builds the org tree
+     *  Manager → Superviseur → Chef d'équipe → (commerciaux, imprimeur, caissier…) used to scope
+     *  statistics and team messaging. A plain self-referencing id keeps the migration trivial. */
+    private String parentUserId;
+
     /** Full set of roles the account holds: the primary {@code role} plus any extra {@code roles}. */
     @Transient
     public java.util.Set<Role> effectiveRoles() {

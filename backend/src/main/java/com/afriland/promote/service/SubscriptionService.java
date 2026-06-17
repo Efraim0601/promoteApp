@@ -41,6 +41,7 @@ public class SubscriptionService {
     private final SaraReceiptExtractor receiptExtractor;
     private final ReferenceSequence refs;     // PRM-#### sequence (subscriptions only)
     private final ApplicationEventPublisher events;
+    private final CommissionService commissions;
 
     /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */
     @Value("${app.payment.async:false}")
@@ -53,7 +54,8 @@ public class SubscriptionService {
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
                                AppUserRepository users, AgencyRepository agencies, PaymentGateway gateway,
                                ImageStorage storage, SaraReceiptExtractor receiptExtractor,
-                               ReferenceSequence refs, ApplicationEventPublisher events) {
+                               ReferenceSequence refs, ApplicationEventPublisher events,
+                               CommissionService commissions) {
         this.subs = subs;
         this.configs = configs;
         this.users = users;
@@ -63,6 +65,18 @@ public class SubscriptionService {
         this.receiptExtractor = receiptExtractor;
         this.refs = refs;
         this.events = events;
+        this.commissions = commissions;
+    }
+
+    /** Award the sales commission for a settled subscription. Idempotent — safe to call from every
+     *  paid-transition path (MoMo webhook, reconciliation, live pull, cash, SARA). */
+    private void awardCommission(Subscription s) {
+        try {
+            commissions.recordForSubscription(s);
+        } catch (RuntimeException e) {
+            // Commission accounting must never break the payment flow.
+            log.warn("Commission recording failed for {}: {}", s.getRef(), e.getMessage());
+        }
     }
 
     /** Initialise the shared sequence above the highest existing reference (after seeding). */
@@ -425,7 +439,9 @@ public class SubscriptionService {
         if (ok) { s.setPayStatus(PayStatus.paid); s.setPaidAt(Instant.now()); } else s.markFailed();
         // Keep the decline reason (e.g. "Solde insuffisant") so the client UI can explain why; clear it on success.
         s.setPaymentMessage(ok ? null : (reason == null || reason.isBlank() ? null : reason.trim()));
-        return subs.save(s);
+        Subscription saved = subs.save(s);
+        if (ok) awardCommission(saved);
+        return saved;
     }
 
     /** Resolve the subscription a webhook refers to: by the unique gateway order id we sent, falling
@@ -457,6 +473,7 @@ public class SubscriptionService {
                 s.setPaidAt(Instant.now());
                 s.setPaymentMessage(null);
                 subs.save(s);
+                awardCommission(s);
             }
             return s;
         }
@@ -502,6 +519,7 @@ public class SubscriptionService {
             s.setPaidAt(Instant.now());
             s.setPaymentMessage(null);
             subs.save(s);
+            awardCommission(s);
             return new ReconcilePullResult(ref, before.name(), PayStatus.paid.name(), true, null);
         }
         if (pulled == PayStatus.failed && before == PayStatus.pending) {
@@ -540,6 +558,7 @@ public class SubscriptionService {
                 if (pulled == PayStatus.failed) s.markFailed(); else s.setPayStatus(pulled);
                 if (pulled == PayStatus.paid) s.setPaidAt(Instant.now());
                 subs.save(s);
+                if (pulled == PayStatus.paid) awardCommission(s);
             }
         }
         return s;
@@ -594,7 +613,8 @@ public class SubscriptionService {
         if (req.saraRef() != null) s.setSaraRef(blankToNull(req.saraRef()));
         if (req.saraPayerPhone() != null) s.setSaraPayerPhone(blankToNull(req.saraPayerPhone()));
         if (req.saraAmount() != null) s.setSaraAmount(req.saraAmount());
-        if ("validate".equalsIgnoreCase(req.outcome())) {
+        boolean validated = "validate".equalsIgnoreCase(req.outcome());
+        if (validated) {
             s.setPayStatus(PayStatus.paid);
             s.setPaidAt(Instant.now());
             s.setPaymentMessage(null);
@@ -603,7 +623,9 @@ public class SubscriptionService {
             String reason = req.reason();
             s.setPaymentMessage(reason == null || reason.isBlank() ? "Reçu SARA non conforme" : reason.trim());
         }
-        return subs.save(s);
+        Subscription saved = subs.save(s);
+        if (validated) awardCommission(saved);
+        return saved;
     }
 
     /**
@@ -616,7 +638,8 @@ public class SubscriptionService {
     public Subscription validateCash(String ref, String outcome, String reason, String cashierId, String paymentReference) {
         Subscription s = subs.findByRefIgnoreCase(ref).orElseThrow();
         if (s.getPayStatus() != PayStatus.cash) return s;
-        if ("validate".equalsIgnoreCase(outcome)) {
+        boolean validated = "validate".equalsIgnoreCase(outcome);
+        if (validated) {
             s.setPayStatus(PayStatus.paid);
             s.setPaidAt(Instant.now());
             s.setPaymentMessage(null);
@@ -629,7 +652,9 @@ public class SubscriptionService {
             s.markFailed();
             s.setPaymentMessage(reason == null || reason.isBlank() ? "Paiement espèces non perçu" : reason.trim());
         }
-        return subs.save(s);
+        Subscription saved = subs.save(s);
+        if (validated) awardCommission(saved);
+        return saved;
     }
 
     /** Resolve a staff member's display name from their id; falls back to the raw id. */

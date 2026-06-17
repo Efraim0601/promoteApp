@@ -11,7 +11,14 @@ export const routes: Routes = [
   { path: 'change-password', canActivate: [sessionGuard],
     loadComponent: () => import('./pages/change-password').then((m) => m.ChangePasswordComponent) },
 
-  { path: 'admin', canActivate: [roleGuard('ADMIN', 'SUPERVISEUR')], loadComponent: () => import('./pages/admin').then((m) => m.AdminComponent) },
+  { path: 'admin', canActivate: [roleGuard('ADMIN', 'MANAGER', 'SUPERVISEUR')], loadComponent: () => import('./pages/admin').then((m) => m.AdminComponent) },
+
+  // manager console — catalog, commissions, scoped stats
+  { path: 'manager', canActivate: [roleGuard('MANAGER', 'ADMIN')], loadComponent: () => import('./pages/manager').then((m) => m.ManagerComponent) },
+
+  // hierarchy-scoped sales dashboard — every management level (server scopes the data)
+  { path: 'team-stats', canActivate: [roleGuard('ADMIN', 'MANAGER', 'SUPERVISEUR', 'CHEF_EQUIPE')], loadComponent: () => import('./pages/team-stats').then((m) => m.TeamStatsComponent) },
+
   { path: 'agent', canActivate: [roleGuard('AGENT')], loadComponent: () => import('./pages/agent-home').then((m) => m.AgentHomeComponent) },
 
   // assisted subscription — relationship officers and cashiers

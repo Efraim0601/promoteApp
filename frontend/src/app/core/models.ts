@@ -1,6 +1,8 @@
 /** Shared API types mirroring the backend DTOs. */
 
-export type Role = 'ADMIN' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER' | 'COLLECTEUR' | 'SUPERVISEUR';
+export type Role =
+  | 'ADMIN' | 'MANAGER' | 'AGENT' | 'PRINT_AGENT' | 'CASHIER'
+  | 'COLLECTEUR' | 'SUPERVISEUR' | 'CHEF_EQUIPE';
 
 export type Permission =
   | 'SOUSCRIPTIONS_READ' | 'SOUSCRIPTIONS_WRITE' | 'SOUSCRIPTIONS_VALIDATE'
@@ -8,7 +10,12 @@ export type Permission =
   | 'RECHARGES_READ' | 'RECHARGES_VALIDATE' | 'RECHARGES_EXPORT'
   | 'COLLECTES_READ' | 'COLLECTES_WRITE' | 'COLLECTES_EXPORT'
   | 'UTILISATEURS_READ' | 'UTILISATEURS_WRITE'
-  | 'CONFIG_READ' | 'CONFIG_WRITE';
+  | 'CONFIG_READ' | 'CONFIG_WRITE'
+  | 'PRODUITS_READ' | 'PRODUITS_WRITE'
+  | 'PROMOTIONS_READ' | 'PROMOTIONS_WRITE'
+  | 'COMMISSIONS_READ' | 'COMMISSIONS_WRITE' | 'COMMISSIONS_EXPORT'
+  | 'STATS_READ'
+  | 'MESSAGES_READ' | 'MESSAGES_WRITE';
 
 export interface Profile {
   id: number;
@@ -35,12 +42,19 @@ export const PERM_MATRIX: PermMatrixModule[] = [
   { module: 'SOUSCRIPTIONS', label: 'Souscriptions', actions: ['READ', 'WRITE', 'VALIDATE', 'PRINT', 'EXPORT'] },
   { module: 'RECHARGES',     label: 'Recharges',     actions: ['READ', 'VALIDATE', 'EXPORT'] },
   { module: 'COLLECTES',     label: 'Collectes',     actions: ['READ', 'WRITE', 'EXPORT'] },
+  { module: 'PRODUITS',      label: 'Produits',      actions: ['READ', 'WRITE'] },
+  { module: 'PROMOTIONS',    label: 'Promotions',    actions: ['READ', 'WRITE'] },
+  { module: 'COMMISSIONS',   label: 'Commissions',   actions: ['READ', 'WRITE', 'EXPORT'] },
+  { module: 'STATS',         label: 'Statistiques',  actions: ['READ'] },
+  { module: 'MESSAGES',      label: 'Messages',      actions: ['READ', 'WRITE'] },
   { module: 'UTILISATEURS',  label: 'Utilisateurs',  actions: ['READ', 'WRITE'] },
   { module: 'CONFIG',        label: 'Configuration', actions: ['READ', 'WRITE'] },
 ];
 
 /** All assignable roles, in landing-priority order (first present drives the landing page). */
-export const ALL_ROLES: Role[] = ['ADMIN', 'SUPERVISEUR', 'AGENT', 'CASHIER', 'PRINT_AGENT', 'COLLECTEUR'];
+export const ALL_ROLES: Role[] = [
+  'ADMIN', 'MANAGER', 'SUPERVISEUR', 'CHEF_EQUIPE', 'AGENT', 'CASHIER', 'PRINT_AGENT', 'COLLECTEUR',
+];
 
 export interface User {
   id: string;
@@ -55,6 +69,7 @@ export interface User {
   createdAt?: string | null;
   profileIds?: number[] | null;
   permissions?: Permission[] | null;
+  parentUserId?: string | null;   // hierarchy parent (who this account reports to)
 }
 
 /** One audited login attempt (admin view). */
@@ -104,6 +119,141 @@ export interface CardConfig {
   passPremium: number;       // Offre Promote — Pass Premium, carte prépayée (XAF)
   rechargeInitialeBancaire: number;  // recharge initiale, carte bancaire (XAF)
   passPremiumBancaire: number;       // Pass Premium, carte bancaire (XAF)
+}
+
+// ---- catalog: products & promotions ----
+export type ProductKind = 'CARD' | 'BANK';
+export type PromotionType = 'PRICE' | 'PERCENT';
+
+export interface ProductComponent {
+  ckey: string;
+  label: string | null;
+  amount: number;
+}
+
+export interface Promotion {
+  id: number;
+  productId: number;
+  label: string | null;
+  type: PromotionType;
+  value: number;          // promo price (PRICE) or discount % (PERCENT)
+  startDate: string | null;   // yyyy-MM-dd
+  endDate: string | null;
+  active: boolean;
+}
+
+export interface Product {
+  id: number;
+  code: string;
+  label: string;
+  description: string | null;
+  groupCode: string | null;
+  kind: ProductKind;
+  basePrice: number;
+  effectivePrice: number;     // basePrice with the best live promotion applied
+  builtin: boolean;
+  active: boolean;
+  components: ProductComponent[];
+  promotions: Promotion[];
+}
+
+export interface ProductRequest {
+  code: string;
+  label: string;
+  description?: string | null;
+  groupCode?: string | null;
+  kind: ProductKind;
+  basePrice: number;
+  active: boolean;
+  components?: ProductComponent[];
+}
+
+export interface PromotionRequest {
+  label?: string | null;
+  type: PromotionType;
+  value: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  active: boolean;
+}
+
+// ---- commissions ----
+export type CommissionScopeType = 'PRODUCT' | 'GROUP';
+export type CommissionTargetType = 'ROLE' | 'USER';
+export type CommissionRateType = 'FIXED' | 'PERCENT';
+export type CommissionStatus = 'PENDING' | 'VALIDATED' | 'PAID';
+
+export interface CommissionRule {
+  id: number;
+  scopeType: CommissionScopeType;
+  scopeCode: string;
+  targetType: CommissionTargetType;
+  targetValue: string;       // role name or user id
+  rateType: CommissionRateType;
+  rateValue: number;         // fixed XAF or percent 0–100
+  startDate: string | null;
+  endDate: string | null;
+  active: boolean;
+}
+
+export interface CommissionRuleRequest {
+  scopeType: CommissionScopeType;
+  scopeCode: string;
+  targetType: CommissionTargetType;
+  targetValue: string;
+  rateType: CommissionRateType;
+  rateValue: number;
+  startDate?: string | null;
+  endDate?: string | null;
+  active: boolean;
+}
+
+export interface CommissionEntry {
+  id: number;
+  saleType: 'SUBSCRIPTION' | 'COLLECTE';
+  saleRef: string;
+  productCode: string;
+  beneficiaryId: string;
+  beneficiaryName: string | null;
+  baseAmount: number;
+  amount: number;
+  ruleId: number | null;
+  status: CommissionStatus;
+  createdAt: string | null;
+}
+
+// ---- hierarchy-scoped statistics ----
+export interface MemberStats {
+  id: string;
+  name: string;
+  role: string;
+  subscriptions: number;
+  subscriptionsAmount: number;
+  collectes: number;
+  commissionTotal: number;
+}
+
+export interface HierarchyStats {
+  scope: 'GLOBAL' | 'SUBTREE';
+  totalSubscriptions: number;
+  totalSubscriptionsAmount: number;
+  totalCollectes: number;
+  totalCommissions: number;
+  members: MemberStats[];
+}
+
+// ---- team (roster + messaging) ----
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  agency: string | null;
+}
+
+export interface TeamMessageRequest {
+  title: string;
+  body: string;
+  recipientIds?: string[] | null;   // empty → the whole team
 }
 
 export type PayStatus = 'pending' | 'paid' | 'cash' | 'sara_pending' | 'failed';
@@ -245,6 +395,7 @@ export interface CreateUserRequest {
   roles?: Role[];      // full set chosen at creation
   agency?: string | null;
   phone?: string | null;
+  parentUserId?: string | null;   // hierarchy parent (optional)
 }
 
 export interface UpdateUserRequest {
@@ -252,6 +403,7 @@ export interface UpdateUserRequest {
   email: string;
   agency?: string | null;
   phone?: string | null;
+  parentUserId?: string | null;   // hierarchy parent (optional)
 }
 
 /** Result of a staff creation: the account + the auto-generated temporary password (also emailed).

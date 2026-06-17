@@ -3189,7 +3189,8 @@ export class AdminComponent implements OnInit, OnDestroy {
   roleLabel(role: Role) {
     return this.i18n.t(role === 'ADMIN' ? 'role_admin' : role === 'PRINT_AGENT' ? 'role_print'
       : role === 'CASHIER' ? 'role_cashier' : role === 'COLLECTEUR' ? 'role_collecteur'
-      : role === 'SUPERVISEUR' ? 'role_superviseur' : 'role_agent');
+      : role === 'SUPERVISEUR' ? 'role_superviseur' : role === 'MANAGER' ? 'role_manager'
+      : role === 'CHEF_EQUIPE' ? 'role_chef_equipe' : 'role_agent');
   }
 
   // --- bulk user import ---

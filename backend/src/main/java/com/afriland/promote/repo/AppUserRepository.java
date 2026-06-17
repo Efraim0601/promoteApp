@@ -13,4 +13,6 @@ public interface AppUserRepository extends JpaRepository<AppUser, String> {
     /** Dup-tolerant lookup used by phone+PIN login (resolves the matching collecteur in code). */
     List<AppUser> findAllByPhone(String phone);
     List<AppUser> findByRole(Role role);
+    /** Direct reports of a node in the org tree (hierarchy scoping). */
+    List<AppUser> findByParentUserId(String parentUserId);
 }
