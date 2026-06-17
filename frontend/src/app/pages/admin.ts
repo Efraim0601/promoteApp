@@ -41,7 +41,13 @@ import * as XLSX from 'xlsx';
             <div class="muted" style="font-size:11px">{{ i18n.t(isSupervisor() ? 'role_superviseur' : 'role_admin') }}</div>
           </div>
         </div>
-        <nav class="admin-nav">
+        <!-- Mobile: toggle that collapses the nav so it no longer fills the top of the screen. -->
+        <button type="button" class="admin-nav-toggle" (click)="menuOpen.set(!menuOpen())"
+                [attr.aria-expanded]="menuOpen()" [attr.aria-label]="i18n.t('menu')">
+          <ic [name]="menuOpen() ? 'x' : 'menu'" [size]="18"></ic>
+          <span>{{ currentNavLabel() }}</span>
+        </button>
+        <nav class="admin-nav" [class.open]="menuOpen()" (click)="menuOpen.set(false)">
           @if (!isSupervisor()) {
           <button [class.active]="section() === 'overview'" (click)="section.set('overview')"><ic name="chart" [size]="18"></ic> {{ i18n.t('nav_overview') }}</button>
           <button [class.active]="section() === 'config'" (click)="section.set('config')"><ic name="gear" [size]="18"></ic> {{ i18n.t('nav_config') }}</button>
@@ -2072,6 +2078,21 @@ export class AdminComponent implements OnInit, OnDestroy {
   /** Active sidebar section. */
   section = signal<'overview' | 'config' | 'users' | 'agencies' | 'agence-retrait' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
   auditTab = signal<'logins' | 'actions'>('logins');
+
+  /** Mobile only: the nav collapses behind a toggle so it no longer eats the top of the screen. */
+  menuOpen = signal(false);
+  /** Label shown on the mobile nav toggle — the current section's name. */
+  currentNavLabel = computed(() => {
+    const keys: Record<string, string> = {
+      overview: 'nav_overview', config: 'nav_config',
+      users: this.isSupervisor() ? 'nav_collecteurs' : 'nav_users',
+      agencies: 'nav_agencies', 'agence-retrait': 'nav_agence_retrait',
+      transactions: 'nav_transactions', recharges: 'nav_recharges',
+      collectes: 'nav_collectes', audit: 'nav_audit', map: 'nav_map',
+      habilitations: 'nav_habilitations',
+    };
+    return this.i18n.t(keys[this.section()] ?? 'nav_overview');
+  });
 
   readonly skeletonRows = [1, 2, 3, 4, 5, 6, 7, 8];
 
