@@ -78,17 +78,20 @@ public class StatsService {
 
         List<AgentBreakdown> rows = new ArrayList<>();
         // Enumerate everyone who holds the AGENT role (primary OR secondary) — not just those whose
-        // primary role is AGENT — so multi-role sellers aren't missing from the ranking. Count each
-        // agent's sales with the same attribution as their own dashboard (owned ∪ referred), so the
-        // published classement matches the "Mes souscriptions" figure agents see on their phone.
+        // primary role is AGENT — so multi-role sellers aren't missing from the ranking. The ranking
+        // drives the primes, so it counts ONLY sales that actually settled (paid) with the same
+        // attribution as the agent's dashboard (owned ∪ referred). A sale registered in cash but never
+        // collected stays `cash` and is excluded — it can no longer inflate an agent's count. Count and
+        // collected amount thus use the same `paid` filter and stay coherent (e.g. 100 cards collected
+        // → 100 sales, 350 000 FCFA; not 100 sales for 269 500 FCFA actually collected).
         for (AppUser a : users.findByEffectiveRole(Role.AGENT)) {
             String phone9 = SubscriptionService.local9(a.getPhone());
             rows.add(new AgentBreakdown(a.getId(), a.getName(), a.getAgency(), "agent",
-                    subs.countOwnedOrReferred(a.getId(), phone9),
+                    subs.countPaidOwnedOrReferred(a.getId(), phone9),
                     subs.collectedPaidOwnedOrReferred(a.getId(), phone9)));
         }
         rows.add(new AgentBreakdown("online", "online", null, "online",
-                subs.countByAgentIdIsNull(), subs.collectedPaidOnline()));
+                subs.countByAgentIdIsNullAndPayStatus(PayStatus.paid), subs.collectedPaidOnline()));
         rows.sort(Comparator.comparingLong(AgentBreakdown::count).reversed());
 
         return new AdminStats(total, paid, pending, collected, totalPrinted, todayPaid, todayPrinted, todayCollected, todayPending, rows);

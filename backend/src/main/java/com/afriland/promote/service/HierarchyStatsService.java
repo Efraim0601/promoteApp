@@ -61,10 +61,11 @@ public class HierarchyStatsService {
         for (AppUser m : members) {
             String id = m.getId();
 
-            // Same attribution as the member's own dashboard (owned ∪ referred sales), so a team /
-            // supervisor view matches the "Mes souscriptions" figure each member sees — see StatsService.
+            // Same attribution as the member's own dashboard (owned ∪ referred sales). Count ONLY settled
+            // (paid) sales — like the admin ranking — so a cash sale registered but never collected can't
+            // inflate a member's performance / primes. Count and amount share the same `paid` filter.
             String phone9 = SubscriptionService.local9(m.getPhone());
-            long subsCount = includeCard ? subs.countOwnedOrReferred(id, phone9) : 0;
+            long subsCount = includeCard ? subs.countPaidOwnedOrReferred(id, phone9) : 0;
             long subsAmount = includeCard ? subs.collectedPaidOwnedOrReferred(id, phone9) : 0;
 
             long collectesCount = 0;

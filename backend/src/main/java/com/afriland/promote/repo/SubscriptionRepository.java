@@ -71,6 +71,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     long countByCashCollectedByIdAndCashCollectedAtGreaterThanEqual(String cashCollectedById, Instant since);
     long countByAgentId(String agentId);
     long countByAgentIdIsNull();
+    /** Online (client) sales that actually settled — used by the ranking so unpaid sales don't inflate it. */
+    long countByAgentIdIsNullAndPayStatus(PayStatus payStatus);
 
     /**
      * Search subscription by ref, full_name, phone digits, cni, email, pan or card_number.
@@ -102,6 +104,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     @Query("select count(s) from Subscription s "
             + "where s.agentId = :aid or (:phone9 <> '' and s.referrerPhone9 = :phone9)")
     long countOwnedOrReferred(@Param("aid") String agentId, @Param("phone9") String phone9);
+
+    /** Like {@link #countOwnedOrReferred} but ONLY sales that actually settled ({@code paid}). Drives the
+     *  performance ranking / primes: a sale registered in cash but never collected must not inflate the
+     *  count (cash becomes {@code paid} only once a cashier validates the collection). Mirrors the
+     *  {@code paid}-only filter of {@link #collectedPaidOwnedOrReferred} so count and amount stay coherent. */
+    @Query("select count(s) from Subscription s "
+            + "where (s.agentId = :aid or (:phone9 <> '' and s.referrerPhone9 = :phone9)) "
+            + "and s.payStatus = com.afriland.promote.model.PayStatus.paid")
+    long countPaidOwnedOrReferred(@Param("aid") String agentId, @Param("phone9") String phone9);
 
     @Query("select coalesce(sum(s.amount), 0) from Subscription s "
             + "where (s.agentId = :aid or (:phone9 <> '' and s.referrerPhone9 = :phone9)) "

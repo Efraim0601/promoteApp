@@ -63,4 +63,26 @@ class StatsServiceTest {
         assertEquals(cash.getAmount(), c.myCollected());
         assertEquals(1, c.myCountToday());
     }
+
+    /** The performance ranking (which drives the primes) must count ONLY settled sales: a cash sale
+     *  registered but never collected must not inflate the count. Regression for the reported cheat
+     *  ("enregistrer une vente en espèces augmente les performances"). */
+    @Test
+    void rankingCountsOnlySettledSales() {
+        String agent = "rank-agent";
+        // a) cash — registered but NOT collected (stays `cash`); b) MoMo validated paid.
+        Subscription cash = service.create(req("cash", "655110011", "RANK1111"), "agent", agent);
+        Subscription paid = service.create(req("om", "655220022", "RANK2222"), "agent", agent);
+        service.applyPayment(paid.getRef(), "validate", null);
+
+        // Owned attribution only (test agent has no phone on file → phone9 = "").
+        assertEquals(2, repo.countByAgentId(agent), "2 sales attributed (all statuses)");
+        assertEquals(1, repo.countPaidOwnedOrReferred(agent, ""),
+                "ranking counts only the settled (paid) sale — uncollected cash is excluded");
+
+        // Once the cashier collects the cash it becomes paid and now legitimately counts.
+        service.validateCash(cash.getRef(), "validate", null, "rank-cashier", null);
+        assertEquals(2, repo.countPaidOwnedOrReferred(agent, ""),
+                "collected cash becomes paid and now counts toward the ranking");
+    }
 }
