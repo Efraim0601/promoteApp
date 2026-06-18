@@ -473,9 +473,15 @@ public class RechargeService {
     /** Cashier confirms the effective recharge (card credited). Idempotent: only acts on a paid,
      *  not-yet-fulfilled recharge. */
     @Transactional
-    public Recharge fulfill(String ref, String cashierId) {
+    public Recharge fulfill(String ref, String evidenceImageKey, String cashierId) {
         Recharge r = recharges.findByRefIgnoreCase(ref).orElseThrow();
         if (r.getPayStatus() != PayStatus.paid || r.isFulfilled()) return r;
+        // Evidence is mandatory: the cashier must import a screenshot proving the card was credited.
+        String evidence = evidenceImageKey == null ? "" : evidenceImageKey.trim();
+        if (evidence.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "evidence_required");
+        }
+        r.setEvidenceImageKey(evidence);
         r.setFulfilled(true);
         r.setFulfilledBy(cashierName(cashierId));
         r.setFulfilledById(cashierId);

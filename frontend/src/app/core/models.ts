@@ -386,6 +386,7 @@ export interface Recharge {
   fulfilled: boolean;            // true once the cashier credited the card and validated
   fulfilledBy?: string | null;
   fulfilledAt?: string | null;
+  hasEvidence: boolean;          // true once a top-up evidence screenshot is attached (kind=recharge-evidence)
   createdAt: string;
   paymentMessage?: string | null;
 }

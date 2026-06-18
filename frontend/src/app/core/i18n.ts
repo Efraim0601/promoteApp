@@ -282,6 +282,11 @@ const FR: Record<string, string> = {
   cap_multiple: 'Plusieurs visages détectés — restez seul dans le cadre.',
   cap_too_small: 'Rapprochez-vous pour remplir le cadre.',
   cap_offcenter: 'Centrez bien le visage dans le cadre.',
+  cap_too_close: 'Reculez un peu, le visage est trop près.',
+  cap_look_straight: 'Regardez droit vers la caméra.',
+  cap_tilt: 'Tenez la tête droite (sans incliner).',
+  cap_dark: 'Trop sombre — placez-vous dans un endroit mieux éclairé.',
+  cap_blurry: 'Image floue — stabilisez le téléphone.',
   cap_ready: 'Bien cadré — vous pouvez prendre la photo.',
   cap_hold_still: 'Bien cadré — ne bougez plus, capture automatique…',
   // CNI OCR cross-check (advisory)
@@ -439,6 +444,12 @@ const FR: Record<string, string> = {
   cash_rch_validate: 'Valider la recharge', cash_rch_validated: 'Recharge validée',
   cash_rch_new_alert: 'Nouvelle recharge à valider !',
   cash_rch_credit_hint: 'Créditez {amount} sur la carte {pan}, puis validez.',
+  // Preuve (capture d'écran) de la recharge effectuée — obligatoire avant validation
+  rch_evidence_title: 'Preuve de la recharge',
+  rch_evidence_hint: 'Après avoir crédité {amount} sur la carte {pan}, importez une capture d’écran de la recharge réussie comme preuve.',
+  rch_evidence_guide: 'Importez la capture d’écran de la recharge (image).',
+  rch_evidence_uploading: 'Envoi de la preuve…',
+  rch_evidence_required: 'Une capture d’écran est requise pour valider.',
   transport_fee: 'Frais de transport (domicile)',
   cfg_recharge_title: 'Recharge — montants autorisés', cfg_recharge_min: 'Montant minimum', cfg_recharge_max: 'Montant maximum',
   // ---- Offre Promote (carte gratuite + cashback) ----
@@ -851,6 +862,11 @@ const EN: Record<string, string> = {
   cap_multiple: 'Several faces detected — stay alone in the frame.',
   cap_too_small: 'Move closer to fill the frame.',
   cap_offcenter: 'Center your face in the frame.',
+  cap_too_close: 'Move back a little, your face is too close.',
+  cap_look_straight: 'Look straight at the camera.',
+  cap_tilt: 'Hold your head upright (no tilt).',
+  cap_dark: 'Too dark — move to a better-lit place.',
+  cap_blurry: 'Blurry image — hold the phone steady.',
   cap_ready: 'Well framed — you can take the photo.',
   cap_hold_still: 'Well framed — hold still, capturing automatically…',
   // CNI OCR cross-check (advisory)
@@ -1000,6 +1016,12 @@ const EN: Record<string, string> = {
   cash_rch_validate: 'Validate recharge', cash_rch_validated: 'Recharge validated',
   cash_rch_new_alert: 'New recharge to validate!',
   cash_rch_credit_hint: 'Credit {amount} to card {pan}, then validate.',
+  // Recharge evidence (screenshot) — mandatory before validating the top-up
+  rch_evidence_title: 'Recharge evidence',
+  rch_evidence_hint: 'After crediting {amount} to card {pan}, import a screenshot of the successful top-up as evidence.',
+  rch_evidence_guide: 'Import the screenshot of the top-up (image).',
+  rch_evidence_uploading: 'Uploading evidence…',
+  rch_evidence_required: 'A screenshot is required to validate.',
   transport_fee: 'Transport fee (home)', arrived_via: 'Arrived via link / QR',
   cfg_recharge_title: 'Recharge — allowed amounts', cfg_recharge_min: 'Minimum amount', cfg_recharge_max: 'Maximum amount',
   // ---- Promote offer (free card + cashback) ----

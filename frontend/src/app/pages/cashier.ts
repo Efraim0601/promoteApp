@@ -14,6 +14,7 @@ import { FieldComponent } from '../shared/fields';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
 import { PhotoCaptureComponent } from '../shared/photo-capture';
+import { ReceiptUploadComponent } from '../shared/receipt-upload';
 import { NotifBellComponent } from '../shared/notif-bell';
 
 /** Cashier — retrieve a subscription, verify the client's identity, then validate the in-person
@@ -21,7 +22,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
 @Component({
   selector: 'page-cashier',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent, NotifBellComponent, SlicePipe],
+  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent, ReceiptUploadComponent, NotifBellComponent, SlicePipe],
   template: `
   <div class="scr">
     <app-bar>
@@ -339,7 +340,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
                   <ic name="alert" [size]="16" style="color:#8a6400;flex-shrink:0;margin-top:1px"></ic>
                   <span style="font-size:11.5px;line-height:1.4;color:#6b4f00">{{ i18n.t('cash_rch_credit_hint', { amount: i18n.money(r.amount), pan: fmtPan(r.pan) }) }}</span>
                 </div>
-                <button class="btn btn-primary" (click)="doFulfill(r.ref)" [disabled]="fulfilling() === r.ref" style="padding:11px">
+                <button class="btn btn-primary" (click)="startFulfill(r)" [disabled]="fulfilling() === r.ref" style="padding:11px">
                   @if (fulfilling() === r.ref) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('cash_rch_validate') }} }
                 </button>
               </div>
@@ -360,7 +361,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
                   </div>
                   <status-badge [status]="r.status"></status-badge>
                   @if (r.payStatus === 'paid' && !r.fulfilled) {
-                    <button class="btn btn-primary" (click)="doFulfill(r.ref)" [disabled]="fulfilling() === r.ref" style="width:auto;padding:6px 10px;font-size:12px">@if (fulfilling() === r.ref) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('cash_rch_validate') }} }</button>
+                    <button class="btn btn-primary" (click)="startFulfill(r)" [disabled]="fulfilling() === r.ref" style="width:auto;padding:6px 10px;font-size:12px">@if (fulfilling() === r.ref) { <spinner [size]="14"></spinner> } @else { {{ i18n.t('cash_rch_validate') }} }</button>
                   }
                 </div>
               }
@@ -407,6 +408,31 @@ import { NotifBellComponent } from '../shared/notif-bell';
         <div class="scr-foot"><button class="btn btn-ghost" (click)="again()">{{ i18n.t('pp_again') }}</button></div>
       }
     }
+
+    <!-- Evidence-gated recharge fulfillment: the cashier must import a screenshot of the successful
+         top-up before "rechargement effectué" can be confirmed. -->
+    @if (fulfillTarget(); as t) {
+      <div style="position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;justify-content:center" (click)="closeFulfill()">
+        <div class="card" style="width:100%;max-width:460px;border-radius:18px 18px 0 0;padding:18px;display:flex;flex-direction:column;gap:13px;max-height:92vh;overflow:auto" (click)="$event.stopPropagation()">
+          <div style="display:flex;align-items:center;gap:10px">
+            <ic name="image" [size]="20" style="color:var(--primary)"></ic>
+            <h3 style="font-size:16px;flex:1">{{ i18n.t('rch_evidence_title') }}</h3>
+            <button class="btn btn-ghost" (click)="closeFulfill()" style="width:auto;padding:6px"><ic name="x" [size]="18"></ic></button>
+          </div>
+          <div class="muted" style="font-size:12.5px;line-height:1.45">{{ i18n.t('rch_evidence_hint', { amount: i18n.money(t.amount), pan: fmtPan(t.pan) }) }}</div>
+          <receipt-upload [imageData]="evidenceData()" [guide]="i18n.t('rch_evidence_guide')" (captured)="onEvidence($event)"></receipt-upload>
+          @if (evidenceUploading()) {
+            <div class="muted" style="font-size:12px;display:flex;align-items:center;gap:8px"><spinner [size]="14"></spinner> {{ i18n.t('rch_evidence_uploading') }}</div>
+          }
+          <button class="btn btn-primary" (click)="confirmFulfill()" [disabled]="!evidenceKey() || evidenceUploading() || fulfilling() === t.ref" style="padding:12px">
+            @if (fulfilling() === t.ref) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('cash_rch_validate') }} }
+          </button>
+          @if (!evidenceKey() && !evidenceUploading()) {
+            <div class="muted" style="font-size:11.5px;text-align:center">{{ i18n.t('rch_evidence_required') }}</div>
+          }
+        </div>
+      </div>
+    }
   </div>`,
 })
 export class CashierComponent implements OnInit, OnDestroy {
@@ -445,6 +471,11 @@ export class CashierComponent implements OnInit, OnDestroy {
   allRch = signal<Recharge[]>([]);
   allRchLoading = signal(false);
   fulfilling = signal<string | null>(null); // ref being validated
+  // Evidence-gated fulfill: a recharge awaiting its top-up screenshot before it can be validated.
+  fulfillTarget = signal<Recharge | null>(null);
+  evidenceData = signal<string | null>(null);  // imported screenshot preview (data URL)
+  evidenceKey = signal<string | null>(null);    // uploaded object-storage key (kind=recharge-evidence)
+  evidenceUploading = signal(false);
   gabPaymentReference = signal('');
   gabTouched = signal(false);
   newAlert = signal(false);
@@ -550,14 +581,43 @@ export class CashierComponent implements OnInit, OnDestroy {
     });
   }
 
-  /** Cashier confirms the card has been credited → recharge validated, leaves the queue. */
-  doFulfill(ref: string) {
+  /** Step 1 — open the evidence panel: the cashier must import the top-up screenshot first. */
+  startFulfill(r: Recharge) {
     if (this.fulfilling()) return;
+    this.fulfillTarget.set(r);
+    this.evidenceData.set(null);
+    this.evidenceKey.set(null);
+    this.evidenceUploading.set(false);
+  }
+  /** Close the evidence panel without validating. */
+  closeFulfill() {
+    this.fulfillTarget.set(null);
+    this.evidenceData.set(null);
+    this.evidenceKey.set(null);
+    this.evidenceUploading.set(false);
+  }
+  /** Imported screenshot → upload it as the recharge evidence, keep the returned key for confirm. */
+  onEvidence(dataUrl: string) {
+    this.evidenceData.set(dataUrl);
+    this.evidenceKey.set(null);
+    this.evidenceUploading.set(true);
+    this.api.uploadImage(dataUrl, 'recharge-evidence').subscribe({
+      next: (res) => { this.evidenceKey.set(res.key); this.evidenceUploading.set(false); },
+      error: () => { this.evidenceUploading.set(false); },
+    });
+  }
+  /** Step 2 — confirm the card has been credited, with the mandatory evidence key → recharge validated. */
+  confirmFulfill() {
+    const r = this.fulfillTarget();
+    const key = this.evidenceKey();
+    if (!r || !key || this.fulfilling()) return;
+    const ref = r.ref;
     this.fulfilling.set(ref);
-    this.api.fulfillRecharge(ref).subscribe({
+    this.api.fulfillRecharge(ref, key).subscribe({
       next: () => {
         this.fulfilling.set(null);
-        this.pendingRch.update((l) => l.filter((r) => r.ref !== ref));
+        this.closeFulfill();
+        this.pendingRch.update((l) => l.filter((x) => x.ref !== ref));
         this.prevPending = this.pendingRch().length;
         if (this.rchView() === 'all') this.loadAllRch();
       },

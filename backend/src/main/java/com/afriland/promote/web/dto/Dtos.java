@@ -531,13 +531,17 @@ public final class Dtos {
             String saraRef,              // client-confirmed receipt reference (sara)
             Double latitude, Double longitude, Double geoAccuracy) {}
 
+    /** Cashier confirms the effective recharge. {@code evidenceImageKey} (mandatory) is the key of the
+     *  top-up screenshot uploaded via /api/kyc/image (kind = recharge-evidence). */
+    public record FulfillRequest(String evidenceImageKey) {}
+
     /** Recharge view returned to the client / staff. */
     public record RechargeDto(
             String ref, String prenom, String nom, String fullName, String phone, String pan, int amount,
             String pay, String payPhone, String payStatus, String status,
             boolean hasSaraReceipt, String saraRef, String saraPayerPhone, Integer saraAmount,
             String cashCollectedBy, String cashCollectedAt,
-            boolean fulfilled, String fulfilledBy, String fulfilledAt,
+            boolean fulfilled, String fulfilledBy, String fulfilledAt, boolean hasEvidence,
             String createdAt, String paymentMessage) {
         public static RechargeDto of(com.afriland.promote.model.Recharge r) {
             return new RechargeDto(
@@ -546,6 +550,7 @@ public final class Dtos {
                     r.getSaraReceiptKey() != null, r.getSaraRef(), r.getSaraPayerPhone(), r.getSaraAmount(),
                     r.getCashCollectedBy(), r.getCashCollectedAt() == null ? null : r.getCashCollectedAt().toString(),
                     r.isFulfilled(), r.getFulfilledBy(), r.getFulfilledAt() == null ? null : r.getFulfilledAt().toString(),
+                    r.getEvidenceImageKey() != null,
                     r.getCreatedAt() == null ? null : r.getCreatedAt().toString(), r.getPaymentMessage());
         }
     }

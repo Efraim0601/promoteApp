@@ -111,10 +111,13 @@ public class RechargeController {
         return dto;
     }
 
-    /** Cashier — confirm the effective recharge (the card has been credited). */
+    /** Cashier — confirm the effective recharge (the card has been credited). Requires an evidence
+     *  screenshot (key from /api/kyc/image, kind = recharge-evidence). */
     @PatchMapping("/{ref}/fulfill")
-    public RechargeDto fulfill(@PathVariable String ref, Authentication auth) {
-        RechargeDto dto = RechargeDto.of(service.fulfill(ref, (String) auth.getPrincipal()));
+    public RechargeDto fulfill(@PathVariable String ref, @RequestBody(required = false) FulfillRequest req,
+                              Authentication auth) {
+        String evidenceKey = req == null ? null : req.evidenceImageKey();
+        RechargeDto dto = RechargeDto.of(service.fulfill(ref, evidenceKey, (String) auth.getPrincipal()));
         audit.record(auth, "FULFILL_RCH", "RECHARGE", ref,
                 "Rechargement effectué " + ref);
         return dto;

@@ -87,14 +87,21 @@ public class Recharge implements Payable {
     private String fulfilledBy;     // cashier display name
     private String fulfilledById;   // cashier id (stats attribution)
     private Instant fulfilledAt;
+    /** Evidence of the actual top-up: a screenshot the cashier imports when fulfilling (proof the
+     *  card was effectively credited in the banking/GAB system). Object-storage key. */
+    private String evidenceImageKey;
 
     @Column(nullable = false)
     private Instant createdAt;
 
-    /** Resolve a stored image key by kind (only the SARA receipt exists for a recharge). */
+    /** Resolve a stored image key by kind: the SARA receipt or the fulfillment evidence screenshot. */
     @Transient
     public String imageKey(String kind) {
-        return "sara-receipt".equals(kind) ? saraReceiptKey : null;
+        return switch (kind == null ? "" : kind) {
+            case "sara-receipt" -> saraReceiptKey;
+            case "recharge-evidence" -> evidenceImageKey;
+            default -> null;
+        };
     }
 
     /** Overall display status. After payment, a recharge must still be credited to the card by a

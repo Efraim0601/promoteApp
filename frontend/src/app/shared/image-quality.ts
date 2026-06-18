@@ -58,6 +58,28 @@ export function assessDocument(canvas: HTMLCanvasElement): DocQuality {
   return assessFraming(data, w, h);
 }
 
+/**
+ * Exposure + sharpness only (no card/framing logic) — used to gate the live selfie so the shot
+ * kept is actually exploitable (not dark, not blown out, not blurry). Faces carry less high-frequency
+ * detail than a text-heavy ID card, so callers pass a lower `blurMin` than the document gate.
+ * Returns the first issue, or null when the frame is clear enough.
+ */
+export function assessClarity(canvas: HTMLCanvasElement, blurMin = BLUR_VARIANCE): 'dark' | 'glare' | 'blurry' | null {
+  const gray = toGrayscale(canvas);
+  if (!gray) return null; // can't read pixels → don't block
+  const { data, w, h } = gray;
+  let sum = 0, nearWhite = 0;
+  for (let i = 0; i < data.length; i++) {
+    sum += data[i];
+    if (data[i] >= NEAR_WHITE) nearWhite++;
+  }
+  const mean = sum / data.length;
+  if (mean < MIN_BRIGHTNESS) return 'dark';
+  if (nearWhite / data.length > GLARE_FRACTION) return 'glare';
+  if (laplacianVariance(data, w, h) < blurMin) return 'blurry';
+  return null;
+}
+
 /** Downscale to a small grayscale buffer for fast, noise-tolerant analysis. */
 function toGrayscale(src: HTMLCanvasElement): { data: Uint8ClampedArray; w: number; h: number } | null {
   const w = Math.min(ANALYSIS_WIDTH, src.width);

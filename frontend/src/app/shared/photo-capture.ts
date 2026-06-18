@@ -1,14 +1,17 @@
 import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, Output, ViewChild, inject, signal } from '@angular/core';
 import { I18n } from '../core/i18n';
 import { IconComponent } from './icon';
-import { assessDocument, DocIssue } from './image-quality';
+import { assessClarity, assessDocument, DocIssue } from './image-quality';
 import { FaceMesh } from './face-mesh';
 import { KYC_SMART_CAPTURE } from './constants';
 
 /** Live detection mode on the camera preview. 'face' = selfie head check, 'document' = ID auto-frame. */
 export type DetectMode = 'off' | 'face' | 'document';
 /** State surfaced by the live detector, drives the on-screen hint + the ready ring. */
-export type DetectState = 'idle' | 'searching' | 'none' | 'multiple' | 'too_small' | 'offcenter' | 'ready';
+export type DetectState =
+  | 'idle' | 'searching' | 'none' | 'multiple'
+  | 'too_small' | 'too_close' | 'offcenter' | 'look_straight' | 'tilt'
+  | 'dark' | 'blurry' | 'ready';
 
 /**
  * KYC photo capture via the device camera (getUserMedia). Supports the front
@@ -174,10 +177,21 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   private lastDetectTs = 0;
   /** Consecutive "ready" frames; auto-capture fires once this crosses the threshold. */
   private readyStreak = 0;
+  /** Centre of the face on the previous ready frame (box space), to measure stillness. */
+  private lastFaceCenter: { x: number; y: number } | null = null;
   /** Frames needed in a row before auto-firing (anti-jitter: ~0.7s at the throttled rate). */
-  private static readonly READY_FRAMES = 5;
+  private static readonly READY_FRAMES = 6;
   /** Detector cadence — ~10 fps is plenty for framing and keeps the model cheap on mobile. */
-  private static readonly DETECT_INTERVAL_MS = 100;
+  private static readonly DETECT_INTERVAL_MS = 90;
+
+  // --- face (selfie) tunables: judged in the VISIBLE circle's coordinate space ---
+  private static readonly FACE_FILL_MIN = 0.42;   // head height vs box: smaller → too far
+  private static readonly FACE_FILL_MAX = 0.95;   // larger → too close (head clipped)
+  private static readonly FACE_CENTER_TOL = 0.18; // |centre−0.5| allowed on each axis
+  private static readonly FACE_ROLL_MAX = 0.22;   // ~12.5° head tilt
+  private static readonly FACE_YAW_MAX = 0.24;    // nose-vs-eyes offset → head turned
+  private static readonly FACE_MOVE_MAX = 0.03;   // max centre drift between frames → "still"
+  private static readonly FACE_BLUR_MIN = 18;     // Laplacian variance floor for a face (< → blurry)
 
   /** True when the live detector should run for this capture (mode set, flag on, camera live). */
   liveActive(): boolean {
@@ -224,6 +238,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   private async startDetection() {
     if (!this.liveActive()) return;
     this.readyStreak = 0;
+    this.lastFaceCenter = null;
     this.detectState.set('searching');
     // The face model loads lazily; if it fails we silently drop face detection (manual capture stays).
     if (this.detect === 'face' && !(await this.faceMesh.ready())) {
@@ -256,18 +271,48 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
-   * Face mode: run FaceLandmarker, draw the landmark points, and decide whether a single, large,
-   * roughly-centred head is in frame. Returns true when the selfie is good to take.
+   * Face mode: run FaceLandmarker, draw the points, and decide whether a single, well-placed,
+   * frontal, upright, sharp and STILL head is in frame. Geometry is judged in the visible circle's
+   * coordinate space (cover-crop applied) so it matches what the user sees. Returns true only when
+   * the selfie is genuinely good to take — i.e. the kept image will be net & exploitable.
    */
   private tickFace(v: HTMLVideoElement, ts: number): boolean {
+    const C = PhotoCaptureComponent;
     const { count, face } = this.faceMesh.detect(v, ts);
     this.drawFaceOverlay(v, face);
-    if (count === 0 || !face) { this.detectState.set('none'); return false; }
-    if (count > 1) { this.detectState.set('multiple'); return false; }
-    if (face.fill < 0.22) { this.detectState.set('too_small'); return false; }
-    if (Math.abs(face.cx - 0.5) > 0.22 || Math.abs(face.cy - 0.5) > 0.26) { this.detectState.set('offcenter'); return false; }
+    if (count === 0 || !face || !face.frontal) { this.lastFaceCenter = null; this.detectState.set('none'); return false; }
+    if (count > 1) { this.lastFaceCenter = null; this.detectState.set('multiple'); return false; }
+
+    // Map the face from full-video coords into the visible (cover-cropped) box.
+    const cr = this.boxW / this.boxH, vr = v.videoWidth / v.videoHeight;
+    let sw = v.videoWidth, sh = v.videoHeight, sx = 0, sy = 0;
+    if (vr > cr) { sw = v.videoHeight * cr; sx = (v.videoWidth - sw) / 2; }
+    else { sh = v.videoWidth / cr; sy = (v.videoHeight - sh) / 2; }
+    const cx = ((face.cx * v.videoWidth) - sx) / sw;       // face centre in box space (0..1)
+    const cy = ((face.cy * v.videoHeight) - sy) / sh;
+    const fill = (face.box.h * v.videoHeight) / sh;        // head height vs visible box height
+
+    if (fill < C.FACE_FILL_MIN) { this.lastFaceCenter = null; this.detectState.set('too_small'); return false; }
+    if (fill > C.FACE_FILL_MAX) { this.lastFaceCenter = null; this.detectState.set('too_close'); return false; }
+    if (Math.abs(cx - 0.5) > C.FACE_CENTER_TOL || Math.abs(cy - 0.5) > C.FACE_CENTER_TOL) {
+      this.lastFaceCenter = null; this.detectState.set('offcenter'); return false;
+    }
+    if (Math.abs(face.yaw) > C.FACE_YAW_MAX) { this.lastFaceCenter = null; this.detectState.set('look_straight'); return false; }
+    if (Math.abs(face.roll) > C.FACE_ROLL_MAX) { this.lastFaceCenter = null; this.detectState.set('tilt'); return false; }
+
+    // Clarity — only once the face is well placed. Reject dark/blurry so the captured shot is usable.
+    const clarity = assessClarity(this.frameToCanvas(v, 320), C.FACE_BLUR_MIN);
+    if (clarity === 'dark') { this.lastFaceCenter = null; this.detectState.set('dark'); return false; }
+    if (clarity === 'blurry') { this.lastFaceCenter = null; this.detectState.set('blurry'); return false; }
+    // 'glare' on skin is usually harmless — don't block the selfie on it.
+
+    // Stillness: the head must hold position between frames, otherwise the auto shot is motion-blurred.
     this.detectState.set('ready');
-    return true;
+    const moved = this.lastFaceCenter
+      ? Math.hypot(cx - this.lastFaceCenter.x, cy - this.lastFaceCenter.y)
+      : Infinity;
+    this.lastFaceCenter = { x: cx, y: cy };
+    return moved <= C.FACE_MOVE_MAX;   // "ready", but capture only fires once steady
   }
 
   /** Document mode: reuse the post-capture quality gate live; ready when the card is well framed. */
@@ -322,6 +367,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     if (this.rafId) cancelAnimationFrame(this.rafId);
     this.rafId = 0;
     this.readyStreak = 0;
+    this.lastFaceCenter = null;
   }
 
   flip() {
@@ -335,7 +381,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     if (!v || !c) return;
     this.stopDetection();   // freeze the live loop the instant we commit to a frame (manual or auto)
     this.shooting.set(true);
-    const w = this.round ? 320 : 640, h = this.round ? 320 : 400;
+    const w = this.round ? 480 : 640, h = this.round ? 480 : 400;
     c.width = w; c.height = h;
     const ctx = c.getContext('2d')!;
     // cover-fit the video frame into the canvas
@@ -348,7 +394,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     // Quality check is now advisory (flexible): flag blurry / dark / glare / mis-framed shots as a
     // warning shown on the preview, but keep the photo — the user retakes or continues as they wish.
     this.qualityIssue.set(this.qualityCheck ? (assessDocument(c).issue ?? null) : null);
-    const data = c.toDataURL('image/jpeg', 0.82);
+    const data = c.toDataURL('image/jpeg', this.round ? 0.9 : 0.82);
     setTimeout(() => { this.shooting.set(false); this.stop(); this.imageData = data; this.captured.emit(data); }, 220);
   }
 
@@ -384,7 +430,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   /** Cover-fit an image source into the capture canvas at the same dimensions as shoot(). */
   private drawCover(img: HTMLImageElement): string {
     const c = this.canvas?.nativeElement ?? document.createElement('canvas');
-    const w = this.round ? 320 : 640, h = this.round ? 320 : 400;
+    const w = this.round ? 480 : 640, h = this.round ? 480 : 400;
     c.width = w; c.height = h;
     const ctx = c.getContext('2d')!;
     const ir = img.naturalWidth / img.naturalHeight, cr = w / h;
@@ -392,13 +438,13 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     if (ir > cr) { sw = img.naturalHeight * cr; sx = (img.naturalWidth - sw) / 2; }
     else { sh = img.naturalWidth / cr; sy = (img.naturalHeight - sh) / 2; }
     ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-    return c.toDataURL('image/jpeg', 0.82);
+    return c.toDataURL('image/jpeg', this.round ? 0.9 : 0.82);
   }
 
   /** Neutral placeholder so KYC can proceed when no camera is available. */
   private simulate() {
     const c = this.canvas?.nativeElement ?? document.createElement('canvas');
-    const w = this.round ? 320 : 640, h = this.round ? 320 : 400;
+    const w = this.round ? 480 : 640, h = this.round ? 480 : 400;
     c.width = w; c.height = h;
     const ctx = c.getContext('2d')!;
     const g = ctx.createLinearGradient(0, 0, w, h);

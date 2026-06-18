@@ -34,7 +34,7 @@ public class KycController {
 
     private static final long MAX_IMAGE_BYTES = 6 * 1024 * 1024;    // 6 MB for KYC images
     private static final long MAX_RECEIPT_BYTES = 10 * 1024 * 1024; // 10 MB for SARA receipts (PDFs are heavier)
-    private static final Set<String> KINDS = Set.of("selfie", "cni-recto", "cni-verso", "sara-receipt");
+    private static final Set<String> KINDS = Set.of("selfie", "cni-recto", "cni-verso", "sara-receipt", "recharge-evidence");
     private static final String RECEIPT_KIND = "sara-receipt";
     // SARA receipts may be a PDF; KYC images stay image-only.
     private static final Pattern DATA_URL =

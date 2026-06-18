@@ -248,9 +248,10 @@ export class Api {
   pendingRecharges(): Observable<Recharge[]> {
     return this.http.get<Recharge[]>(`${this.base}/recharges/pending-fulfillment`);
   }
-  /** Cashier — confirm the effective recharge (card credited). */
-  fulfillRecharge(ref: string): Observable<Recharge> {
-    return this.http.patch<Recharge>(`${this.base}/recharges/${ref}/fulfill`, {});
+  /** Cashier — confirm the effective recharge (card credited). Requires an evidence screenshot key
+   *  (from uploadImage with kind = recharge-evidence); the backend rejects fulfill without it. */
+  fulfillRecharge(ref: string, evidenceImageKey: string): Observable<Recharge> {
+    return this.http.patch<Recharge>(`${this.base}/recharges/${ref}/fulfill`, { evidenceImageKey });
   }
 
   // ---- collectes (ventes de produits bancaires) ----
