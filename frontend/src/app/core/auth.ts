@@ -107,7 +107,7 @@ export class Auth {
    *  role wins (ADMIN → Superviseur → Agent → Cashier → Print → Collecteur). */
   landingPath(role?: Role): string {
     const home: Record<Role, string> = {
-      ADMIN: '/admin', MANAGER: '/manager', SUPERVISEUR: '/admin', CHEF_EQUIPE: '/team-stats',
+      ADMIN: '/admin', MANAGER: '/manager', SUPERVISEUR: '/supervision', CHEF_EQUIPE: '/team-stats',
       AGENT: '/agent', CASHIER: '/cashier', PRINT_AGENT: '/print', COLLECTEUR: '/collecte',
     };
     if (role) return home[role] ?? '/login';

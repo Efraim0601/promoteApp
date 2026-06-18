@@ -9,10 +9,12 @@ import com.afriland.promote.web.dto.Dtos.AdminStats;
 import com.afriland.promote.web.dto.Dtos.AgencyPickupStats;
 import com.afriland.promote.web.dto.Dtos.AgentStats;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
+import com.afriland.promote.web.dto.Dtos.CashSupervisionStats;
 import com.afriland.promote.web.dto.Dtos.HierarchyStatsDto;
 import com.afriland.promote.web.dto.Dtos.PaymentStats;
 import com.afriland.promote.web.dto.Dtos.PrintReconciliation;
 import com.afriland.promote.web.dto.Dtos.PrintStats;
+import com.afriland.promote.web.dto.Dtos.PrintSupervisionStats;
 import org.springframework.security.core.Authentication;
 
 import java.util.Set;
@@ -78,6 +80,20 @@ public class StatsController {
     @GetMapping("/cashier")
     public CashierStats cashier(Authentication auth) {
         return stats.cashierStats((String) auth.getPrincipal());
+    }
+
+    /** Supervisor — daily print reconciliation across ALL print agents (day = yyyy-MM-dd, default today). */
+    @GetMapping("/print/supervision")
+    public PrintSupervisionStats printSupervision(@RequestParam(required = false) String day) {
+        LocalDate d = (day != null && !day.isBlank()) ? LocalDate.parse(day) : null;
+        return stats.printSupervision(d);
+    }
+
+    /** Supervisor — daily cash reconciliation across ALL cashiers (day = yyyy-MM-dd, default today). */
+    @GetMapping("/cashier/supervision")
+    public CashSupervisionStats cashSupervision(@RequestParam(required = false) String day) {
+        LocalDate d = (day != null && !day.isBlank()) ? LocalDate.parse(day) : null;
+        return stats.cashSupervision(d);
     }
 
     /** Admin — Mobile Money payment funnel (acceptance, confirmation latency, failure causes, by network). */

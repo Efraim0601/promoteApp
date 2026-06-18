@@ -549,6 +549,40 @@ export interface CashierStats {
   pendingAmount: number;   // total amount still to collect (XAF)
 }
 
+/** Supervisor daily reconciliation — one print agent's remittance for the selected day. */
+export interface PrinterDayRow {
+  id: string;
+  name: string;
+  agency: string | null;
+  printed: number;           // cards printed that day
+  activated: number;         // of which activated (PAN captured)
+  pendingActivation: number; // printed but not yet activated
+}
+/** Supervisor — daily print reconciliation across all print agents (day = yyyy-MM-dd). */
+export interface PrintSupervisionStats {
+  day: string;
+  totalPrinted: number;
+  queue: number;             // current global queue (paid, not yet printed)
+  byPrinter: PrinterDayRow[];
+}
+
+/** Supervisor daily reconciliation — one cashier's collection for the selected day. */
+export interface CashierDayRow {
+  id: string;
+  name: string;
+  agency: string | null;
+  count: number;             // cash payments validated that day
+  collected: number;         // amount collected that day (XAF)
+}
+/** Supervisor — daily cash reconciliation across all cashiers (day = yyyy-MM-dd). */
+export interface CashSupervisionStats {
+  day: string;
+  totalCollected: number;
+  pendingCount: number;      // current cash queue still awaiting collection
+  pendingAmount: number;
+  byCashier: CashierDayRow[];
+}
+
 export interface PaymentStats {
   momoTotal: number;       // total Mobile Money transactions
   momoPaid: number;

@@ -100,6 +100,10 @@ public class SecurityConfig {
                 .requestMatchers("/api/stats/dashboard").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
                 // Hierarchy-scoped stats: the service bounds the data to the caller's sub-tree.
                 .requestMatchers("/api/stats/hierarchy").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR", "CHEF_EQUIPE")
+                // Supervisor daily reconciliation across ALL print agents / cashiers. Declared BEFORE the
+                // per-user "/api/stats/print/**" matcher below so it isn't captured by it.
+                .requestMatchers("/api/stats/print/supervision", "/api/stats/cashier/supervision")
+                        .hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
                 // Notifications: send = admin/manager/supervisor/team-lead; read/mark = any authenticated user
                 .requestMatchers(HttpMethod.POST, "/api/notifications").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR", "CHEF_EQUIPE")
                 .requestMatchers("/api/map/**").hasRole("ADMIN")

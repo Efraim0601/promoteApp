@@ -441,6 +441,26 @@ public final class Dtos {
     public record CashierStats(long myCount, long myCollected, long myCountToday,
                                long pendingCount, long pendingAmount) {}
 
+    // ---- supervisor daily reconciliation (all print agents / all cashiers) ----
+
+    /** One print agent's remittance for the selected day: cards printed, of which activated (PAN
+     *  captured) and still pending activation. */
+    public record PrinterDayRow(String id, String name, String agency,
+                                long printed, long activated, long pendingActivation) {}
+
+    /** Supervisor view — daily print reconciliation across ALL print agents (day = yyyy-MM-dd). */
+    public record PrintSupervisionStats(String day, long totalPrinted, long queue,
+                                        List<PrinterDayRow> byPrinter) {}
+
+    /** One cashier's collection for the selected day: number of cash payments validated + the amount. */
+    public record CashierDayRow(String id, String name, String agency, long count, long collected) {}
+
+    /** Supervisor view — daily cash reconciliation across ALL cashiers (day = yyyy-MM-dd), plus the
+     *  current cash queue still awaiting collection. */
+    public record CashSupervisionStats(String day, long totalCollected,
+                                       long pendingCount, long pendingAmount,
+                                       List<CashierDayRow> byCashier) {}
+
     /** Mobile Money payment funnel (admin): volumes & success per network, failure causes, and the
      *  confirmation latency (PENDING → paid). Lets the bank monitor the aggregator's health. */
     /** One failure-category bucket for the failure-analysis breakdown. */

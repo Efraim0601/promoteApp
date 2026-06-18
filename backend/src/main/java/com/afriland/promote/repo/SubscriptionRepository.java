@@ -67,8 +67,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     long countByPrintedByIdAndPrintedAtGreaterThanEqual(String printedById, Instant since);
     /** Cards a print agent has remitted (printed), newest first — backs the printer's reconciliation table. */
     List<Subscription> findByPrintedByIdOrderByPrintedAtDesc(String printedById);
+    /** Cards a print agent printed within a half-open window [from, to) — backs the supervisor's daily
+     *  print reconciliation (per-printer, per-day). */
+    List<Subscription> findByPrintedByIdAndPrintedAtGreaterThanEqualAndPrintedAtLessThan(
+            String printedById, Instant from, Instant to);
     long countByCashCollectedById(String cashCollectedById);
     long countByCashCollectedByIdAndCashCollectedAtGreaterThanEqual(String cashCollectedById, Instant since);
+    /** Cash payments a cashier collected within a half-open window [from, to) — supervisor daily recon. */
+    long countByCashCollectedByIdAndCashCollectedAtGreaterThanEqualAndCashCollectedAtLessThan(
+            String cashCollectedById, Instant from, Instant to);
     long countByAgentId(String agentId);
     long countByAgentIdIsNull();
     /** Online (client) sales that actually settled — used by the ranking so unpaid sales don't inflate it. */
@@ -92,6 +99,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
 
     @Query("select coalesce(sum(s.amount), 0) from Subscription s where s.cashCollectedById = :id")
     long sumAmountByCashCollectedById(@Param("id") String id);
+
+    /** Amount a cashier collected within a half-open window [from, to) — supervisor daily recon. */
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s "
+            + "where s.cashCollectedById = :id and s.cashCollectedAt >= :from and s.cashCollectedAt < :to")
+    long sumAmountByCashCollectedByIdInWindow(@Param("id") String id,
+                                              @Param("from") Instant from, @Param("to") Instant to);
 
     @Query("select coalesce(sum(s.amount), 0) from Subscription s "
             + "where s.agentId = :aid and s.payStatus = com.afriland.promote.model.PayStatus.paid")

@@ -6,7 +6,7 @@ import {
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ActionAudit, ImportUserRow, ImportUsersResult, LoginAudit, Role,
-  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintReconciliation, PrintStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintReconciliation, PrintStats, PrintSupervisionStats, CashSupervisionStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
   Product, ProductRequest, Promotion, PromotionRequest,
   CommissionRule, CommissionRuleRequest, CommissionEntry, HierarchyStats,
   TeamMember, TeamMessageRequest,
@@ -355,6 +355,19 @@ export class Api {
   /** Cashier KPIs for the logged-in cashier (cash validated + queue). */
   cashierStats(): Observable<CashierStats> {
     return this.http.get<CashierStats>(`${this.base}/stats/cashier`);
+  }
+
+  /** Supervisor — daily print reconciliation across all print agents (day = yyyy-MM-dd, default today). */
+  printSupervision(day?: string): Observable<PrintSupervisionStats> {
+    const params: Record<string, string> = {};
+    if (day) params['day'] = day;
+    return this.http.get<PrintSupervisionStats>(`${this.base}/stats/print/supervision`, { params });
+  }
+  /** Supervisor — daily cash reconciliation across all cashiers (day = yyyy-MM-dd, default today). */
+  cashSupervision(day?: string): Observable<CashSupervisionStats> {
+    const params: Record<string, string> = {};
+    if (day) params['day'] = day;
+    return this.http.get<CashSupervisionStats>(`${this.base}/stats/cashier/supervision`, { params });
   }
   /** Admin — Mobile Money payment funnel (acceptance, latency, failure causes, by network). */
   paymentStats(): Observable<PaymentStats> {

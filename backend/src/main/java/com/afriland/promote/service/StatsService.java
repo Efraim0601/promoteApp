@@ -138,6 +138,54 @@ public class StatsService {
         return new PrintReconciliation(remises, activated, remises - activated, cards);
     }
 
+    /** Supervisor view — per-print-agent remittance for one day (ALL print agents, no exception), so
+     *  the supervisor can validate everyone's daily print reconciliation. {@code day} = null → today.
+     *  Every print agent is listed (including those with 0 that day) to confirm the full roster. */
+    public PrintSupervisionStats printSupervision(LocalDate day) {
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate d = day != null ? day : LocalDate.now(zone);
+        Instant from = d.atStartOfDay(zone).toInstant();
+        Instant to = d.plusDays(1).atStartOfDay(zone).toInstant();
+
+        List<PrinterDayRow> rows = new ArrayList<>();
+        long totalPrinted = 0;
+        for (AppUser p : users.findByEffectiveRole(Role.PRINT_AGENT)) {
+            List<Subscription> printed = subs.findByPrintedByIdAndPrintedAtGreaterThanEqualAndPrintedAtLessThan(
+                    p.getId(), from, to);
+            long n = printed.size();
+            long activated = printed.stream().filter(s -> s.getPan() != null && !s.getPan().isBlank()).count();
+            totalPrinted += n;
+            rows.add(new PrinterDayRow(p.getId(), p.getName(), p.getAgency(), n, activated, n - activated));
+        }
+        rows.sort(Comparator.comparingLong(PrinterDayRow::printed).reversed());
+        long queue = subs.countByPrintedFalseAndPayStatus(PayStatus.paid);
+        return new PrintSupervisionStats(d.toString(), totalPrinted, queue, rows);
+    }
+
+    /** Supervisor view — per-cashier collection for one day (ALL cashiers, no exception), so the
+     *  supervisor can validate everyone's daily cash reconciliation. {@code day} = null → today.
+     *  Every cashier is listed (including those with 0 that day). */
+    public CashSupervisionStats cashSupervision(LocalDate day) {
+        ZoneId zone = ZoneId.systemDefault();
+        LocalDate d = day != null ? day : LocalDate.now(zone);
+        Instant from = d.atStartOfDay(zone).toInstant();
+        Instant to = d.plusDays(1).atStartOfDay(zone).toInstant();
+
+        List<CashierDayRow> rows = new ArrayList<>();
+        long totalCollected = 0;
+        for (AppUser c : users.findByEffectiveRole(Role.CASHIER)) {
+            long count = subs.countByCashCollectedByIdAndCashCollectedAtGreaterThanEqualAndCashCollectedAtLessThan(
+                    c.getId(), from, to);
+            long collected = subs.sumAmountByCashCollectedByIdInWindow(c.getId(), from, to);
+            totalCollected += collected;
+            rows.add(new CashierDayRow(c.getId(), c.getName(), c.getAgency(), count, collected));
+        }
+        rows.sort(Comparator.comparingLong(CashierDayRow::collected).reversed());
+        long pendingCount = subs.countByPayStatus(PayStatus.cash);
+        long pendingAmount = subs.sumAmountByPayStatus(PayStatus.cash);
+        return new CashSupervisionStats(d.toString(), totalCollected, pendingCount, pendingAmount, rows);
+    }
+
     /** Mobile Money payment funnel for the admin dashboard: volumes & success per network, failure
      *  causes (from the stored decline reason), and the confirmation latency (createdAt → paidAt). */
     public PaymentStats paymentStats() {

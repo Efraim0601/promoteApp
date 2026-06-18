@@ -1,10 +1,19 @@
 package com.afriland.promote.service;
 
+import com.afriland.promote.model.AppUser;
+import com.afriland.promote.model.Role;
 import com.afriland.promote.model.Subscription;
+import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
+import com.afriland.promote.web.dto.Dtos.CashSupervisionStats;
+import com.afriland.promote.web.dto.Dtos.CashierDayRow;
 import com.afriland.promote.web.dto.Dtos.CreateSubscriptionRequest;
 import com.afriland.promote.web.dto.Dtos.PrintStats;
+import com.afriland.promote.web.dto.Dtos.PrinterDayRow;
+import com.afriland.promote.web.dto.Dtos.PrintSupervisionStats;
+
+import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -23,6 +32,7 @@ class StatsServiceTest {
     @Autowired SubscriptionService service;
     @Autowired StatsService stats;
     @Autowired SubscriptionRepository repo;
+    @Autowired AppUserRepository users;
 
     private CreateSubscriptionRequest req(String pay, String phone, String cni) {
         return new CreateSubscriptionRequest(
@@ -84,5 +94,47 @@ class StatsServiceTest {
         service.validateCash(cash.getRef(), "validate", null, "rank-cashier", null);
         assertEquals(2, repo.countPaidOwnedOrReferred(agent, ""),
                 "collected cash becomes paid and now counts toward the ranking");
+    }
+
+    /** Supervisor daily reconciliation: print remittance and cash collection are attributed to the right
+     *  staff member AND bounded to the day the action happened (not the day before). */
+    @Test
+    void supervisionScopesByStaffAndDay() {
+        AppUser printer = users.findById("sup-printer").orElseGet(() -> AppUser.builder().id("sup-printer").build());
+        printer.setName("Imprimeur Test"); printer.setEmail("sup-printer@test.cm");
+        printer.setRole(Role.PRINT_AGENT); printer.setAgency("Agence Sup"); printer.setEnabled(true);
+        printer.setPasswordHash("x");
+        users.save(printer);
+        AppUser cashier = users.findById("sup-cashier").orElseGet(() -> AppUser.builder().id("sup-cashier").build());
+        cashier.setName("Caissier Test"); cashier.setEmail("sup-cashier@test.cm");
+        cashier.setRole(Role.CASHIER); cashier.setAgency("Agence Sup"); cashier.setEnabled(true);
+        cashier.setPasswordHash("x");
+        users.save(cashier);
+
+        // A card printed today by our printer; a cash payment collected today by our cashier.
+        Subscription toPrint = service.create(req("om", "655330303", "SUP11111"), "agent", "sup-agent");
+        service.applyPayment(toPrint.getRef(), "validate", null);
+        service.markPrinted(toPrint.getRef(), "CARD-SUP", null, "sup-printer");
+        Subscription cash = service.create(req("cash", "655440404", "SUP22222"), "agent", "sup-agent");
+        service.validateCash(cash.getRef(), "validate", null, "sup-cashier", null);
+
+        LocalDate today = LocalDate.now();
+        PrinterDayRow pr = stats.printSupervision(today).byPrinter().stream()
+                .filter(r -> r.id().equals("sup-printer")).findFirst().orElseThrow();
+        assertEquals(1, pr.printed(), "the printer's card counts on the day it was printed");
+        assertEquals(1, pr.pendingActivation(), "no PAN captured yet → pending activation");
+
+        CashierDayRow cr = stats.cashSupervision(today).byCashier().stream()
+                .filter(r -> r.id().equals("sup-cashier")).findFirst().orElseThrow();
+        assertEquals(1, cr.count(), "the cashier's collection counts on the day it was collected");
+        assertEquals(cash.getAmount(), cr.collected());
+
+        // The day before must show none of today's activity (every staff member is still listed).
+        PrinterDayRow prY = stats.printSupervision(today.minusDays(1)).byPrinter().stream()
+                .filter(r -> r.id().equals("sup-printer")).findFirst().orElseThrow();
+        assertEquals(0, prY.printed(), "yesterday shows none of today's prints");
+        CashierDayRow crY = stats.cashSupervision(today.minusDays(1)).byCashier().stream()
+                .filter(r -> r.id().equals("sup-cashier")).findFirst().orElseThrow();
+        assertEquals(0, crY.count(), "yesterday shows none of today's collections");
     }
 }

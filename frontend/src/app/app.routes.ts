@@ -46,6 +46,9 @@ export const routes: Routes = [
   // collecte supervisor — global collecte statistics, separate from the admin dashboard
   { path: 'collecte-stats', canActivate: [roleGuard('SUPERVISEUR', 'ADMIN')], loadComponent: () => import('./pages/collecte-stats').then((m) => m.CollecteStatsComponent) },
 
+  // supervisor — daily reconciliation of print remittance + cash collection across everyone
+  { path: 'supervision', canActivate: [roleGuard('SUPERVISEUR', 'ADMIN', 'MANAGER')], loadComponent: () => import('./pages/supervision').then((m) => m.SupervisionComponent) },
+
   // Unknown URLs fall back to the public start page (not the staff login).
   { path: '**', redirectTo: 'start' },
 ];
