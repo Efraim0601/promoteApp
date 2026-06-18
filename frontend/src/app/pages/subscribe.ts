@@ -474,6 +474,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       },
       error: (err) => {
         this.busy.set(false);
+        // A 401 is handled globally (the interceptor ends the session and routes to login). A 403
+        // means the account lacks the AGENT/CASHIER role — surface that instead of blaming the form.
+        if (err?.status === 403) { this.submitError.set('forbidden_role'); return; }
         const code = err?.error?.error as string | undefined;
         const known = ['cni_exists', 'cni_invalid', 'validation_error', 'server_error'];
         this.submitError.set(known.includes(code ?? '') ? code! : 'submit_failed');

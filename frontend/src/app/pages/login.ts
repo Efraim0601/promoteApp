@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Auth } from '../core/auth';
 import { Api } from '../core/api';
@@ -140,6 +140,12 @@ export class LoginComponent {
   private auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
+
+  constructor() {
+    // Routed here by the 401 interceptor after the session expired — tell the user why.
+    if (this.route.snapshot.queryParamMap.get('expired')) this.err.set('session_expired');
+  }
 
   mode = signal<Mode>('staff');
   email = signal('');

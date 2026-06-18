@@ -60,6 +60,16 @@ export class Auth {
     this.router.navigateByUrl('/login');
   }
 
+  /** End an expired/invalid session (triggered by a 401) and return to login with a notice.
+   *  No-op if already signed out, so parallel failing requests don't stack redundant redirects. */
+  expireSession(): void {
+    if (!this.token && !this.user()) return;
+    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(USER_KEY);
+    this.user.set(null);
+    this.router.navigate(['/login'], { queryParams: { expired: 1 } });
+  }
+
   /** Effective roles of the current user (the full set, or just the primary on older sessions). */
   roles(): Role[] {
     const u = this.user();
