@@ -6,7 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { PrintStats, Recharge, Subscription } from '../core/models';
+import { PrintReconciliation, PrintStats, Recharge, Subscription } from '../core/models';
 import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
@@ -35,6 +35,48 @@ import { NotifBellComponent } from '../shared/notif-bell';
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('pp_sub') }}</p>
       </div>
 
+      @if (cardsView()) {
+        <!-- Card reconciliation: cards this printer remitted vs activated, to check against physical stock. -->
+        <button class="btn btn-ghost" (click)="closeCards()" style="width:auto;align-self:flex-start;padding:8px 4px;font-size:13px"><ic name="chevL" [size]="18"></ic> {{ i18n.t('pp_recon_back') }}</button>
+        <div>
+          <h2 style="font-size:19px">{{ i18n.t('pp_recon_title') }}</h2>
+          <p class="muted" style="font-size:12.5px;margin-top:4px;line-height:1.4">{{ i18n.t('pp_recon_sub') }}</p>
+        </div>
+        @if (cardsLoading() && !cards()) {
+          <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
+        } @else if (cards(); as c) {
+          <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+            <div class="kpi"><div class="kv" style="color:var(--primary)">{{ c.remises }}</div><div class="kl">{{ i18n.t('pp_recon_remises') }}</div></div>
+            <div class="kpi"><div class="kv" style="color:var(--success)">{{ c.activated }}</div><div class="kl">{{ i18n.t('pp_recon_activated') }}</div></div>
+            <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ c.pending }}</div><div class="kl">{{ i18n.t('pp_recon_pending') }}</div></div>
+          </div>
+          @if (!c.cards.length) {
+            <div class="card" style="padding:18px;text-align:center"><p class="muted" style="font-size:13px">{{ i18n.t('pp_recon_empty') }}</p></div>
+          } @else {
+            <div class="card" style="overflow:hidden">
+              <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px;display:flex;align-items:center;justify-content:space-between">
+                <span class="muted">{{ c.cards.length }} {{ i18n.t('pp_recon_cards') }}</span>
+                <button (click)="loadCards()" [disabled]="cardsLoading()" style="background:none;border:none;color:var(--primary);font-weight:700;font-size:11.5px;cursor:pointer">{{ i18n.t('pp_recon_refresh') }}</button>
+              </div>
+              @for (card of c.cards; track card.ref) {
+                <div style="display:flex;align-items:center;gap:11px;padding:11px 14px;border-bottom:1px solid var(--border)">
+                  <div style="min-width:0;flex:1">
+                    <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ card.fullName }}</div>
+                    <div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ card.ref }}@if (card.cardNumber) { · {{ i18n.t('pp_card_number') }} {{ card.cardNumber }} }</div>
+                    <div class="muted" style="font-size:11px;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ fmtPrintedAt(card.printedAt) }}@if (card.pan) { · {{ i18n.t('pp_pan') }} {{ fmtPan(card.pan) }} }</div>
+                  </div>
+                  @if (card.activated) {
+                    <span style="font-size:10.5px;font-weight:700;color:var(--success);background:color-mix(in srgb,var(--success) 14%,var(--surface));padding:4px 9px;border-radius:20px;white-space:nowrap">{{ i18n.t('pp_recon_badge_activated') }}</span>
+                  } @else {
+                    <span style="font-size:10.5px;font-weight:700;color:var(--af-gold);background:color-mix(in srgb,var(--af-gold) 16%,var(--surface));padding:4px 9px;border-radius:20px;white-space:nowrap">{{ i18n.t('pp_recon_badge_pending') }}</span>
+                  }
+                </div>
+              }
+            </div>
+          }
+        }
+      } @else {
+
       @if (auth.hasRole('COLLECTEUR')) {
         <button class="btn btn-outline" (click)="goCollecte()" style="width:100%;margin-bottom:10px"><ic name="store" [size]="18"></ic> {{ i18n.t('nav_collectes') }}</button>
       }
@@ -47,6 +89,10 @@ import { NotifBellComponent } from '../shared/notif-bell';
           <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.queue }}</div><div class="kl">{{ i18n.t('pp_kpi_queue') }}</div></div>
         </div>
         <p class="muted" style="font-size:10.5px;margin-top:-4px;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</p>
+      }
+
+      @if (!rec()) {
+        <button class="btn btn-outline" (click)="openCards()" style="width:100%;margin-bottom:10px"><ic name="idcard" [size]="18"></ic> {{ i18n.t('pp_my_cards') }}</button>
       }
 
       <field [label]="i18n.t('pp_input')">
@@ -221,6 +267,11 @@ import { NotifBellComponent } from '../shared/notif-bell';
               </div>
               <div class="srow"><span class="lbl">{{ i18n.t('pay_method_label') }}</span><span class="val" style="display:inline-flex;align-items:center;gap:7px"><span class="op-logo" [style.background]="pm(r).bg" [style.color]="pm(r).fg" style="width:22px;height:22px;font-size:9px;border-radius:6px;overflow:hidden">@if (pm(r).logo) { <img [src]="pm(r).logo" [alt]="pm(r).name" style="width:100%;height:100%;object-fit:contain" /> } @else { {{ pm(r).short }} }</span>{{ r.pay === 'cash' ? i18n.t('pay_cash_name') : pm(r).name }}</span></div>
               <div class="srow"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ r.delivery === 'agence' && r.pickupAgencyName ? r.pickupAgencyName : i18n.t('del_' + r.delivery + '_title') }}</span></div>
+              <!-- Parrain (« Recommandé par ») en lecture seule : nom si rattaché, sinon le numéro saisi. -->
+              @if (r.referrerName || r.referrerPhone) {
+                <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ r.referrerName || r.referrerPhone }}</span></div>
+                @if (r.referrerPhone) { <div class="srow"><span class="lbl">{{ i18n.t('tx_referrer_phone') }}</span><span class="val">{{ r.referrerPhone }}</span></div> }
+              }
               @if (r.payStatus === 'cash') {
                 <div class="srow total"><span class="lbl">{{ i18n.t('pp_to_collect') }}</span><span class="val" style="color:var(--warning)">{{ i18n.money(r.amount) }}</span></div>
               } @else if (r.payStatus === 'sara_pending') {
@@ -345,6 +396,8 @@ import { NotifBellComponent } from '../shared/notif-bell';
         }
       }
 
+      }
+
       <div style="flex:1"></div>
     </div>
 
@@ -416,6 +469,10 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   rRec = signal<Recharge | null>(null);
   rValidated = signal(false);
   stats = signal<PrintStats | null>(null);
+  // Card reconciliation panel (cards remitted vs activated) — opened from the printer's menu.
+  cardsView = signal(false);
+  cards = signal<PrintReconciliation | null>(null);
+  cardsLoading = signal(false);
   selfieUrl = signal<SafeUrl | null>(null);
   rectoUrl = signal<SafeUrl | null>(null);
   versoUrl = signal<SafeUrl | null>(null);
@@ -486,6 +543,25 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   }
   ngOnDestroy() { if (this.poll) clearInterval(this.poll); this.clearSelfie(); }
   private loadStats() { this.api.printStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} }); }
+
+  /** Open the card-reconciliation table (cards I remitted vs activated) and (re)load it. */
+  openCards() {
+    this.cardsView.set(true);
+    this.loadCards();
+  }
+  closeCards() { this.cardsView.set(false); }
+  loadCards() {
+    this.cardsLoading.set(true);
+    this.api.printCards().subscribe({
+      next: (r) => { this.cards.set(r); this.cardsLoading.set(false); },
+      error: () => { this.cardsLoading.set(false); },
+    });
+  }
+  fmtPrintedAt = (iso: string | null) => {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '—' : d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   /** Silent background refresh: KPIs always; plus the open record's status OR the search
    *  results, so a payment becoming "payée — à imprimer" surfaces in near real-time. Skips any

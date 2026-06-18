@@ -521,6 +521,25 @@ export interface PrintStats {
   totalPrinted: number;    // all printed cards (global)
 }
 
+/** One card a print agent remitted; `activated` is true once a PAN was captured. */
+export interface PrintCardRow {
+  ref: string;
+  fullName: string;
+  phone: string;
+  cardNumber: string | null;
+  pan: string | null;
+  printedAt: string | null;
+  activated: boolean;
+}
+
+/** Print agent's card reconciliation (cards remitted vs activated), for checking physical stock. */
+export interface PrintReconciliation {
+  remises: number;
+  activated: number;
+  pending: number;
+  cards: PrintCardRow[];
+}
+
 export interface CashierStats {
   myCount: number;         // cash payments I validated (all-time)
   myCollected: number;     // total amount I collected (XAF)

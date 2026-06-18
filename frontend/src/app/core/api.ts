@@ -6,7 +6,7 @@ import {
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ActionAudit, ImportUserRow, ImportUsersResult, LoginAudit, Role,
-  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintReconciliation, PrintStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
   Product, ProductRequest, Promotion, PromotionRequest,
   CommissionRule, CommissionRuleRequest, CommissionEntry, HierarchyStats,
   TeamMember, TeamMessageRequest,
@@ -334,6 +334,11 @@ export class Api {
   /** Print-point KPIs for the logged-in printer (cards printed + queue). */
   printStats(): Observable<PrintStats> {
     return this.http.get<PrintStats>(`${this.base}/stats/print`);
+  }
+
+  /** Per-card reconciliation for the logged-in printer (cards remitted vs activated). */
+  printCards(): Observable<PrintReconciliation> {
+    return this.http.get<PrintReconciliation>(`${this.base}/stats/print/cards`);
   }
   /** Cashier KPIs for the logged-in cashier (cash validated + queue). */
   cashierStats(): Observable<CashierStats> {

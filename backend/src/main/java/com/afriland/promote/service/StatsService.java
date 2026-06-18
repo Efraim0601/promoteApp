@@ -6,6 +6,7 @@ import com.afriland.promote.model.Role;
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
+import com.afriland.promote.util.PanUtils;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.springframework.stereotype.Service;
 
@@ -114,6 +115,24 @@ public class StatsService {
         long queue = subs.countByPrintedFalseAndPayStatus(PayStatus.paid);
         long totalPrinted = subs.countByPrintedTrue();
         return new PrintStats(myPrinted, myToday, queue, totalPrinted);
+    }
+
+    /** Per-card reconciliation for a print agent: every card they remitted (printed), flagged activated
+     *  once a PAN was captured, plus the remitted / activated / pending-activation totals. Lets a printer
+     *  reconcile against the physical cards they received. */
+    public PrintReconciliation printReconciliation(String printerId) {
+        List<Subscription> mine = subs.findByPrintedByIdOrderByPrintedAtDesc(printerId);
+        List<PrintCardRow> cards = new ArrayList<>(mine.size());
+        long activated = 0;
+        for (Subscription s : mine) {
+            boolean act = s.getPan() != null && !s.getPan().isBlank();
+            if (act) activated++;
+            cards.add(new PrintCardRow(s.getRef(), s.getFullName(), s.getPhone(),
+                    PanUtils.mask(s.getCardNumber()), PanUtils.mask(s.getPan()),
+                    s.getPrintedAt() == null ? null : s.getPrintedAt().toString(), act));
+        }
+        long remises = mine.size();
+        return new PrintReconciliation(remises, activated, remises - activated, cards);
     }
 
     /** Mobile Money payment funnel for the admin dashboard: volumes & success per network, failure

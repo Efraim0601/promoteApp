@@ -11,6 +11,7 @@ import com.afriland.promote.web.dto.Dtos.AgentStats;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
 import com.afriland.promote.web.dto.Dtos.HierarchyStatsDto;
 import com.afriland.promote.web.dto.Dtos.PaymentStats;
+import com.afriland.promote.web.dto.Dtos.PrintReconciliation;
 import com.afriland.promote.web.dto.Dtos.PrintStats;
 import org.springframework.security.core.Authentication;
 
@@ -65,6 +66,13 @@ public class StatsController {
     @GetMapping("/print")
     public PrintStats print(Authentication auth) {
         return stats.printStats((String) auth.getPrincipal());
+    }
+
+    /** Print agent — reconciliation of the cards they remitted (printed) vs activated, for checking
+     *  against the physical cards received. */
+    @GetMapping("/print/cards")
+    public PrintReconciliation printCards(Authentication auth) {
+        return stats.printReconciliation((String) auth.getPrincipal());
     }
 
     @GetMapping("/cashier")

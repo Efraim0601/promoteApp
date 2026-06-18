@@ -65,6 +65,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     long countByPrintedFalseAndPayStatus(PayStatus payStatus);    // print queue == paid, not yet printed
     long countByPrintedById(String printedById);
     long countByPrintedByIdAndPrintedAtGreaterThanEqual(String printedById, Instant since);
+    /** Cards a print agent has remitted (printed), newest first — backs the printer's reconciliation table. */
+    List<Subscription> findByPrintedByIdOrderByPrintedAtDesc(String printedById);
     long countByCashCollectedById(String cashCollectedById);
     long countByCashCollectedByIdAndCashCollectedAtGreaterThanEqual(String cashCollectedById, Instant since);
     long countByAgentId(String agentId);

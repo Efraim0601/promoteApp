@@ -416,6 +416,15 @@ public final class Dtos {
      *  (paid but not yet printed), plus the global printed total. */
     public record PrintStats(long myPrinted, long myPrintedToday, long queue, long totalPrinted) {}
 
+    /** One row of a print agent's card reconciliation: a card they remitted (printed). {@code activated}
+     *  is true once a PAN was captured for the card; otherwise it is remitted but not yet activated. */
+    public record PrintCardRow(String ref, String fullName, String phone, String cardNumber, String pan,
+                               String printedAt, boolean activated) {}
+
+    /** Print agent's card reconciliation: cards remitted, how many are activated (PAN captured), how many
+     *  are still pending activation, and the per-card detail — to check against the physical cards received. */
+    public record PrintReconciliation(long remises, long activated, long pending, List<PrintCardRow> cards) {}
+
     /** Cashier KPIs: cash payments I validated (count + amount, all-time + today) and the queue of
      *  cash subscriptions still awaiting collection (count + amount). */
     public record CashierStats(long myCount, long myCollected, long myCountToday,
