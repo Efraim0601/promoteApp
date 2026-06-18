@@ -17,11 +17,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
 
@@ -101,30 +101,14 @@ public class PaymentReconciliationService {
             log.info("Manual payment reconciliation: checking {} order(s) from the last {}s (subs={}, recharges={})",
                     scanned, windowSeconds, subRows.size(), rechRows.size());
 
-            List<CompletableFuture<ReconcilePullResult>> tasks = new ArrayList<>(scanned);
-            for (Subscription s : subRows) {
-                tasks.add(CompletableFuture.supplyAsync(
-                        () -> subscriptionService.reconcileFromGateway(s.getRef()), reconcileExecutor));
-            }
-            for (Recharge r : rechRows) {
-                tasks.add(CompletableFuture.supplyAsync(
-                        () -> rechargeService.reconcileFromGateway(r.getRef()), reconcileExecutor));
-            }
+            List<Supplier<ReconcilePullResult>> jobs = new ArrayList<>(scanned);
+            for (Subscription s : subRows) jobs.add(() -> subscriptionService.reconcileFromGateway(s.getRef()));
+            for (Recharge r : rechRows) jobs.add(() -> rechargeService.reconcileFromGateway(r.getRef()));
 
-            List<ReconcilePullResult> details = Collections.synchronizedList(new ArrayList<>(scanned));
-            try {
-                CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new))
-                        .orTimeout(batchTimeoutSeconds, TimeUnit.SECONDS)
-                        .join();
-                for (CompletableFuture<ReconcilePullResult> t : tasks) {
-                    details.add(t.join());
-                }
-            } catch (RuntimeException ex) {
-                log.warn("Manual payment reconciliation timed out or failed: {}", ex.getMessage());
-                for (CompletableFuture<ReconcilePullResult> t : tasks) {
-                    if (t.isDone() && !t.isCompletedExceptionally()) details.add(t.join());
-                }
-            }
+            // Bounded chunks so the reconcile pool never rejects a task. A rejected task would leave its
+            // future uncompleted, hanging the await for the full batch timeout (the 120s freeze seen in prod
+            // when >80 orders matched) and returning partial results.
+            List<ReconcilePullResult> details = runBounded(jobs, reconcileExecutor, batchTimeoutSeconds, log);
 
             int updated = 0, unchanged = 0, errors = 0;
             for (ReconcilePullResult row : details) {
@@ -139,5 +123,39 @@ public class PaymentReconciliationService {
         } finally {
             releaseSweep();
         }
+    }
+
+    /**
+     * Run {@code jobs} on the reconcile pool in chunks no larger than the pool can hold
+     * ({@code maxPoolSize + queueCapacity}), awaiting each chunk before submitting the next. This
+     * guarantees a task is never rejected — a rejected task is silently discarded by the pool's
+     * drop handler, so its {@link CompletableFuture} would never complete and the {@code allOf}
+     * await would block for the whole timeout. Stops submitting once the overall deadline passes and
+     * returns the results that completed normally (partial, but bounded — never a dead 120 s freeze).
+     * Shared by the manual sweep and {@link PaymentReconciliationJob}.
+     */
+    static <T> List<T> runBounded(List<Supplier<T>> jobs, ThreadPoolTaskExecutor pool,
+                                  long timeoutSeconds, Logger log) {
+        int chunkSize = Math.max(1, pool.getMaxPoolSize() + pool.getQueueCapacity());
+        long deadlineNanos = System.nanoTime() + timeoutSeconds * 1_000_000_000L;
+        List<T> results = new ArrayList<>(jobs.size());
+        for (int i = 0; i < jobs.size(); i += chunkSize) {
+            List<Supplier<T>> chunk = jobs.subList(i, Math.min(i + chunkSize, jobs.size()));
+            List<CompletableFuture<T>> futures = new ArrayList<>(chunk.size());
+            for (Supplier<T> job : chunk) futures.add(CompletableFuture.supplyAsync(job, pool));
+            long remainingNanos = deadlineNanos - System.nanoTime();
+            try {
+                CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new))
+                        .orTimeout(Math.max(1, remainingNanos), TimeUnit.NANOSECONDS)
+                        .join();
+            } catch (RuntimeException ex) {
+                log.warn("Reconciliation chunk timed out or failed: {}", ex.getMessage());
+            }
+            for (CompletableFuture<T> f : futures) {
+                if (f.isDone() && !f.isCompletedExceptionally()) results.add(f.join());
+            }
+            if (System.nanoTime() >= deadlineNanos) break;
+        }
+        return results;
     }
 }

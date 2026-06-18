@@ -17,8 +17,7 @@ import org.springframework.stereotype.Component;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
+import java.util.function.Supplier;
 
 /**
  * Safety net for the asynchronous payment flow: a periodic sweep that rescues {@code pending}
@@ -111,24 +110,13 @@ public class PaymentReconciliationJob {
         int total = sPending.size() + rPending.size();
         if (total == 0) return;
 
-        List<CompletableFuture<Void>> tasks = new ArrayList<>(total);
-        for (Subscription s : sPending) {
-            tasks.add(CompletableFuture.runAsync(
-                    () -> reconcileSubscription(s, expireCutoff), reconcileExecutor));
-        }
-        for (Recharge r : rPending) {
-            tasks.add(CompletableFuture.runAsync(
-                    () -> reconcileRecharge(r, expireCutoff), reconcileExecutor));
-        }
+        // Bounded chunks so the reconcile pool never rejects a task (a dropped task's future would never
+        // complete and hang the await on the full batch timeout). Shared with the manual sweep.
+        List<Supplier<Void>> jobs = new ArrayList<>(total);
+        for (Subscription s : sPending) jobs.add(() -> { reconcileSubscription(s, expireCutoff); return null; });
+        for (Recharge r : rPending) jobs.add(() -> { reconcileRecharge(r, expireCutoff); return null; });
+        PaymentReconciliationService.runBounded(jobs, reconcileExecutor, batchTimeoutSeconds, log);
 
-        try {
-            CompletableFuture.allOf(tasks.toArray(CompletableFuture[]::new))
-                    .orTimeout(batchTimeoutSeconds, TimeUnit.SECONDS)
-                    .join();
-        } catch (RuntimeException ex) {
-            log.warn("Payment reconciliation: batch timed out or failed after {}s ({} order(s) in flight): {}",
-                    batchTimeoutSeconds, total, ex.getMessage());
-        }
         log.info("Payment reconciliation: processed {} pending order(s) from last {}s (subs={}, recharges={})",
                 total, lookbackSeconds, sPending.size(), rPending.size());
     }
