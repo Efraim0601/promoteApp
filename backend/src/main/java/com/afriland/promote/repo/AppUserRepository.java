@@ -15,4 +15,13 @@ public interface AppUserRepository extends JpaRepository<AppUser, String> {
     List<AppUser> findByRole(Role role);
     /** Direct reports of a node in the org tree (hierarchy scoping). */
     List<AppUser> findByParentUserId(String parentUserId);
+
+    /** Accounts holding {@code role} in ANY slot — the primary {@code role} column OR the multi-role
+     *  {@code roles} set. Unlike {@link #findByRole}, this also returns agents for whom AGENT is a
+     *  secondary role (e.g. a CHEF_EQUIPE who also sells), so they aren't dropped from the ranking /
+     *  referrer resolution. Filtered in code because {@code roles LIKE '%AGENT%'} would also match
+     *  PRINT_AGENT. */
+    default List<AppUser> findByEffectiveRole(Role role) {
+        return findAll().stream().filter(u -> u.effectiveRoles().contains(role)).toList();
+    }
 }

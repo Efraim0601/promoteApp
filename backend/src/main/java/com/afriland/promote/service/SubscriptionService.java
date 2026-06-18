@@ -147,14 +147,14 @@ public class SubscriptionService {
         // regardless of how the agent's phone was stored (with/without the +237 country code).
         String want = local9(phone);
         if (want.isEmpty()) return null;
-        return users.findByRole(Role.AGENT).stream()
+        return users.findByEffectiveRole(Role.AGENT).stream()
                 .filter(a -> a.getPhone() != null && local9(a.getPhone()).equals(want))
                 .findFirst().orElse(null);
     }
 
     /** Reduce a phone to its local Cameroon form (the last 9 digits), dropping any country code.
      *  Null-safe: a missing number yields an empty string (never matches). */
-    private static String local9(String phone) {
+    public static String local9(String phone) {
         if (phone == null) return "";
         String d = phone.replaceAll("\\D", "");
         return d.length() > 9 ? d.substring(d.length() - 9) : d;

@@ -76,9 +76,15 @@ public class StatsService {
                             + subs.countByPayStatusAndCreatedAtGreaterThanEqual(PayStatus.sara_pending, todayStart);
 
         List<AgentBreakdown> rows = new ArrayList<>();
-        for (AppUser a : users.findByRole(Role.AGENT)) {
+        // Enumerate everyone who holds the AGENT role (primary OR secondary) — not just those whose
+        // primary role is AGENT — so multi-role sellers aren't missing from the ranking. Count each
+        // agent's sales with the same attribution as their own dashboard (owned ∪ referred), so the
+        // published classement matches the "Mes souscriptions" figure agents see on their phone.
+        for (AppUser a : users.findByEffectiveRole(Role.AGENT)) {
+            String phone9 = SubscriptionService.local9(a.getPhone());
             rows.add(new AgentBreakdown(a.getId(), a.getName(), a.getAgency(), "agent",
-                    subs.countByAgentId(a.getId()), subs.collectedPaidByAgentId(a.getId())));
+                    subs.countOwnedOrReferred(a.getId(), phone9),
+                    subs.collectedPaidOwnedOrReferred(a.getId(), phone9)));
         }
         rows.add(new AgentBreakdown("online", "online", null, "online",
                 subs.countByAgentIdIsNull(), subs.collectedPaidOnline()));

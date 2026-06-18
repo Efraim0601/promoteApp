@@ -93,6 +93,19 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
             + "where s.agentId = :aid and s.payStatus = com.afriland.promote.model.PayStatus.paid")
     long collectedPaidByAgentId(@Param("aid") String agentId);
 
+    /** Sales attributed to an agent exactly as {@code mine()} does: owned (agentId) OR referred
+     *  (referrerPhone9). The {@code :phone9 <> ''} guard mirrors mine() — an agent with no phone on
+     *  file is credited by ownership only. Keeps the admin ranking consistent with each agent's own
+     *  dashboard counter. */
+    @Query("select count(s) from Subscription s "
+            + "where s.agentId = :aid or (:phone9 <> '' and s.referrerPhone9 = :phone9)")
+    long countOwnedOrReferred(@Param("aid") String agentId, @Param("phone9") String phone9);
+
+    @Query("select coalesce(sum(s.amount), 0) from Subscription s "
+            + "where (s.agentId = :aid or (:phone9 <> '' and s.referrerPhone9 = :phone9)) "
+            + "and s.payStatus = com.afriland.promote.model.PayStatus.paid")
+    long collectedPaidOwnedOrReferred(@Param("aid") String agentId, @Param("phone9") String phone9);
+
     @Query("select coalesce(sum(s.amount), 0) from Subscription s "
             + "where s.agentId is null and s.payStatus = com.afriland.promote.model.PayStatus.paid")
     long collectedPaidOnline();

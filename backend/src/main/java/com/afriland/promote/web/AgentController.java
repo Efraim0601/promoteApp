@@ -24,7 +24,7 @@ public class AgentController {
     /** Admin — list of relationship officers. */
     @GetMapping
     public List<AgentDto> list() {
-        return users.findByRole(Role.AGENT).stream().map(AgentDto::of).toList();
+        return users.findByEffectiveRole(Role.AGENT).stream().map(AgentDto::of).toList();
     }
 
     /** Public — resolve a referrer by phone for the client form ("recommandé par"). */
