@@ -387,6 +387,17 @@ public final class Dtos {
      *  primary field; the client confirms/corrects it). Any extracted field may be null. */
     public record ReceiptUploadResponse(String key, String reference, String payerPhone, Integer amount) {}
 
+    /** CNI OCR cross-check — the captured front image (data URL) plus the data the client typed,
+     *  so the server can read the card and compare. */
+    public record CniOcrRequest(@NotBlank String image, String prenom, String nom, String cni) {}
+
+    /** Result of the CNI OCR cross-check. {@code nameMatch}/{@code numberMatch} are null when OCR
+     *  could not read that field (nothing to compare) — only an explicit false is a contradiction.
+     *  {@code available} is false when OCR is disabled or read nothing, so the UI shows nothing. */
+    public record CniOcrResponse(boolean available, Boolean nameMatch, Boolean numberMatch,
+                                 String extractedNom, String extractedPrenom, String extractedNumero,
+                                 double confidence) {}
+
     /** Agent claims a QR (self) sale by phone + CNI; {@code niu} is optionally captured at claim time. */
     public record ClaimRequest(@NotBlank String phone, @NotBlank String cni, String niu) {}
 

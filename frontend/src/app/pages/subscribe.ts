@@ -108,6 +108,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   saraExtract = signal<{ payerPhone: string | null; amount: number | null } | null>(null);
   // True once the receipt's transaction number was auto-read from the upload (vs typed by hand).
   saraRefDetected = signal(false);
+  // Non-blocking CNI OCR cross-check: i18n key of the warning to show when the typed data does not
+  // match what OCR read on the card (null = no warning). Advisory only — never blocks the wizard.
+  cniOcrWarning = signal<string | null>(null);
 
   private pollTimer: ReturnType<typeof setTimeout> | null = null;
   private polling = false;
@@ -400,8 +403,23 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   onCniRecto(dataUrl: string) {
     this.form.cniRectoData = dataUrl; this.form.cniRectoKey = null;
     this.api.uploadImage(dataUrl, 'cni-recto').subscribe({ next: (r) => { this.form.cniRectoKey = r.key; this.persist(); }, error: () => {} });
+    this.crossCheckCni(dataUrl);
   }
-  onRetakeRecto() { this.form.cniRectoData = null; this.form.cniRectoKey = null; this.persist(); }
+  onRetakeRecto() { this.form.cniRectoData = null; this.form.cniRectoKey = null; this.cniOcrWarning.set(null); this.persist(); }
+
+  /** OCR the captured CNI front and warn (without blocking) if the typed name/number disagree.
+   *  Best-effort: any error, OCR disabled, or unreadable card → no warning shown. */
+  private crossCheckCni(dataUrl: string) {
+    this.cniOcrWarning.set(null);
+    this.api.cniOcr(dataUrl, { prenom: this.form.prenom, nom: this.form.nom, cni: this.form.cni }).subscribe({
+      next: (r) => {
+        if (!r.available) return;
+        if (r.numberMatch === false) this.cniOcrWarning.set('cni_ocr_number_mismatch');
+        else if (r.nameMatch === false) this.cniOcrWarning.set('cni_ocr_name_mismatch');
+      },
+      error: () => {},
+    });
+  }
 
   onCniVerso(dataUrl: string) {
     this.form.cniVersoData = dataUrl; this.form.cniVersoKey = null;

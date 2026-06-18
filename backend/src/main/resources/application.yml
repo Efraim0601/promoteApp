@@ -49,6 +49,14 @@ app:
     name: ${CASHIER_NAME:Caissier Promote}
   seed:
     test-agent: ${SEED_TEST_AGENT:true}   # set false in production to skip the demo agent
+  kyc:
+    cni-ocr:
+      # OCR the captured CNI front and cross-check it against the typed data (advisory warning,
+      # never blocking). OFF by default — turn on once Tesseract + fra tessdata are validated.
+      enabled: ${KYC_CNI_OCR_ENABLED:false}
+      # Tesseract language / tessdata dir; default to the SARA receipt OCR setup already in place.
+      lang: ${KYC_CNI_OCR_LANG:${APP_RECEIPT_OCR_LANG:fra}}
+      datapath: ${KYC_CNI_OCR_DATAPATH:${APP_RECEIPT_OCR_DATAPATH:}}
   # Public BASE URL of the app (root, NOT .../client) — used to build the login link in account
   # emails. The welcome email appends /login to it. e.g. https://<host> or https://<host>:8443
   public-url: ${APP_PUBLIC_URL:http://localhost:8973}

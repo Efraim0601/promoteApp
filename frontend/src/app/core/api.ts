@@ -159,6 +159,17 @@ export class Api {
   uploadReceipt(image: string): Observable<{ key: string; reference: string | null; payerPhone: string | null; amount: number | null }> {
     return this.http.post<{ key: string; reference: string | null; payerPhone: string | null; amount: number | null }>(`${this.base}/kyc/receipt`, { image });
   }
+  /** OCR the captured CNI front and cross-check it against the typed data. Advisory: `available`
+   *  is false when OCR is disabled/unreadable; nameMatch/numberMatch are null when not comparable. */
+  cniOcr(
+    image: string,
+    typed: { prenom: string; nom: string; cni: string },
+  ): Observable<{ available: boolean; nameMatch: boolean | null; numberMatch: boolean | null;
+                 extractedNom: string | null; extractedPrenom: string | null; extractedNumero: string | null; confidence: number }> {
+    return this.http.post<{ available: boolean; nameMatch: boolean | null; numberMatch: boolean | null;
+                            extractedNom: string | null; extractedPrenom: string | null; extractedNumero: string | null; confidence: number }>(
+      `${this.base}/kyc/cni-ocr`, { image, ...typed });
+  }
   /** Fetch a stored KYC image (staff) as a blob, for display. */
   imageBlob(ref: string, kind: string): Observable<Blob> {
     return this.http.get(`${this.base}/subscriptions/${ref}/image/${kind}`, { responseType: 'blob' });

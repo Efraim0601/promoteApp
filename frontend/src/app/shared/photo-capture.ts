@@ -2,6 +2,13 @@ import { AfterViewInit, Component, ElementRef, EventEmitter, Input, OnDestroy, O
 import { I18n } from '../core/i18n';
 import { IconComponent } from './icon';
 import { assessDocument, DocIssue } from './image-quality';
+import { FaceMesh } from './face-mesh';
+import { KYC_SMART_CAPTURE } from './constants';
+
+/** Live detection mode on the camera preview. 'face' = selfie head check, 'document' = ID auto-frame. */
+export type DetectMode = 'off' | 'face' | 'document';
+/** State surfaced by the live detector, drives the on-screen hint + the ready ring. */
+export type DetectState = 'idle' | 'searching' | 'none' | 'multiple' | 'too_small' | 'offcenter' | 'ready';
 
 /**
  * KYC photo capture via the device camera (getUserMedia). Supports the front
@@ -50,14 +57,34 @@ import { assessDocument, DocIssue } from './image-quality';
                  [style.display]="streaming() ? 'block' : 'none'"
                  [style.transform]="facing === 'user' ? 'scaleX(-1)' : 'none'"
                  style="width:100%;height:100%;object-fit:cover"></video>
+          <!-- Live detection overlay (face landmarks). Mirrored together with the video so points align. -->
+          @if (liveActive()) {
+            <canvas #overlay
+                    [style.transform]="facing === 'user' ? 'scaleX(-1)' : 'none'"
+                    style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>
+          }
           @if (!streaming()) {
             <ic [name]="round ? 'user' : 'idcard'" [size]="46" style="color:rgba(255,255,255,.35)"></ic>
           }
-          @if (!round && streaming()) {
+          <!-- Framing ring: dashed white while searching, solid green once the subject is well placed. -->
+          @if (liveActive()) {
+            <span [style.border-radius.px]="round ? boxW : 12"
+                  [style.border-color]="detectState() === 'ready' ? 'var(--success)' : 'rgba(255,255,255,.55)'"
+                  [style.border-style]="detectState() === 'ready' ? 'solid' : 'dashed'"
+                  style="position:absolute;inset:10px;border-width:3px;pointer-events:none;transition:border-color .2s"></span>
+          } @else if (!round && streaming()) {
             <span style="position:absolute;inset:10px;border:2px dashed rgba(255,255,255,.5);border-radius:10px;pointer-events:none"></span>
           }
           @if (shooting()) { <span style="position:absolute;inset:0;background:#fff;animation:pulse .9s ease"></span> }
         </div>
+        <!-- Live hint: what the detector wants the user to fix (or "hold still / auto-capturing"). -->
+        @if (liveActive() && detectMsg()) {
+          <p [style.color]="detectState() === 'ready' ? 'var(--success)' : 'var(--accent)'"
+             style="display:flex;gap:7px;align-items:center;font-size:12.5px;font-weight:700;text-align:center;line-height:1.4;max-width:280px;margin:0">
+            <ic [name]="detectState() === 'ready' ? 'check' : 'alert'" [size]="16" [sw]="2.5" style="flex:0 0 auto"></ic>
+            <span>{{ detectMsg() }}</span>
+          </p>
+        }
         <p class="muted" style="font-size:12px;text-align:center;line-height:1.45;max-width:260px">{{ guide || i18n.t('selfie_guide') }}</p>
         <!-- Progressive guidance: a short checklist of what makes a good shot. -->
         @if (tips.length) {
@@ -82,7 +109,7 @@ import { assessDocument, DocIssue } from './image-quality';
               </button>
             }
           } @else {
-            <button class="btn btn-primary" (click)="shoot()" [disabled]="shooting()" style="width:auto;padding:11px 18px">
+            <button class="btn btn-primary" (click)="shoot()" [disabled]="shooting() || !canShoot()" style="width:auto;padding:11px 18px">
               <ic name="camera" [size]="18"></ic> {{ i18n.t('cam_take') }}
             </button>
             @if (allowGallery) {
@@ -104,6 +131,7 @@ import { assessDocument, DocIssue } from './image-quality';
 })
 export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   i18n = inject(I18n);
+  private faceMesh = inject(FaceMesh);
 
   @Input() imageData: string | null = null;
   /** 'user' = front/selfie, 'environment' = rear. */
@@ -120,19 +148,57 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   @Input() qualityCheck = false;
   /** Allow picking from the gallery. Set false to FORCE the live camera (selfie / KYC integrity). */
   @Input() allowGallery = true;
+  /** Live detection on the preview: 'face' (selfie head check), 'document' (ID auto-frame), or off. */
+  @Input() detect: DetectMode = 'off';
+  /** Auto-fire the shutter once the subject is well placed for a few frames (manual button stays usable). */
+  @Input() autoCapture = true;
   @Output() captured = new EventEmitter<string>();
   @Output() retake = new EventEmitter<void>();
 
   @ViewChild('video') video?: ElementRef<HTMLVideoElement>;
   @ViewChild('canvas') canvas?: ElementRef<HTMLCanvasElement>;
   @ViewChild('file') file?: ElementRef<HTMLInputElement>;
+  @ViewChild('overlay') overlay?: ElementRef<HTMLCanvasElement>;
 
   streaming = signal(false);
   starting = signal(false);
   shooting = signal(false);
   /** Last blocking quality issue (null = none); drives the on-screen guidance message. */
   qualityIssue = signal<DocIssue | null>(null);
+  /** Current live-detector state (face/document), drives the ring colour + hint. */
+  detectState = signal<DetectState>('idle');
   private stream: MediaStream | null = null;
+
+  // --- live detection loop state ---
+  private rafId = 0;
+  private lastDetectTs = 0;
+  /** Consecutive "ready" frames; auto-capture fires once this crosses the threshold. */
+  private readyStreak = 0;
+  /** Frames needed in a row before auto-firing (anti-jitter: ~0.7s at the throttled rate). */
+  private static readonly READY_FRAMES = 5;
+  /** Detector cadence — ~10 fps is plenty for framing and keeps the model cheap on mobile. */
+  private static readonly DETECT_INTERVAL_MS = 100;
+
+  /** True when the live detector should run for this capture (mode set, flag on, camera live). */
+  liveActive(): boolean {
+    return KYC_SMART_CAPTURE && this.detect !== 'off' && this.streaming();
+  }
+
+  /** Manual shutter availability: blocked in face mode until a valid head is in frame (anti-spoof).
+   *  'idle' means the detector isn't running (model failed to load) → fall back to manual capture. */
+  canShoot(): boolean {
+    if (!this.liveActive() || this.detect !== 'face') return true;
+    const s = this.detectState();
+    return s === 'ready' || s === 'idle';
+  }
+
+  /** Localised hint for the current detector state (empty while idle/searching with nothing to say). */
+  detectMsg(): string {
+    const s = this.detectState();
+    if (s === 'idle') return '';
+    if (s === 'ready') return this.i18n.t(this.autoCapture ? 'cap_hold_still' : 'cap_ready');
+    return this.i18n.t('cap_' + s);
+  }
 
   ngAfterViewInit() { /* camera starts on user action */ }
 
@@ -148,9 +214,114 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
       this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: this.facing }, audio: false });
       this.streaming.set(true);
       setTimeout(() => { if (this.video) this.video.nativeElement.srcObject = this.stream; }, 0);
+      this.startDetection();
     } catch {
       this.simulate(); // no camera / denied / insecure origin
     }
+  }
+
+  /** Spin up the live detector loop (face landmarks / document framing) once the camera is live. */
+  private async startDetection() {
+    if (!this.liveActive()) return;
+    this.readyStreak = 0;
+    this.detectState.set('searching');
+    // The face model loads lazily; if it fails we silently drop face detection (manual capture stays).
+    if (this.detect === 'face' && !(await this.faceMesh.ready())) {
+      this.detectState.set('idle');   // model unavailable → no gating, no overlay hints
+      return;
+    }
+    if (!this.streaming()) return;     // camera was closed while the model loaded
+    this.lastDetectTs = 0;
+    const tick = (ts: number) => {
+      if (!this.streaming()) return;
+      this.rafId = requestAnimationFrame(tick);
+      if (ts - this.lastDetectTs < PhotoCaptureComponent.DETECT_INTERVAL_MS) return;
+      this.lastDetectTs = ts;
+      this.detectTick(ts);
+    };
+    this.rafId = requestAnimationFrame(tick);
+  }
+
+  /** One detection step: assess the frame, update the ready state, and auto-fire when stable. */
+  private detectTick(ts: number) {
+    const v = this.video?.nativeElement;
+    if (!v || !v.videoWidth) return;
+    const ready = this.detect === 'face' ? this.tickFace(v, ts) : this.tickDocument(v);
+    if (!ready) { this.readyStreak = 0; return; }
+    this.readyStreak++;
+    if (this.autoCapture && this.readyStreak >= PhotoCaptureComponent.READY_FRAMES) {
+      this.stopDetection();
+      this.shoot();
+    }
+  }
+
+  /**
+   * Face mode: run FaceLandmarker, draw the landmark points, and decide whether a single, large,
+   * roughly-centred head is in frame. Returns true when the selfie is good to take.
+   */
+  private tickFace(v: HTMLVideoElement, ts: number): boolean {
+    const { count, face } = this.faceMesh.detect(v, ts);
+    this.drawFaceOverlay(v, face);
+    if (count === 0 || !face) { this.detectState.set('none'); return false; }
+    if (count > 1) { this.detectState.set('multiple'); return false; }
+    if (face.fill < 0.22) { this.detectState.set('too_small'); return false; }
+    if (Math.abs(face.cx - 0.5) > 0.22 || Math.abs(face.cy - 0.5) > 0.26) { this.detectState.set('offcenter'); return false; }
+    this.detectState.set('ready');
+    return true;
+  }
+
+  /** Document mode: reuse the post-capture quality gate live; ready when the card is well framed. */
+  private tickDocument(v: HTMLVideoElement): boolean {
+    const probe = this.frameToCanvas(v, 320);
+    const issue = assessDocument(probe).issue;
+    if (issue === 'too_far' || issue === 'no_card') { this.detectState.set('too_small'); return false; }
+    if (issue) { this.detectState.set('searching'); return false; }
+    this.detectState.set('ready');
+    return true;
+  }
+
+  /** Draw the face landmarks onto the overlay canvas, mapping video coords through the cover-crop. */
+  private drawFaceOverlay(v: HTMLVideoElement, face: { points: { x: number; y: number }[] } | null) {
+    const cv = this.overlay?.nativeElement;
+    if (!cv) return;
+    if (cv.width !== this.boxW || cv.height !== this.boxH) { cv.width = this.boxW; cv.height = this.boxH; }
+    const ctx = cv.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, cv.width, cv.height);
+    if (!face) return;
+    // Same cover-crop maths as shoot(): map a normalised video point into the displayed box.
+    const cr = cv.width / cv.height, vr = v.videoWidth / v.videoHeight;
+    let sw = v.videoWidth, sh = v.videoHeight, sx = 0, sy = 0;
+    if (vr > cr) { sw = v.videoHeight * cr; sx = (v.videoWidth - sw) / 2; }
+    else { sh = v.videoWidth / cr; sy = (v.videoHeight - sh) / 2; }
+    ctx.fillStyle = this.detectState() === 'ready' ? 'rgba(34,197,94,.9)' : 'rgba(255,255,255,.75)';
+    for (const p of face.points) {
+      const bx = ((p.x * v.videoWidth) - sx) / sw * cv.width;
+      const by = ((p.y * v.videoHeight) - sy) / sh * cv.height;
+      ctx.fillRect(bx - 0.6, by - 0.6, 1.6, 1.6);
+    }
+  }
+
+  /** Cover-fit the current video frame into a small square-ish canvas for live document analysis. */
+  private frameToCanvas(v: HTMLVideoElement, targetW: number): HTMLCanvasElement {
+    const cr = this.boxW / this.boxH;
+    const w = targetW, h = Math.max(1, Math.round(targetW / cr));
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    const ctx = c.getContext('2d')!;
+    const vr = v.videoWidth / v.videoHeight;
+    let sw = v.videoWidth, sh = v.videoHeight, sx = 0, sy = 0;
+    if (vr > cr) { sw = v.videoHeight * cr; sx = (v.videoWidth - sw) / 2; }
+    else { sh = v.videoWidth / cr; sy = (v.videoHeight - sh) / 2; }
+    ctx.drawImage(v, sx, sy, sw, sh, 0, 0, w, h);
+    return c;
+  }
+
+  /** Stop the detection loop (camera closed, shot taken). */
+  private stopDetection() {
+    if (this.rafId) cancelAnimationFrame(this.rafId);
+    this.rafId = 0;
+    this.readyStreak = 0;
   }
 
   flip() {
@@ -162,6 +333,7 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     const v = this.video?.nativeElement;
     const c = this.canvas?.nativeElement;
     if (!v || !c) return;
+    this.stopDetection();   // freeze the live loop the instant we commit to a frame (manual or auto)
     this.shooting.set(true);
     const w = this.round ? 320 : 640, h = this.round ? 320 : 400;
     c.width = w; c.height = h;
@@ -243,9 +415,11 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     this.captured.emit(this.imageData);
   }
 
-  retakePhoto() { this.imageData = null; this.qualityIssue.set(null); this.retake.emit(); }
+  retakePhoto() { this.imageData = null; this.qualityIssue.set(null); this.detectState.set('idle'); this.retake.emit(); }
 
   private stop() {
+    this.stopDetection();
+    this.detectState.set('idle');
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
     this.streaming.set(false);

@@ -279,10 +279,15 @@
       @else if (step() === 1) {
         <div style="font-size:13px;font-weight:700;margin-top:2px">{{ docLabel }} — {{ i18n.t('side_recto') }}</div>
         <photo-capture [imageData]="form.cniRectoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
+          detect="document" [autoCapture]="true"
           [guide]="i18n.t('cni_recto_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniRecto($event)" (retake)="onRetakeRecto()"></photo-capture>
+        @if (cniOcrWarning()) {
+          <div class="err" style="text-align:center;font-weight:700;font-size:12.5px">{{ i18n.t(cniOcrWarning()!) }}</div>
+        }
         @if (needsVerso) {
           <div style="font-size:13px;font-weight:700;margin-top:6px">{{ docLabel }} — {{ i18n.t('side_verso') }}</div>
           <photo-capture [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
+            detect="document" [autoCapture]="true"
             [guide]="i18n.t('cni_verso_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniVerso($event)" (retake)="onRetakeVerso()"></photo-capture>
         }
         @if (touched() && !docsOk) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('required') }}</div> }
@@ -291,7 +296,7 @@
       <!-- Step 2: client photo -->
       @else if (step() === 2) {
         <photo-capture [imageData]="form.selfieData" facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
-          [allowGallery]="false"
+          [allowGallery]="false" detect="face" [autoCapture]="true"
           [guide]="i18n.t('photo_guide')" (captured)="onSelfie($event)" (retake)="onRetakeSelfie()"></photo-capture>
       }
 

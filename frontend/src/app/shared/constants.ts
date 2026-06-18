@@ -18,6 +18,14 @@ export const payById = (id: string): PayMethod => PAY_METHODS.find((p) => p.id =
 export const LIVE_REFRESH_MS = 15000;
 
 /**
+ * Smart KYC capture: live face detection on the selfie (reject filming something other than a
+ * head) + live auto-framing/auto-capture on the CNI. Degrades gracefully — if the MediaPipe model
+ * can't load, the camera falls back to plain manual capture. Set to false to revert every capture
+ * screen to the legacy manual behaviour without touching the components.
+ */
+export const KYC_SMART_CAPTURE = true;
+
+/**
  * Cameroon mobile prefixes per operator (9 digits, starting with 6). Used to ensure the
  * Mobile Money number entered matches the chosen operator before letting the client continue.
  *  - MTN:    67·····, 650–654····, 680–684····

@@ -1,8 +1,14 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.kyc.CniData;
+import com.afriland.promote.kyc.CniExtractor;
+import com.afriland.promote.kyc.CniMatch;
+import com.afriland.promote.kyc.CniMatcher;
 import com.afriland.promote.receipt.SaraReceipt;
 import com.afriland.promote.receipt.SaraReceiptExtractor;
 import com.afriland.promote.storage.ImageStorage;
+import com.afriland.promote.web.dto.Dtos.CniOcrRequest;
+import com.afriland.promote.web.dto.Dtos.CniOcrResponse;
 import com.afriland.promote.web.dto.Dtos.ImageKeyResponse;
 import com.afriland.promote.web.dto.Dtos.ImageUpload;
 import com.afriland.promote.web.dto.Dtos.ReceiptUploadResponse;
@@ -36,10 +42,15 @@ public class KycController {
 
     private final ImageStorage storage;
     private final SaraReceiptExtractor receiptExtractor;
+    private final CniExtractor cniExtractor;
+    private final CniMatcher cniMatcher;
 
-    public KycController(ImageStorage storage, SaraReceiptExtractor receiptExtractor) {
+    public KycController(ImageStorage storage, SaraReceiptExtractor receiptExtractor,
+                         CniExtractor cniExtractor, CniMatcher cniMatcher) {
         this.storage = storage;
         this.receiptExtractor = receiptExtractor;
+        this.cniExtractor = cniExtractor;
+        this.cniMatcher = cniMatcher;
     }
 
     @PostMapping("/image")
@@ -63,6 +74,24 @@ public class KycController {
         String key = storage.store(d.data, d.contentType, RECEIPT_KIND);
         SaraReceipt r = receiptExtractor.extract(d.data, d.contentType);
         return ResponseEntity.ok(new ReceiptUploadResponse(key, r.reference(), r.payerPhone(), r.amount()));
+    }
+
+    /**
+     * OCR the captured CNI front image and cross-check it against the data the client typed.
+     * Advisory only: returns per-field match flags so the UI can warn on a contradiction. When OCR
+     * is disabled or reads nothing, {@code available} is false and the UI shows nothing.
+     */
+    @PostMapping("/cni-ocr")
+    public ResponseEntity<CniOcrResponse> cniOcr(@Valid @RequestBody CniOcrRequest req) {
+        Decoded d = decode(req.image(), false);   // CNI is image-only (no PDF)
+        CniData ocr = cniExtractor.extract(d.data);
+        boolean available = cniExtractor.isEnabled() && !ocr.isEmpty();
+        if (!available) {
+            return ResponseEntity.ok(new CniOcrResponse(false, null, null, null, null, null, 1.0));
+        }
+        CniMatch m = cniMatcher.match(ocr, req.prenom(), req.nom(), req.cni());
+        return ResponseEntity.ok(new CniOcrResponse(true, m.nameMatch(), m.numberMatch(),
+                m.extractedNom(), m.extractedPrenom(), m.extractedNumero(), m.confidence()));
     }
 
     /** Decode + validate a data URL / base64 payload. PDF is allowed only for receipts. */
