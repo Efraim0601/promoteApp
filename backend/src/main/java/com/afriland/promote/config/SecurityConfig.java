@@ -106,7 +106,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/recharges").hasAnyRole("CASHIER", "ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/recharges/pending-fulfillment").hasAnyRole("CASHIER", "ADMIN")
                 .requestMatchers("/api/audit/**").hasRole("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/api/collectes").hasAnyRole("ADMIN", "MANAGER")
+                // Per-row collecte list: admin/manager AND the collecte supervisor (for the detail
+                // export on the stats page — same global scope as the stats they already see).
+                .requestMatchers(HttpMethod.GET, "/api/collectes").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
                 // Collecte stats: admin/manager AND the dedicated collecte supervisor (separate stats view).
                 .requestMatchers(HttpMethod.GET, "/api/collectes/stats").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR")
 

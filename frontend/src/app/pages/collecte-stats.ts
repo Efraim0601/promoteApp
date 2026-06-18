@@ -3,7 +3,7 @@ import * as XLSX from 'xlsx';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
-import { CollecteStats } from '../core/models';
+import { Collecte, CollecteStats } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { SpinnerComponent } from '../shared/spinner';
@@ -89,6 +89,7 @@ export class CollecteStatsComponent implements OnInit {
   private api = inject(Api);
 
   stats = signal<CollecteStats | null>(null);
+  rows = signal<Collecte[]>([]);     // per-row collectes, for the detail sheet in the export
   loading = signal(true);
 
   ngOnInit() { this.load(); }
@@ -98,6 +99,12 @@ export class CollecteStatsComponent implements OnInit {
     this.api.collecteStats().subscribe({
       next: (s) => { this.stats.set(s); this.loading.set(false); },
       error: () => { this.stats.set(null); this.loading.set(false); },
+    });
+    // Detail rows are supplementary (only used by the Excel export) — load them independently so a
+    // failure here never blocks the stats page.
+    this.api.collectes().subscribe({
+      next: (rows) => this.rows.set(rows),
+      error: () => this.rows.set([]),
     });
   }
 
@@ -134,6 +141,38 @@ export class CollecteStatsComponent implements OnInit {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws1, 'Résumé');
     XLSX.utils.book_append_sheet(wb, ws2, 'Commerciaux');
+
+    // Sheet 3: Détail des collectes (même format que l'export admin).
+    const rows = this.rows();
+    if (rows.length) {
+      const detailRows: (string | number)[][] = [
+        ['Référence', 'Commercial', 'Produit', 'Nom client', 'Téléphone', 'N° compte', 'N° carte', 'Type carte', 'Date'],
+        ...rows.map(c => [
+          c.ref,
+          c.collectedByName ?? '',
+          this.i18n.t('prod_' + c.product),
+          c.clientNom ?? '',
+          c.clientPhone ?? '',
+          c.accountNumber ?? '',
+          c.cardNumber ?? '',
+          c.cardType ? this.i18n.t('ct_' + c.cardType) : '',
+          this.fmtDateTime(c.createdAt),
+        ]),
+      ];
+      const ws3 = XLSX.utils.aoa_to_sheet(detailRows);
+      ws3['!cols'] = [{ wch: 12 }, { wch: 22 }, { wch: 18 }, { wch: 20 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, ws3, 'Détail');
+    }
+
     XLSX.writeFile(wb, `collecte-stats_${today}.xlsx`);
+  }
+
+  private fmtDateTime(iso: string) {
+    if (!iso) return '';
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return iso;
+    return d.toLocaleString(this.i18n.lang() === 'en' ? 'en-GB' : 'fr-FR', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
   }
 }
