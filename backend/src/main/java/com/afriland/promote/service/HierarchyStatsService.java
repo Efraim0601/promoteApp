@@ -61,8 +61,11 @@ public class HierarchyStatsService {
         for (AppUser m : members) {
             String id = m.getId();
 
-            long subsCount = includeCard ? subs.countByAgentId(id) : 0;
-            long subsAmount = includeCard ? subs.collectedPaidByAgentId(id) : 0;
+            // Same attribution as the member's own dashboard (owned ∪ referred sales), so a team /
+            // supervisor view matches the "Mes souscriptions" figure each member sees — see StatsService.
+            String phone9 = SubscriptionService.local9(m.getPhone());
+            long subsCount = includeCard ? subs.countOwnedOrReferred(id, phone9) : 0;
+            long subsAmount = includeCard ? subs.collectedPaidOwnedOrReferred(id, phone9) : 0;
 
             long collectesCount = 0;
             if (includeBank) {

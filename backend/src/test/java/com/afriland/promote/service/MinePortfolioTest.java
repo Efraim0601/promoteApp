@@ -24,22 +24,23 @@ class MinePortfolioTest {
     @Autowired SubscriptionService service;
     @Autowired SubscriptionRepository subs;
 
-    private CreateSubscriptionRequest req(String referrerPhone) {
+    private CreateSubscriptionRequest req(String cni, String referrerPhone) {
         return new CreateSubscriptionRequest(
-                "Jean", "Kamga", "M", "cni", "1234ABCD", null, "12/04/2030", "677001122",
+                "Jean", "Kamga", "M", "cni", cni, null, "12/04/2030", "677001122",
                 "jean@example.com", "Bonamoussadi", "Littoral", "Douala",
                 "cash", null, "promote", false, null, null, null, null, null, referrerPhone);
     }
 
     @Test
     void mineUnionsOwnedAndReferredButExcludesUnrelated() {
+        // Distinct CNIs — these are three different client files; same-CNI would trip the two-per-CNI cap.
         // Owned by a1 (a1 is the selling agent, no referrer).
-        Subscription owned = service.create(req(null), "agent", "a1");
+        Subscription owned = service.create(req("1234ABCD", null), "agent", "a1");
         // Referred to a1 but SOLD by another agent — a1 is only the parrain (agentId != a1). This is the
         // case the in-memory union used to cover and the new referrer_phone9 index must still catch.
-        Subscription referred = service.create(req("+237 699 123 456"), "agent", "a2");
+        Subscription referred = service.create(req("5678EFGH", "+237 699 123 456"), "agent", "a2");
         // Unrelated to a1 entirely.
-        Subscription other = service.create(req(null), "agent", "a2");
+        Subscription other = service.create(req("9012IJKL", null), "agent", "a2");
 
         List<String> mine = service.mine("a1").stream().map(Subscription::getRef).toList();
         assertTrue(mine.contains(owned.getRef()), "owned sale appears");

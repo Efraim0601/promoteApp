@@ -36,6 +36,17 @@ class UserEnabledTest {
         u.setPasswordHash(encoder.encode("Promote1"));
         u.setEnabled(true);
         users.save(u);
+
+        // Ensure the "admin" principal the @WithMockUser tests act as actually exists — the suite shares
+        // one H2 instance, and a sibling test may have removed the seeded admin, which would turn the
+        // self-disable check into a 404 instead of "cannot_disable_self".
+        AppUser admin = users.findById("admin").orElseGet(() -> AppUser.builder().id("admin").build());
+        admin.setName("Administrateur");
+        admin.setEmail("admin@test.cm");
+        admin.setRole(Role.ADMIN);
+        admin.setPasswordHash(encoder.encode("Promote1"));
+        admin.setEnabled(true);
+        users.save(admin);
     }
 
     private String enabled(boolean b) { return "{\"enabled\":" + b + "}"; }

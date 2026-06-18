@@ -9,7 +9,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** One Promote card per CNI — duplicate subscriptions are refused. */
+/** Two Promote cards per CNI max — a third active subscription is refused. */
 @SpringBootTest
 class CniDuplicateTest {
 
@@ -23,13 +23,18 @@ class CniDuplicateTest {
     }
 
     @Test
-    void rejectsSecondSubscriptionWithSameCniAfterPayment() {
+    void allowsSecondButRejectsThirdSubscriptionWithSameCni() {
+        // First card — paid.
         var first = service.create(momo("AB12CD34", "690011122"), "self", null);
         service.applyPayment(first.getRef(), "validate", null);
         assertEquals(PayStatus.paid, service.byRef(first.getRef()).getPayStatus());
 
+        // Second card with the same CNI (normalised: spaces/dashes ignored) is allowed — the limit is two.
+        assertDoesNotThrow(() -> service.create(momo("AB 12-CD34", "690033344"), "self", null));
+
+        // Third active card with the same CNI is refused.
         ResponseStatusException ex = assertThrows(ResponseStatusException.class,
-                () -> service.create(momo("AB 12-CD34", "690033344"), "self", null));
+                () -> service.create(momo("AB12CD34", "690044455"), "self", null));
         assertEquals(409, ex.getStatusCode().value());
         assertEquals("cni_exists", ex.getReason());
     }
