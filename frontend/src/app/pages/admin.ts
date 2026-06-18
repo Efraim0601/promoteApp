@@ -93,13 +93,13 @@ import * as XLSX from 'xlsx';
 
           <!-- 3 headline KPIs -->
           <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px">
+            <div class="kpi" [title]="i18n.t('rch_kpi_success_desc')">
+              <div class="kv" style="color:var(--success)">{{ k.paid }}</div>
+              <div class="kl">{{ i18n.t('rch_kpi_success') }}</div>
+            </div>
             <div class="kpi" [title]="i18n.t('rch_kpi_total_desc')">
               <div class="kv">{{ k.total }}</div>
               <div class="kl">{{ i18n.t('rch_kpi_total') }}</div>
-            </div>
-            <div class="kpi" [title]="i18n.t('rch_kpi_rate_desc')">
-              <div class="kv" style="color:var(--success)">{{ rate(k.paid, k.total) }}%</div>
-              <div class="kl">{{ i18n.t('pay_funnel_success_rate') }}</div>
             </div>
             <div class="kpi" [title]="i18n.t('rch_kpi_amount_desc')">
               <div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(k.amount) }}</div>
@@ -230,7 +230,7 @@ import * as XLSX from 'xlsx';
 
       <!-- ===== KPIs globaux (filtrables par date) ===== -->
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
-        <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
+        <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--primary)">{{ stats()?.totalPrinted ?? 0 }}</div><div class="kl">Cartes récupérées{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
         <div class="kpi" style="position:relative;overflow:hidden">
           <div class="kv amount-block" style="color:var(--primary)">
@@ -241,7 +241,7 @@ import * as XLSX from 'xlsx';
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px">
-        <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
+        <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
         <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
         <div class="kpi" (click)="showFailed()" style="cursor:pointer"
              [style.borderColor]="technicalFailed() ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'"
