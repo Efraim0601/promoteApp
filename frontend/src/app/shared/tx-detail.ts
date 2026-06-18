@@ -86,7 +86,7 @@ import { PhotoCaptureComponent } from './photo-capture';
         @if (t.payStatus === 'failed') {
           <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_fail_cause') }}</span><span class="val" style="color:var(--accent)">{{ failLabel(t.failureCategory) }}@if (t.paymentMessage) { · {{ t.paymentMessage }} }</span></div>
         }
-        <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ t.referrerName || '—' }}</span></div>
+        <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ t.referrerName || t.referrerPhone || '—' }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_referrer_phone') }}</span><span class="val">{{ t.referrerPhone || '—' }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ t.delivery === 'agence' && t.pickupAgencyName ? t.pickupAgencyName : i18n.t('del_' + t.delivery + '_title') }}</span></div>
         <div class="srow" style="padding:8px 0"><span class="lbl">{{ i18n.t('tx_channel') }}</span><span class="val">{{ t.channel === 'self' ? i18n.t('online_channel') : (sellerName ? (i18n.t('tx_agent') + ' · ' + sellerName) : i18n.t('tx_agent')) }}</span></div>

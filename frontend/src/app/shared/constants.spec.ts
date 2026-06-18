@@ -38,4 +38,10 @@ describe('recordStatus', () => {
     expect(recordStatus(base)).toBe('pending');                                          // pending = en attente de paiement
     expect(recordStatus({ ...base, payStatus: 'paid' } as Subscription)).toBe('paid');   // payée, pas encore imprimée
   });
+  it('distingue le délai dépassé (TIMEOUT) du vrai échec', () => {
+    // Un paiement failed dont la cause est un prompt USSD expiré → statut « expired » (libellé « Expiré »).
+    expect(recordStatus({ ...base, payStatus: 'failed', failureCategory: 'TIMEOUT' } as Subscription)).toBe('expired');
+    // Toute autre cause d'échec (rejet, solde, PIN…) reste « failed ».
+    expect(recordStatus({ ...base, payStatus: 'failed', failureCategory: 'INSUFFICIENT_FUNDS' } as Subscription)).toBe('failed');
+  });
 });

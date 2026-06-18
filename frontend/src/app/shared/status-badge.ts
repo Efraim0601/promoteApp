@@ -22,6 +22,7 @@ export class StatusBadgeComponent {
     fulfilled: { cls: 'success', key: 'st_fulfilled' },  // recharge créditée & validée (terminé)
     printed: { cls: 'success', key: 'st_printed' },      // imprimée (terminé)
     failed: { cls: 'failed', key: 'st_failed' },
+    expired: { cls: 'expired', key: 'st_expired' },     // délai dépassé (prompt non validé) — pas un rejet, à reprendre
     awaiting: { cls: 'pending', key: 'st_pending' },     // rétro-compatibilité
   };
   get cls(): string { return (this.map[this.status] ?? this.map['pending']).cls; }

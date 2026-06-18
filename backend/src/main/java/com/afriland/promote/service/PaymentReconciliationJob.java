@@ -53,6 +53,11 @@ public class PaymentReconciliationJob {
     private long expireAfterSeconds;
     @Value("${app.payment.reconcile.lookback-seconds:3600}")
     private long lookbackSeconds;
+    /** Recovery pass: also re-pull live status for orders already marked {@code failed} created in the
+     *  last N seconds, so a late COMPLETED (gateway settled after our local timeout / EXPIRED) is
+     *  recovered to {@code paid}. 0 = disabled (default) → no extra gateway calls. */
+    @Value("${app.payment.reconcile.recheck-failed-seconds:0}")
+    private long recheckFailedSeconds;
     @Value("${app.payment.reconcile.batch:200}")
     private int batch;
     @Value("${app.payment.reconcile.batch-timeout-seconds:120}")
@@ -91,10 +96,16 @@ public class PaymentReconciliationJob {
 
     private void runSweep() {
         Instant now = Instant.now();
+        var page = PageRequest.of(0, Math.max(1, batch));
+        runPendingSweep(now, page);
+        runFailedRecheck(now, page);
+    }
+
+    /** Re-pull live status for {@code pending} orders; force-fail those past the expiry window. */
+    private void runPendingSweep(Instant now, PageRequest page) {
         Instant windowStart = now.minusSeconds(Math.max(60, lookbackSeconds));
         Instant pullCutoff = now.minusSeconds(pullAfterSeconds);
         Instant expireCutoff = now.minusSeconds(expireAfterSeconds);
-        var page = PageRequest.of(0, Math.max(1, batch));
 
         if (!windowStart.isBefore(pullCutoff)) {
             log.debug("Payment reconciliation: lookback window empty (lookback={}s, pullAfter={}s)",
@@ -119,6 +130,34 @@ public class PaymentReconciliationJob {
 
         log.info("Payment reconciliation: processed {} pending order(s) from last {}s (subs={}, recharges={})",
                 total, lookbackSeconds, sPending.size(), rPending.size());
+    }
+
+    /**
+     * Recovery pass for orders already marked {@code failed} in the last {@code recheck-failed-seconds}:
+     * re-pull a live status via {@code reconcileFromGateway}, which recovers {@code failed → paid} when
+     * the gateway settled late (a COMPLETED arriving after our local timeout / an EXPIRED that the client
+     * actually confirmed). Disabled when {@code recheck-failed-seconds <= 0}. Bounded by the same batch cap
+     * as the pending sweep, and idempotent (a row the gateway still reports failed stays failed).
+     */
+    private void runFailedRecheck(Instant now, PageRequest page) {
+        if (recheckFailedSeconds <= 0) return;
+        Instant windowStart = now.minusSeconds(recheckFailedSeconds);
+
+        List<Subscription> sFailed = subs.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+                PayStatus.failed, windowStart, now, page);
+        List<Recharge> rFailed = recharges.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+                PayStatus.failed, windowStart, now, page);
+
+        int total = sFailed.size() + rFailed.size();
+        if (total == 0) return;
+
+        List<Supplier<Void>> jobs = new ArrayList<>(total);
+        for (Subscription s : sFailed) jobs.add(() -> { subscriptionService.reconcileFromGateway(s.getRef()); return null; });
+        for (Recharge r : rFailed) jobs.add(() -> { rechargeService.reconcileFromGateway(r.getRef()); return null; });
+        PaymentReconciliationService.runBounded(jobs, reconcileExecutor, batchTimeoutSeconds, log);
+
+        log.info("Payment reconciliation: re-checked {} recently-failed order(s) from last {}s (subs={}, recharges={})",
+                total, recheckFailedSeconds, sFailed.size(), rFailed.size());
     }
 
     private void reconcileSubscription(Subscription s, Instant expireCutoff) {

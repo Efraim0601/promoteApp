@@ -83,6 +83,11 @@ app:
       interval-ms: ${PAYMENT_RECONCILE_INTERVAL_MS:300000}      # 5 min between sweeps
       pull-after-seconds: ${PAYMENT_RECONCILE_PULL_AFTER:20}   # min age before we pull live status
       lookback-seconds: ${PAYMENT_RECONCILE_LOOKBACK_SECONDS:3600} # scheduled sweep only: orders from the last hour
+      # Recovery pass: also re-pull live status for orders already `failed` created in the last N seconds,
+      # so a late COMPLETED (gateway settled after our local timeout / EXPIRED) is recovered to `paid`.
+      # 0 = disabled (no extra gateway calls). A modest window (e.g. 1800 = 30 min) re-checks each failed
+      # row a few times before it ages out, bounded by `batch`.
+      recheck-failed-seconds: ${PAYMENT_RECONCILE_RECHECK_FAILED:0}
       # Manual reconciliation (POST /api/payment/reconcile?hours=N) window cap, in HOURS — independent
       # of the scheduled lookback above so an operator can reconcile the last 24 h / 48 h on demand.
       # The per-run batch cap still bounds the work. Default 168 h (7 days).

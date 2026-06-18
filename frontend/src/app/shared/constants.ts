@@ -78,7 +78,10 @@ export const DELIVERY_MODES = ['promote', 'agence'];
 /** Overall record status for badges — ports components.jsx recordStatus(). */
 export function recordStatus(r: Subscription): string {
   // A failed payment must never be hidden by a (mistaken) print — surface the failure first.
-  if (r.payStatus === 'failed') return 'failed';
+  // Un délai dépassé (prompt USSD jamais validé, sans débit) est distingué d'un vrai rejet :
+  // statut « expired » → libellé « Expiré » au lieu de l'alarmant « Échouée ». Reste un payStatus
+  // 'failed' côté données (filtres/stats inchangés) — seul le badge change.
+  if (r.payStatus === 'failed') return r.failureCategory === 'TIMEOUT' ? 'expired' : 'failed';
   if (r.printed) return 'printed';
   if (r.payStatus === 'cash') return 'cash';
   if (r.payStatus === 'sara_pending') return 'sara_pending';

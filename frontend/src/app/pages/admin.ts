@@ -1354,11 +1354,11 @@ import * as XLSX from 'xlsx';
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px">
         <div class="kpi" style="padding:10px 12px">
           <div class="kv" style="font-size:22px">{{ txKpiTotal() }}</div>
-          <div class="kl">Total souscriptions</div>
+          <div class="kl">{{ i18n.t('kpi_total') }}</div>
         </div>
         <div class="kpi" style="padding:10px 12px">
           <div class="kv" style="font-size:22px;color:var(--success)">{{ txKpiPaid() }}</div>
-          <div class="kl">Payées avec succès</div>
+          <div class="kl">{{ i18n.t('kpi_success') }}</div>
         </div>
         <div class="kpi" style="padding:10px 12px;cursor:pointer"
              [style.borderColor]="txKpiCash() ? 'color-mix(in srgb,var(--warning) 45%,var(--border))' : 'var(--border)'"

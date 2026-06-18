@@ -351,6 +351,7 @@ html, body { margin: 0; height: 100%; }
 .badge.pending{ background:var(--warning-soft); color:var(--warning); }       /* ambre — en attente / action requise */
 .badge.success{ background:var(--success-soft); color:var(--success-700); }   /* vert — terminé */
 .badge.failed{ background:var(--accent-soft); color:var(--accent); }           /* rouge — réservé aux échecs */
+.badge.expired{ background:var(--surface-2); color:var(--muted); }             /* gris neutre — délai dépassé, sans débit, à reprendre */
 .badge.info{ background:var(--info-soft); color:var(--info); }                 /* bleu — payé, étape suivante (imprimer / créditer) */
 .promote-app[data-theme="fintech"] .badge.pending{ color:var(--af-gold); }
 .promote-app[data-theme="fintech"] .badge.success{ color:var(--success); }
