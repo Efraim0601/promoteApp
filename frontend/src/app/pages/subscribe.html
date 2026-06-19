@@ -299,7 +299,7 @@
       <!-- Step 2: client photo -->
       @else if (step() === 2) {
         <photo-capture [imageData]="form.selfieData" facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
-          [allowGallery]="false" detect="face" [autoCapture]="true"
+          [allowGallery]="false" detect="off" [autoCapture]="false"
           [guide]="i18n.t('photo_guide')" (captured)="onSelfie($event)" (retake)="onRetakeSelfie()"></photo-capture>
       }
 
