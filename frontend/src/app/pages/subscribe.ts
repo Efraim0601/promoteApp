@@ -321,17 +321,24 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     if (!this.payStepOk) return 3;
     return this.lastStep;
   }
+  /** Highest step the client may navigate to: can't jump past the first incomplete step, so the
+   *  recap/payment is unreachable until every prior step is valid. Drives the step-bar lock. */
+  get maxReachableStep() { return this.firstInvalidStep(); }
   get lastStep() { return STEP_COUNT - 1; }
   stepKey(i: number) { return STEP_KEYS[i]; }
   /** Localised step names for the clickable progress bar. */
   get stepLabels() { return STEP_KEYS.map((k) => this.i18n.t(k)); }
 
-  /** Free navigation: jump straight to any step via the progress bar. Going forward surfaces
-   *  any missing fields (touched) so the client sees what's left; the final confirm stays guarded. */
+  /** Step-bar navigation. Backward is always free. Forward may NOT skip past an incomplete step:
+   *  the target is capped at the first step still missing/invalid, so the client can never reach
+   *  the recap / payment with incorrect data. The landed step surfaces what's left (touched). */
   goToStep(i: number) {
     if (i === this.step()) return;
-    this.touched.set(i > this.step());
-    this.step.set(Math.min(this.lastStep, Math.max(0, i)));
+    const goingForward = i > this.step();
+    // firstInvalidStep() is the furthest reachable step (== lastStep only when everything is valid).
+    const target = goingForward ? Math.min(i, this.firstInvalidStep()) : i;
+    this.touched.set(goingForward);
+    this.step.set(Math.min(this.lastStep, Math.max(0, target)));
     if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
     this.persist();
   }

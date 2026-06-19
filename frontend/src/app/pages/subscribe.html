@@ -215,7 +215,7 @@
       <span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t(isSelf ? 'badge_self' : 'badge_agent') }}</span>
     </app-bar>
     <div class="scr-body">
-      <div><steps [n]="STEP_COUNT" [current]="step()" [clickable]="true" [labels]="stepLabels" (pick)="goToStep($event)"></steps></div>
+      <div><steps [n]="STEP_COUNT" [current]="step()" [clickable]="true" [maxReachable]="maxReachableStep" [labels]="stepLabels" (pick)="goToStep($event)"></steps></div>
 
       <div>
         <div class="kicker" style="margin-top:4px">{{ i18n.t('step') }} {{ step() + 1 }} {{ i18n.t('of') }} {{ STEP_COUNT }} · {{ i18n.t(stepKey(step())) }}</div>

@@ -7,6 +7,7 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
   template: `<div class="steps">
     @for (i of dots; track i) {
       <button type="button" class="step-dot" [class.done]="i < current" [class.on]="i === current"
+        [class.locked]="i > maxReachable"
         [disabled]="!clickable" [attr.aria-label]="labels[i] || null" [title]="labels[i] || ''"
         (click)="pick.emit(i)">
         <span class="bar"></span>
@@ -20,6 +21,8 @@ import { Component, EventEmitter, Input, Output } from '@angular/core';
     .step-dot .bar{ display:block; height:5px; border-radius:3px; background:var(--border); transition:background .2s ease; }
     .step-dot.on .bar{ background:var(--primary); }
     .step-dot.done .bar{ background:var(--primary-700); }
+    /* Steps beyond the furthest reachable one are locked until prior steps are completed. */
+    .step-dot.locked .bar{ opacity:.4; background:repeating-linear-gradient(45deg,var(--border),var(--border) 3px,transparent 3px,transparent 6px); }
   `],
 })
 export class StepsComponent {
@@ -27,6 +30,8 @@ export class StepsComponent {
   @Input() current = 0;
   @Input() clickable = false;
   @Input() labels: string[] = [];
+  /** Highest step the user may jump to; later steps render as locked (default: all reachable). */
+  @Input() maxReachable = Infinity;
   @Output() pick = new EventEmitter<number>();
   get dots(): number[] { return Array.from({ length: this.n }, (_, i) => i); }
 }
