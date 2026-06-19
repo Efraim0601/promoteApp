@@ -170,9 +170,6 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   qualityIssue = signal<DocIssue | null>(null);
   /** Current live-detector state (face/document), drives the ring colour + hint. */
   detectState = signal<DetectState>('idle');
-  /** Escape hatch: once the face gate has failed to reach "ready" for a while, allow manual
-   *  capture anyway so a field agent is never permanently blocked by a fussy detector. */
-  manualUnlocked = signal(false);
   private stream: MediaStream | null = null;
 
   // --- live detection loop state ---
@@ -182,14 +179,10 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   private readyStreak = 0;
   /** Centre of the face on the previous ready frame (box space), to measure stillness. */
   private lastFaceCenter: { x: number; y: number } | null = null;
-  /** Timestamp (raf clock) when the face gate started; drives the manual-unlock escape hatch. */
-  private gateStartTs = 0;
   /** Frames needed in a row before auto-firing (anti-jitter: ~0.7s at the throttled rate). */
   private static readonly READY_FRAMES = 6;
   /** Detector cadence — ~10 fps is plenty for framing and keeps the model cheap on mobile. */
   private static readonly DETECT_INTERVAL_MS = 90;
-  /** After this long without a clean "ready" face, unblock the manual shutter (never trap the user). */
-  private static readonly GATE_TIMEOUT_MS = 7000;
 
   // --- face (selfie) tunables: judged in the VISIBLE circle's coordinate space ---
   private static readonly FACE_FILL_MIN = 0.42;   // head height vs box: smaller → too far
@@ -206,13 +199,11 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
   }
 
   /** Manual shutter availability: blocked in face mode until a valid head is in frame (anti-spoof).
-   *  'idle' means the detector isn't running (model failed to load) → fall back to manual capture.
-   *  Once the gate times out (manualUnlocked) the shutter is allowed regardless, so the user is
-   *  never stuck behind a detector that can't lock on (poor light, far/angled face, weak GPU). */
+   *  'idle' means the detector isn't running (model failed to load) → fall back to manual capture. */
   canShoot(): boolean {
     if (!this.liveActive() || this.detect !== 'face') return true;
     const s = this.detectState();
-    return s === 'ready' || s === 'idle' || this.manualUnlocked();
+    return s === 'ready' || s === 'idle';
   }
 
   /** Localised hint for the current detector state (empty while idle/searching with nothing to say). */
@@ -220,8 +211,6 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     const s = this.detectState();
     if (s === 'idle') return '';
     if (s === 'ready') return this.i18n.t(this.autoCapture ? 'cap_hold_still' : 'cap_ready');
-    // Gate gave up locking on — tell the user they can shoot manually instead of repeating the error.
-    if (this.manualUnlocked()) return this.i18n.t('cap_manual_ok');
     return this.i18n.t('cap_' + s);
   }
 
@@ -250,8 +239,6 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     if (!this.liveActive()) return;
     this.readyStreak = 0;
     this.lastFaceCenter = null;
-    this.gateStartTs = 0;
-    this.manualUnlocked.set(false);
     this.detectState.set('searching');
     // The face model loads lazily; if it fails we silently drop face detection (manual capture stays).
     if (this.detect === 'face' && !(await this.faceMesh.ready())) {
@@ -275,11 +262,6 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
     const v = this.video?.nativeElement;
     if (!v || !v.videoWidth) return;
     const ready = this.detect === 'face' ? this.tickFace(v, ts) : this.tickDocument(v);
-    // Face escape hatch: if the gate hasn't locked on within the timeout, unblock manual capture.
-    if (this.detect === 'face' && !this.manualUnlocked()) {
-      if (!this.gateStartTs) this.gateStartTs = ts;
-      else if (!ready && ts - this.gateStartTs > PhotoCaptureComponent.GATE_TIMEOUT_MS) this.manualUnlocked.set(true);
-    }
     if (!ready) { this.readyStreak = 0; return; }
     this.readyStreak++;
     if (this.autoCapture && this.readyStreak >= PhotoCaptureComponent.READY_FRAMES) {
@@ -483,7 +465,6 @@ export class PhotoCaptureComponent implements AfterViewInit, OnDestroy {
 
   private stop() {
     this.stopDetection();
-    this.manualUnlocked.set(false);
     this.detectState.set('idle');
     this.stream?.getTracks().forEach((t) => t.stop());
     this.stream = null;
