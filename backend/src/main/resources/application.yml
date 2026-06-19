@@ -121,9 +121,11 @@ app:
     application-id: ${TRUSTPAYWAY_APPLICATION_ID:}
     notif-url: ${TRUSTPAYWAY_NOTIF_URL:}          # public URL of our webhook (see below)
     webhook-secret: ${TRUSTPAYWAY_WEBHOOK_SECRET:} # optional: required in X-Webhook-Secret if set
-    # Hard caps so a slow/hung aggregator can never block a worker thread indefinitely.
+    # Hard caps so a slow/hung aggregator can never block a worker thread indefinitely. Keep the read
+    # timeout well under the USSD prompt window but low enough that a hung push frees its worker fast
+    # (the gateway call no longer holds a DB connection — see SubscriptionService.pushGateway).
     connect-timeout-ms: ${TRUSTPAYWAY_CONNECT_TIMEOUT_MS:5000}
-    read-timeout-ms: ${TRUSTPAYWAY_READ_TIMEOUT_MS:45000}
+    read-timeout-ms: ${TRUSTPAYWAY_READ_TIMEOUT_MS:25000}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost,http://localhost:8973}
   storage:

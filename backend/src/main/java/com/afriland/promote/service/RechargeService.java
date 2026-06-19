@@ -226,27 +226,60 @@ public class RechargeService {
                     r.getRef(), debitGuardSeconds);
             return;
         }
+        applyOutcome(r, callGateway(r));
+    }
+
+    /** Captured result of a gateway push, applied to the recharge in a SEPARATE short transaction —
+     *  the HTTP call itself ({@link #callGateway}) must run with no DB connection held. */
+    private record PushOutcome(String txId, String message, boolean accepted, boolean failed) {}
+
+    /** Call the aggregator (HTTP — can take tens of seconds) and map the result/exception to a
+     *  {@link PushOutcome}. Pure I/O, no DB work, so callers run it OUTSIDE any transaction. Never throws. */
+    private PushOutcome callGateway(Recharge r) {
         try {
             PaymentGateway.PaymentRequest pr = gateway.requestPayment(r, r.getPay());
-            r.setPaymentTxId(pr.externalRef());
-            r.setPaymentMessage(pr.message());
-            if (pr.accepted()) r.setGatewayPushAccepted(true);
-            if (!pr.accepted()) r.setPayStatus(PayStatus.failed);
+            return new PushOutcome(pr.externalRef(), pr.message(), pr.accepted(), !pr.accepted());
         } catch (RuntimeException ex) {
             log.warn("Recharge payment initiation failed for {} ({}): {}", r.getRef(), r.getPay(), ex.getMessage());
-            r.setPaymentMessage(GatewayClientMessages.from(ex));
-            if (!GatewayClientMessages.isTransient(ex)) r.setPayStatus(PayStatus.failed);
+            return new PushOutcome(null, GatewayClientMessages.from(ex), false, !GatewayClientMessages.isTransient(ex));
         }
+    }
+
+    /** Fold a captured gateway outcome onto the recharge (run inside a short write tx). */
+    private void applyOutcome(Recharge r, PushOutcome o) {
+        if (o.txId() != null) r.setPaymentTxId(o.txId());
+        r.setPaymentMessage(o.message());
+        if (o.accepted()) r.setGatewayPushAccepted(true);
+        if (o.failed()) r.setPayStatus(PayStatus.failed);
     }
 
     /** Async entry point invoked by {@code PaymentDispatcher} after the create transaction commits.
      *  Runs the gateway push in its own short transaction; idempotent — only acts while still pending. */
-    @Transactional
     public void pushGateway(String ref) {
-        Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);
-        if (r == null || r.getPayStatus() != PayStatus.pending) return;
-        applyGatewayPush(r);
-        recharges.save(r);
+        // NOT @Transactional on purpose: the slow gateway push must run WITHOUT holding a pooled DB
+        // connection (holding one across the aggregator call drained the pool — see SubscriptionService).
+        // Phase 1 — short read tx: confirm still pending + de-dup guard, then RELEASE the connection.
+        Recharge order = tx.execute(st -> {
+            Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);
+            if (r == null || r.getPayStatus() != PayStatus.pending) return null;
+            if (hasConflictingMomoDebit(r.getPayPhone(), r.getAmount(), r.getPay(), r.getRef())) {
+                log.info("MoMo push ignoré pour recharge {} — même tel/montant déjà débité ou en cours (< {} s)",
+                        r.getRef(), debitGuardSeconds);
+                return null;
+            }
+            return r;
+        });
+        if (order == null) return;
+        // Phase 2 — gateway HTTP call with NO DB connection held.
+        PushOutcome outcome = callGateway(order);
+        // Phase 3 — short write tx: re-check still pending (the webhook may have settled it), apply, save.
+        tx.execute(st -> {
+            Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);
+            if (r == null || r.getPayStatus() != PayStatus.pending) return null;
+            applyOutcome(r, outcome);
+            recharges.save(r);
+            return null;
+        });
     }
 
     /** Legacy rows: a non-null gatewayRef means TrustPayWay was already called. */

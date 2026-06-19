@@ -330,29 +330,63 @@ public class SubscriptionService {
                     s.getRef(), debitGuardSeconds);
             return;
         }
+        applyOutcome(s, callGateway(s));
+    }
+
+    /** Captured result of a gateway push, so it can be applied to the order in a SEPARATE short
+     *  transaction — the HTTP call itself ({@link #callGateway}) must run with no DB connection held. */
+    private record PushOutcome(String txId, String message, boolean accepted, boolean failed) {}
+
+    /** Call the aggregator (HTTP — can take tens of seconds) and map the result/exception to a
+     *  {@link PushOutcome}. Pure I/O, no DB work, so callers run it OUTSIDE any transaction. Never throws. */
+    private PushOutcome callGateway(Subscription order) {
         try {
-            PaymentGateway.PaymentRequest pr = gateway.requestPayment(s, s.getPay());
-            s.setPaymentTxId(pr.externalRef());          // store the aggregator's transaction id
-            s.setPaymentMessage(pr.message());           // reason to surface on failure
-            if (pr.accepted()) s.setGatewayPushAccepted(true);
-            if (!pr.accepted()) s.markFailed();
+            PaymentGateway.PaymentRequest pr = gateway.requestPayment(order, order.getPay());
+            return new PushOutcome(pr.externalRef(), pr.message(), pr.accepted(), !pr.accepted());
         } catch (RuntimeException ex) {
-            log.warn("Payment initiation failed for {} ({}): {}", s.getRef(), s.getPay(), ex.getMessage());
-            s.setPaymentMessage(GatewayClientMessages.from(ex));
-            // Timeouts / 502: the operator may still have initiated the USSD — stay pending for webhook.
-            if (!GatewayClientMessages.isTransient(ex)) s.markFailed();
+            log.warn("Payment initiation failed for {} ({}): {}", order.getRef(), order.getPay(), ex.getMessage());
+            // Timeouts / 502: the operator may still have initiated the USSD — stay pending for the webhook.
+            return new PushOutcome(null, GatewayClientMessages.from(ex), false, !GatewayClientMessages.isTransient(ex));
         }
+    }
+
+    /** Fold a captured gateway outcome onto the order (run inside a short write tx). */
+    private void applyOutcome(Subscription s, PushOutcome o) {
+        if (o.txId() != null) s.setPaymentTxId(o.txId());   // aggregator's transaction id
+        s.setPaymentMessage(o.message());                   // reason to surface on failure
+        if (o.accepted()) s.setGatewayPushAccepted(true);
+        if (o.failed()) s.markFailed();
     }
 
     /** Async entry point invoked by {@code PaymentDispatcher} after the create transaction commits.
      *  Runs the gateway push in its own short transaction; idempotent — only acts while still pending,
      *  so a duplicate event (e.g. a retried dispatch) never sends a second prompt. */
-    @Transactional
     public void pushGateway(String ref) {
-        Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
-        if (s == null || s.getPayStatus() != PayStatus.pending) return;
-        applyGatewayPush(s);
-        subs.save(s);
+        // NOT @Transactional on purpose: the slow gateway push must run WITHOUT holding a pooled DB
+        // connection. Holding one across the aggregator call (read-timeout in the tens of seconds)
+        // drained the pool — every other request then timed out waiting for a connection.
+        // Phase 1 — short read tx: confirm still pending + de-dup guard, then RELEASE the connection.
+        Subscription order = tx.execute(st -> {
+            Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
+            if (s == null || s.getPayStatus() != PayStatus.pending) return null;
+            if (hasConflictingMomoDebit(s.getPayPhone(), s.getAmount(), s.getPay(), s.getRef())) {
+                log.info("MoMo push ignoré pour {} — même tel/montant déjà débité ou en cours (< {} s)",
+                        s.getRef(), debitGuardSeconds);
+                return null;
+            }
+            return s;
+        });
+        if (order == null) return;
+        // Phase 2 — gateway HTTP call with NO DB connection held.
+        PushOutcome outcome = callGateway(order);
+        // Phase 3 — short write tx: re-check still pending (the webhook may have settled it), apply, save.
+        tx.execute(st -> {
+            Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
+            if (s == null || s.getPayStatus() != PayStatus.pending) return null;
+            applyOutcome(s, outcome);
+            subs.save(s);
+            return null;
+        });
     }
 
     /** Reconciliation: force a long-stuck pending order to failed (the webhook never arrived and the
