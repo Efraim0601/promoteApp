@@ -44,7 +44,8 @@ public class TrustPayWayGateway implements PaymentGateway {
     private static final Logger log = LoggerFactory.getLogger(TrustPayWayGateway.class);
 
     private final TrustPayWayProperties props;
-    private final RestClient http;
+    private final RestClient http;        // USSD push (process-payment) — tolerant read timeout
+    private final RestClient statusHttp;  // get-status polls — short read timeout (fail fast)
     private final ObjectMapper json;
 
     // Cached access token + its expiry instant (login is reused until it nears expiry).
@@ -59,9 +60,20 @@ public class TrustPayWayGateway implements PaymentGateway {
         ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.DEFAULTS
                 .withConnectTimeout(Duration.ofMillis(props.getConnectTimeoutMs()))
                 .withReadTimeout(Duration.ofMillis(props.getReadTimeoutMs()));
+        String baseUrl = props.getBaseUrl() == null ? "" : props.getBaseUrl();
         this.http = RestClient.builder()
-                .baseUrl(props.getBaseUrl() == null ? "" : props.getBaseUrl())
+                .baseUrl(baseUrl)
                 .requestFactory(ClientHttpRequestFactories.get(settings))
+                .build();
+        // Separate client for status polls with a SHORT read timeout: a hung get-status must fail
+        // fast instead of pinning a reconciliation thread for the full push timeout (45s), which
+        // starved the sweep and let pending orders expire unconfirmed.
+        ClientHttpRequestFactorySettings statusSettings = ClientHttpRequestFactorySettings.DEFAULTS
+                .withConnectTimeout(Duration.ofMillis(props.getConnectTimeoutMs()))
+                .withReadTimeout(Duration.ofMillis(props.getStatusReadTimeoutMs()));
+        this.statusHttp = RestClient.builder()
+                .baseUrl(baseUrl)
+                .requestFactory(ClientHttpRequestFactories.get(statusSettings))
                 .build();
     }
 
@@ -200,7 +212,7 @@ public class TrustPayWayGateway implements PaymentGateway {
         try {
             String network = network(sub.getPay());
             String lookupId = id;
-            StatusResponse resp = http.get()
+            StatusResponse resp = statusHttp.get()
                     .uri("/api/{network}/get-status/{id}", network, lookupId)
                     .header("Authorization", "Bearer " + token())
                     .accept(MediaType.APPLICATION_JSON)

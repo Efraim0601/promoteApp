@@ -126,6 +126,9 @@ app:
     # (the gateway call no longer holds a DB connection — see SubscriptionService.pushGateway).
     connect-timeout-ms: ${TRUSTPAYWAY_CONNECT_TIMEOUT_MS:5000}
     read-timeout-ms: ${TRUSTPAYWAY_READ_TIMEOUT_MS:25000}
+    # Status polls (get-status) must fail fast — a long timeout here pins reconciliation threads and
+    # starves the sweep, letting pending orders expire unconfirmed. Keep well under the push timeout.
+    status-read-timeout-ms: ${TRUSTPAYWAY_STATUS_READ_TIMEOUT_MS:12000}
   cors:
     allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:4200,http://localhost,http://localhost:8973}
   storage:

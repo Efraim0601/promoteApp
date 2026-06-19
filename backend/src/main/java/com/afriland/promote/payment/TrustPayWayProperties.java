@@ -40,6 +40,14 @@ public class TrustPayWayProperties {
     /** TCP connect timeout (ms) for every aggregator call. Guards against a hung/unreachable host. */
     private int connectTimeoutMs = 5000;
 
-    /** Read timeout (ms) for every aggregator call — Orange MoMo is often slower than MTN. */
+    /** Read timeout (ms) for the USSD push (process-payment) — Orange MoMo is often slower than MTN. */
     private int readTimeoutMs = 45000;
+
+    /**
+     * Read timeout (ms) for status polls (get-status) — kept SHORT and separate from the push:
+     * a status lookup that doesn't answer in a few seconds is effectively dead, and a long timeout
+     * here pins a reconciliation thread (45s each) so the sweep can't cover all pending orders
+     * within its chunk window and they expire unconfirmed. Fail fast and retry on the next sweep.
+     */
+    private int statusReadTimeoutMs = 12000;
 }
