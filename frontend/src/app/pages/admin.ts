@@ -3093,14 +3093,30 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   loadActionAudit() {
     if (this.actLoaded) return;
+    this.actLoaded = true;
+    this.fetchActions(this.actSearch());
+  }
+
+  /** Fetch the action log from the server. An empty term returns the most-recent page; a non-empty
+   *  term searches the WHOLE history so older references (e.g. an old print) are findable. */
+  private fetchActions(q: string) {
     this.actLoading.set(true);
-    this.api.actionAudit().subscribe({
-      next: (a) => { this.actionAudits.set(a); this.actLoading.set(false); this.actLoaded = true; },
+    this.api.actionAudit(q).subscribe({
+      next: (a) => { this.actionAudits.set(a); this.actLoading.set(false); },
       error: () => this.actLoading.set(false),
     });
   }
 
+  /** Re-query the server whenever the (debounced) search term changes, once the tab is open. */
+  private readonly _actSearchFetch = effect(() => {
+    const q = this.dbActSearch();
+    if (!this.actLoaded) return;   // don't fetch before the Actions tab is first opened
+    this.fetchActions(q);
+  });
+
   filteredActions = computed(() => {
+    // The server already filters by the search term; this just narrows the loaded page client-side
+    // (instant feedback while the debounced server query is in flight).
     const q = this.dbActSearch().trim().toLowerCase();
     if (!q) return this.actionAudits();
     return this.actionAudits().filter((a) => {

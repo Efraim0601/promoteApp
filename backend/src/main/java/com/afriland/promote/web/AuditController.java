@@ -1,5 +1,6 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.model.ActionAudit;
 import com.afriland.promote.repo.ActionAuditRepository;
 import com.afriland.promote.repo.LoginAuditRepository;
 import com.afriland.promote.web.dto.Dtos.ActionAuditDto;
@@ -29,10 +30,18 @@ public class AuditController {
                 .stream().map(LoginAuditDto::of).toList();
     }
 
-    /** The most recent application mutations (latest first, capped at 2000). */
+    /**
+     * Application mutations, latest first (capped at 2000). With {@code q}, searches the WHOLE
+     * history (actor / action / entity ref / details) instead of only the most-recent page — this
+     * is what lets a supervisor find who validated an older reference (e.g. an old PRM-xxxx print).
+     */
     @GetMapping("/actions")
-    public List<ActionAuditDto> actions() {
-        return actionRepo.findAllByOrderByAtDesc(PageRequest.of(0, 2000))
-                .stream().map(ActionAuditDto::of).toList();
+    public List<ActionAuditDto> actions(@RequestParam(required = false) String q) {
+        PageRequest page = PageRequest.of(0, 2000);
+        String term = q == null ? "" : q.trim();
+        List<ActionAudit> rows = term.isEmpty()
+                ? actionRepo.findAllByOrderByAtDesc(page)
+                : actionRepo.search("%" + term.toLowerCase() + "%", page);
+        return rows.stream().map(ActionAuditDto::of).toList();
     }
 }

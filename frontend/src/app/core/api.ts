@@ -315,9 +315,11 @@ export class Api {
   loginAudit(): Observable<LoginAudit[]> {
     return this.http.get<LoginAudit[]>(`${this.base}/audit/logins`);
   }
-  /** Admin — recent application mutations (action audit trail). */
-  actionAudit(): Observable<ActionAudit[]> {
-    return this.http.get<ActionAudit[]>(`${this.base}/audit/actions`);
+  /** Admin — application mutations (action audit trail). With `q`, searches the whole history
+   *  server-side (actor / action / reference / details), not just the most-recent page. */
+  actionAudit(q?: string): Observable<ActionAudit[]> {
+    const opts = q && q.trim() ? { params: { q: q.trim() } } : {};
+    return this.http.get<ActionAudit[]>(`${this.base}/audit/actions`, opts);
   }
   /** Admin — bulk-import staff accounts; duplicates skipped or updated per updateExisting. */
   importUsers(rows: ImportUserRow[], updateExisting: boolean): Observable<ImportUsersResult> {
