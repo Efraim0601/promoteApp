@@ -314,6 +314,9 @@ export interface CreateSubscriptionRequest {
   cni: string;
   niu?: string | null;   // NIU (taxpayer id) — optional
   cniExp: string;     // dd/MM/yyyy
+  naissance?: string | null;      // date de naissance (yyyy-MM-dd) — anti-duplicate identity key
+  cniOcrNom?: string | null;      // surname read off the CNI by OCR (optional) — identity match
+  cniOcrPrenom?: string | null;   // given name read off the CNI by OCR (optional)
   phone: string;      // 9 digits
   email: string;
   quartier: string;

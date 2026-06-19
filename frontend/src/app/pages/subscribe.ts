@@ -29,6 +29,8 @@ const PHOTO_STEP = STEP_KEYS.indexOf('step_photo');
 
 interface WizardForm {
   prenom: string; nom: string; sexe: string; docType: string; cni: string; niu: string; cniExp: string; phone: string;
+  naissance: string;                                   // date de naissance (yyyy-MM-dd from the date input)
+  cniOcrNom: string | null; cniOcrPrenom: string | null; // surname/given name OCR read off the CNI
   email: string; quartier: string; ville: string;
   selfie: boolean; selfieData: string | null; selfieKey: string | null;
   cniRectoData: string | null; cniRectoKey: string | null;
@@ -47,6 +49,16 @@ function parseExp(d: string): Date | null {
   return dt;
 }
 const fmtExp = (d: string) => (d.length === 8 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)}` : d);
+
+/** Birth date sanity (yyyy-MM-dd from the date input): a real calendar date, in the past, year ≥ 1900. */
+function isValidBirth(d: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+  const [yy, mm, dd] = d.split('-').map(Number);
+  if (yy < 1900 || mm < 1 || mm > 12 || dd < 1 || dd > 31) return false;
+  const dt = new Date(yy, mm - 1, dd);
+  if (dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return false;
+  return dt < new Date();
+}
 
 @Component({
   selector: 'page-subscribe',
@@ -122,6 +134,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
 
   form: WizardForm = {
     prenom: '', nom: '', sexe: '', docType: 'cni', cni: '', niu: '', cniExp: '', phone: '',
+    naissance: '', cniOcrNom: null, cniOcrPrenom: null,
     email: '', quartier: '', ville: '',
     selfie: false, selfieData: null, selfieKey: null,
     cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
@@ -229,19 +242,24 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       cni: !f.cni ? this.i18n.t('required') : !docOk ? this.i18n.t(f.docType === 'cni' ? 'cni_invalid' : 'doc_num_invalid') : null,
       cniExp: !f.cniExp ? this.i18n.t('required') : !expDate ? this.i18n.t('exp_invalid')
         : expDate < new Date() ? this.i18n.t('exp_expired') : null,
+      // Birth date — part of the anti-duplicate identity (required for a CNI; N/A for passport/récépissé).
+      naissance: f.docType !== 'cni' ? null
+        : !f.naissance ? this.i18n.t('required')
+        : !isValidBirth(f.naissance) ? this.i18n.t('birth_invalid') : null,
       phone: !f.phone ? this.i18n.t('required') : !phoneOk ? this.i18n.t('invalid_phone') : null,
       email: !f.email.trim() ? this.i18n.t('required') : !emailOk ? this.i18n.t('email_invalid') : null,
       quartier: !f.quartier.trim() ? this.i18n.t('required') : null,
       ville: !f.ville.trim() ? this.i18n.t('required') : null,
     };
   }
-  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'phone' | 'email' | 'quartier' | 'ville'): string | null {
+  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'naissance' | 'phone' | 'email' | 'quartier' | 'ville'): string | null {
     return this.touched() ? this.errs[key] : null;
   }
 
   get step0ok() {
     const x = this.errs;
-    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.phone && !x.email && !x.quartier && !x.ville;
+    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.naissance
+      && !x.phone && !x.email && !x.quartier && !x.ville;
   }
   // Document / photo steps are satisfied by a local capture OR a restored upload key (so a
   // page reload mid-wizard doesn't force the client to retake what was already uploaded).
@@ -414,6 +432,9 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     this.api.cniOcr(dataUrl, { prenom: this.form.prenom, nom: this.form.nom, cni: this.form.cni }).subscribe({
       next: (r) => {
         if (!r.available) return;
+        // Persist what OCR read off the card so the anti-duplicate identity check can compare BOTH
+        // the typed name and the CNI-read name server-side.
+        this.form.cniOcrNom = r.extractedNom; this.form.cniOcrPrenom = r.extractedPrenom; this.persist();
         if (r.numberMatch === false) this.cniOcrWarning.set('cni_ocr_number_mismatch');
         else if (r.nameMatch === false) this.cniOcrWarning.set('cni_ocr_name_mismatch');
       },
@@ -450,6 +471,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
       prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
       docType: this.form.docType,
       cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
+      naissance: this.form.naissance || undefined,
+      cniOcrNom: this.form.cniOcrNom || undefined, cniOcrPrenom: this.form.cniOcrPrenom || undefined,
       email: this.form.email.trim(), quartier: this.form.quartier.trim(), ville: this.form.ville.trim(),
       pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
       pickupAgencyId: this.form.delivery === 'agence' ? (this.form.pickupAgencyId || undefined) : undefined,
@@ -612,6 +635,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
     this.clearPersist();
     this.form = {
       prenom: '', nom: '', sexe: '', docType: 'cni', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', ville: '',
+      naissance: '', cniOcrNom: null, cniOcrPrenom: null,
       selfie: false, selfieData: null, selfieKey: null,
       cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
       saraReceiptData: null, saraReceiptKey: null, saraRef: '',

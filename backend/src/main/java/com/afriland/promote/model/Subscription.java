@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * A Promote card subscription — combines the transaction and the KYC file.
@@ -44,6 +45,13 @@ public class Subscription implements Payable {
     private String cniNorm;
     private String niu;             // Numéro d'Identification Unique (taxpayer id) — optional
     private String cniExp;          // expiry, displayed dd/MM/yyyy
+    /** Date de naissance (du titulaire / de la CNI) — part of the anti-duplicate identity key
+     *  (CNI number + birth date + surname + given name). May be null on legacy/non-CNI rows. */
+    private LocalDate birthDate;
+    /** Surname / given name as read off the CNI by OCR at capture time (when available). Persisted so
+     *  the anti-duplicate identity match can compare BOTH the typed name and the CNI-read name. */
+    private String cniOcrNom;
+    private String cniOcrPrenom;
     private String phone;           // "+237 6XXXXXXXX"
     private String quartier;        // neighborhood
     private String region;          // administrative region

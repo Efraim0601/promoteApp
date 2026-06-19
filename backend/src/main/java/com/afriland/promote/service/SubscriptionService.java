@@ -13,6 +13,7 @@ import com.afriland.promote.repo.AgencyRepository;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
+import com.afriland.promote.kyc.CniMatcher;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,12 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 /** Core subscription / KYC business logic, ported from the prototype (app.jsx, kyc.jsx). */
 @Service
@@ -213,14 +219,20 @@ public class SubscriptionService {
             }
         }
 
-        // Two Promote cards per CNI max: block a third subscription while any earlier ones are still
-        // active (pending / paid / cash / SARA). A failed attempt may be retried with the same CNI.
+        // Two Promote cards per IDENTITY max: block a third subscription when an earlier non-failed one
+        // shares the SAME CNI number AND birth date AND name. The name is matched on both the typed value
+        // and the value OCR read off the CNI, with a 20% edit-distance tolerance (OCR rarely reads a long
+        // name perfectly). A failed attempt may be retried. (pending / paid / cash / SARA count as active.)
         if (isCniDocument(req.docType()) && !isValidCniFormat(req.cni())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "cni_invalid");
         }
-        if (isCniDocument(req.docType()) && !normCniMatch(req.cni()).isEmpty()
-                && subs.countByCniNormAndPayStatusNot(normCniMatch(req.cni()), PayStatus.failed) >= 2) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "cni_exists");
+        LocalDate birthDate = parseBirthDate(req.naissance());
+        if (isCniDocument(req.docType()) && !normCniMatch(req.cni()).isEmpty()) {
+            long sameIdentity = subs.findByCniNormAndPayStatusNot(normCniMatch(req.cni()), PayStatus.failed)
+                    .stream().filter(s -> isSameIdentity(s, birthDate, req)).count();
+            if (sameIdentity >= 2) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "cni_exists");
+            }
         }
 
         String cniNorm = isCniDocument(req.docType()) ? normCniMatch(req.cni()) : null;
@@ -237,6 +249,9 @@ public class SubscriptionService {
                 .cniNorm(cniNorm)
                 .niu(normNiu(req.niu()))
                 .cniExp(req.cniExp())
+                .birthDate(birthDate)
+                .cniOcrNom(blankToNull(req.cniOcrNom()))
+                .cniOcrPrenom(blankToNull(req.cniOcrPrenom()))
                 .phone(req.phone().trim())
                 .quartier(req.quartier() == null ? null : req.quartier().trim())
                 .region(req.region())
@@ -734,6 +749,58 @@ public class SubscriptionService {
     /** Normalise an ID-document number for matching: keep only alphanumerics, upper-cased. */
     private static String normCniMatch(String cni) {
         return cni == null ? "" : cni.replaceAll("[^0-9A-Za-z]", "").toUpperCase();
+    }
+
+    /** Names are considered the same person at/above this similarity (≤ 20 % difference — OCR margin). */
+    private static final double NAME_DUP_THRESHOLD = 0.80;
+
+    /** Accepted birth-date input formats: dd/MM/yyyy (form) and yyyy-MM-dd (HTML date input). */
+    private static final DateTimeFormatter[] BIRTH_FORMATS = {
+            DateTimeFormatter.ofPattern("dd/MM/yyyy"),
+            DateTimeFormatter.ISO_LOCAL_DATE,
+    };
+
+    /** Parse a birth date leniently; returns null on blank/unparseable input (never throws). */
+    private static LocalDate parseBirthDate(String s) {
+        if (s == null || s.isBlank()) return null;
+        String v = s.trim();
+        for (DateTimeFormatter f : BIRTH_FORMATS) {
+            try { return LocalDate.parse(v, f); } catch (DateTimeParseException ignored) { /* try next */ }
+        }
+        return null;
+    }
+
+    /** Same person as an existing same-CNI subscription: identical birth date (null == null for legacy
+     *  rows) AND a matching name. The CNI number already matches (the candidate set is filtered by it). */
+    private boolean isSameIdentity(Subscription existing, LocalDate birthDate, CreateSubscriptionRequest req) {
+        if (!Objects.equals(existing.getBirthDate(), birthDate)) return false;
+        return namesMatch(existing, req);
+    }
+
+    /** True when any pairing of the available names (typed and CNI-read/OCR, on each side) is at/above
+     *  the OCR-tolerant threshold. Taking BOTH the typed and the OCR name guards against a client who
+     *  retypes a slightly different name than the one printed on the card. */
+    private boolean namesMatch(Subscription existing, CreateSubscriptionRequest req) {
+        List<String> incoming = nameVariants(req.nom(), req.prenom(), req.cniOcrNom(), req.cniOcrPrenom());
+        List<String> stored = nameVariants(existing.getNom(), existing.getPrenom(),
+                existing.getCniOcrNom(), existing.getCniOcrPrenom());
+        for (String a : incoming) {
+            for (String b : stored) {
+                if (CniMatcher.nameSimilarity(a, b) >= NAME_DUP_THRESHOLD) return true;
+            }
+        }
+        return false;
+    }
+
+    /** The distinct full-name variants available for one party: the typed name and, when present, the
+     *  name OCR read off the CNI. */
+    private static List<String> nameVariants(String nom, String prenom, String ocrNom, String ocrPrenom) {
+        List<String> out = new ArrayList<>(2);
+        String typed = ((nom == null ? "" : nom) + " " + (prenom == null ? "" : prenom)).trim();
+        if (!typed.isBlank()) out.add(typed);
+        String ocr = ((ocrNom == null ? "" : ocrNom) + " " + (ocrPrenom == null ? "" : ocrPrenom)).trim();
+        if (!ocr.isBlank()) out.add(ocr);
+        return out;
     }
 
     /** CNI = alphanumeric, min 6 chars (after stripping separators). */

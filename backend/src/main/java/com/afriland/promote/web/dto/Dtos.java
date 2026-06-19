@@ -263,7 +263,10 @@ public final class Dtos {
             Double longitude,
             Double geoAccuracy,          // accuracy radius in metres (optional)
             String pickupAgencyId,       // chosen pickup branch id when delivery == agence (optional)
-            String cardType) {           // bancaire | prepaid (defaults to bancaire server-side)
+            String cardType,             // bancaire | prepaid (defaults to bancaire server-side)
+            String naissance,            // date de naissance dd/MM/yyyy — anti-duplicate identity key
+            String cniOcrNom,            // surname read off the CNI by OCR (optional) — identity match
+            String cniOcrPrenom) {       // given name read off the CNI by OCR (optional)
 
         /** Backward-compatible constructor (no geolocation) — keeps existing callers/tests valid. */
         public CreateSubscriptionRequest(String prenom, String nom, String sexe, String docType, String cni,
@@ -272,7 +275,18 @@ public final class Dtos {
                 String cniRectoKey, String cniVersoKey, String saraReceiptKey, String saraRef, String referrerPhone) {
             this(prenom, nom, sexe, docType, cni, niu, cniExp, phone, email, quartier, region, ville, pay,
                     payPhone, delivery, selfie, selfieKey, cniRectoKey, cniVersoKey, saraReceiptKey, saraRef,
-                    referrerPhone, null, null, null, null, null);
+                    referrerPhone, null, null, null, null, null, null, null, null);
+        }
+
+        /** Backward-compatible constructor (geolocation, no birth date / OCR identity) — keeps callers valid. */
+        public CreateSubscriptionRequest(String prenom, String nom, String sexe, String docType, String cni,
+                String niu, String cniExp, String phone, String email, String quartier, String region,
+                String ville, String pay, String payPhone, String delivery, boolean selfie, String selfieKey,
+                String cniRectoKey, String cniVersoKey, String saraReceiptKey, String saraRef, String referrerPhone,
+                Double latitude, Double longitude, Double geoAccuracy, String pickupAgencyId, String cardType) {
+            this(prenom, nom, sexe, docType, cni, niu, cniExp, phone, email, quartier, region, ville, pay,
+                    payPhone, delivery, selfie, selfieKey, cniRectoKey, cniVersoKey, saraReceiptKey, saraRef,
+                    referrerPhone, latitude, longitude, geoAccuracy, pickupAgencyId, cardType, null, null, null);
         }
     }
 

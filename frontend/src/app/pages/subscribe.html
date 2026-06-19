@@ -252,6 +252,9 @@
         }
         <field [label]="i18n.t('niu_label')" [hint]="i18n.t('niu_hint')"><div class="input-prefix"><span class="pfx"><ic name="hash" [size]="17"></ic></span><input [placeholder]="i18n.t('niu_ph')" [value]="form.niu" (input)="set('niu', $any($event.target).value)" /></div></field>
         <expiry-field [label]="i18n.t('cni_exp')" [value]="form.cniExp" (valueChange)="set('cniExp', $event)" [err]="e('cniExp')"></expiry-field>
+        @if (form.docType === 'cni') {
+          <field [label]="i18n.t('naissance_label')" [hint]="i18n.t('naissance_hint')" [err]="e('naissance')"><div class="input-prefix"><span class="pfx"><ic name="calendar" [size]="17"></ic></span><input type="date" [value]="form.naissance" (input)="set('naissance', $any($event.target).value)" /></div></field>
+        }
         <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
         <field [label]="i18n.t('email_label')" [err]="e('email')"><div class="input-prefix"><span class="pfx"><ic name="mail" [size]="17"></ic></span><input type="email" [placeholder]="i18n.t('email_ph')" [value]="form.email" (input)="set('email', $any($event.target).value)" /></div></field>
         <field [label]="i18n.t('quartier')" [err]="e('quartier')"><div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span><input [placeholder]="i18n.t('quartier_ph')" [value]="form.quartier" (input)="set('quartier', $any($event.target).value)" /></div></field>

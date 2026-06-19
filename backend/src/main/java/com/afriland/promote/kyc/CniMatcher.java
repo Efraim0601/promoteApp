@@ -61,6 +61,19 @@ public class CniMatcher {
         return comparable == 0 ? 1.0 : (double) matched / comparable;
     }
 
+    /**
+     * Token-sorted, accent-/case-insensitive similarity in [0,1] between two full names. Word order
+     * is ignored ("ZRA EFRAIM" ≡ "EFRAIM ZRA"). Used by the anti-duplicate identity check, which
+     * treats two names as the same person at/above 0.80 (≤ 20 % difference — absorbs OCR noise).
+     * Returns 0 when either side is blank (nothing to compare → not a match).
+     */
+    public static double nameSimilarity(String fullNameA, String fullNameB) {
+        String a = sortTokens(norm(fullNameA));
+        String b = sortTokens(norm(fullNameB));
+        if (a.isBlank() || b.isBlank()) return 0.0;
+        return similarity(a, b);
+    }
+
     // --- text helpers ---------------------------------------------------------
 
     private static String join(String a, String b) {

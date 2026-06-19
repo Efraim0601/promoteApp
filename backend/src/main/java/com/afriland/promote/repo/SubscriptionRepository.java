@@ -50,6 +50,10 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     /** Count non-failed subscriptions for this CNI (limit to 2 cards max per person). */
     long countByCniNormAndPayStatusNot(String cniNorm, PayStatus payStatus);
 
+    /** Non-failed subscriptions sharing this CNI — candidate set for the tuple identity de-dup
+     *  (same CNI + birth date + surname + given name). Filtered in memory (a handful of rows). */
+    List<Subscription> findByCniNormAndPayStatusNot(String cniNorm, PayStatus payStatus);
+
     /** Backfill {@link Subscription#getCniNorm()} for legacy CNI rows (batch-limited). */
     @Query("select s from Subscription s where s.cniNorm is null and s.cni is not null and s.cni <> '' "
             + "and (s.docType is null or lower(s.docType) = 'cni')")
