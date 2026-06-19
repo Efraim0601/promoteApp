@@ -302,6 +302,7 @@ const FR: Record<string, string> = {
   cap_blurry: 'Image floue — stabilisez le téléphone.',
   cap_ready: 'Bien cadré — vous pouvez prendre la photo.',
   cap_hold_still: 'Bien cadré — ne bougez plus, capture automatique…',
+  cap_manual_ok: 'Détection difficile — vous pouvez prendre la photo manuellement.',
   // CNI OCR cross-check (advisory)
   cni_ocr_name_mismatch: 'Le nom saisi ne correspond pas à la CNI lue — vérifiez la saisie.',
   cni_ocr_number_mismatch: 'Le numéro de CNI saisi ne correspond pas à la carte lue — vérifiez la saisie.',
@@ -897,6 +898,7 @@ const EN: Record<string, string> = {
   cap_blurry: 'Blurry image — hold the phone steady.',
   cap_ready: 'Well framed — you can take the photo.',
   cap_hold_still: 'Well framed — hold still, capturing automatically…',
+  cap_manual_ok: 'Detection is struggling — you can take the photo manually.',
   // CNI OCR cross-check (advisory)
   cni_ocr_name_mismatch: 'The name entered does not match the ID card read — please check it.',
   cni_ocr_number_mismatch: 'The ID number entered does not match the card read — please check it.',
