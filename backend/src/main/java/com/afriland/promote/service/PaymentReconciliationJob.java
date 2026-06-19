@@ -163,7 +163,7 @@ public class PaymentReconciliationJob {
     private void reconcileSubscription(Subscription s, Instant expireCutoff) {
         try {
             PayStatus before = s.getPayStatus();
-            Subscription after = subscriptionService.refreshStatus(s.getRef());
+            Subscription after = subscriptionService.refreshStatus(s.getRef(), false);  // sweep: never throttle
             if (after != null && after.getPayStatus() != before && after.getPayStatus() != PayStatus.pending) {
                 log.info("Payment reconciliation: subscription {} get-status -> {}",
                         after.getRef(), after.getPayStatus());
@@ -182,7 +182,7 @@ public class PaymentReconciliationJob {
     private void reconcileRecharge(Recharge r, Instant expireCutoff) {
         try {
             PayStatus before = r.getPayStatus();
-            Recharge after = rechargeService.refreshStatus(r.getRef());
+            Recharge after = rechargeService.refreshStatus(r.getRef(), false);  // sweep: never throttle
             if (after != null && after.getPayStatus() != before && after.getPayStatus() != PayStatus.pending) {
                 log.info("Payment reconciliation: recharge {} get-status -> {}",
                         after.getRef(), after.getPayStatus());

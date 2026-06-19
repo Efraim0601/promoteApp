@@ -74,6 +74,12 @@ app:
     # the webhook reconciles. Decouples our throughput from the gateway's latency.
     # false = legacy synchronous behaviour (the request waits for the gateway), unchanged.
     async: ${APP_PAYMENT_ASYNC:false}
+    # Public /status polling guard: the gateway get-status call is made OUTSIDE any DB transaction and
+    # is rate-limited per order, so heavy polling can't tie up DB connections (which exhausted the pool).
+    # The webhook + reconcile sweep remain the primary settlement paths.
+    status-pull:
+      min-interval-ms: ${PAYMENT_STATUS_PULL_MIN_INTERVAL_MS:8000}  # ≥ this between live pulls per order
+      grace-ms: ${PAYMENT_STATUS_PULL_GRACE_MS:5000}                # let the webhook arrive first after create
     pool:
       # Sizing rule of thumb: max ≈ peak_tx_per_sec × avg_gateway_latency_seconds.
       # The queue is kept small so the pool grows to `max` quickly under load; once both are

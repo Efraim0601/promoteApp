@@ -14,6 +14,7 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.kyc.CniMatcher;
+import com.afriland.promote.payment.LiveStatusThrottle;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +22,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -57,11 +60,15 @@ public class SubscriptionService {
 
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
 
+    private final TransactionTemplate tx;
+    private final LiveStatusThrottle statusThrottle;
+
     public SubscriptionService(SubscriptionRepository subs, CardConfigRepository configs,
                                AppUserRepository users, AgencyRepository agencies, PaymentGateway gateway,
                                ImageStorage storage, SaraReceiptExtractor receiptExtractor,
                                ReferenceSequence refs, ApplicationEventPublisher events,
-                               CommissionService commissions) {
+                               CommissionService commissions, PlatformTransactionManager txManager,
+                               LiveStatusThrottle statusThrottle) {
         this.subs = subs;
         this.configs = configs;
         this.users = users;
@@ -72,6 +79,8 @@ public class SubscriptionService {
         this.refs = refs;
         this.events = events;
         this.commissions = commissions;
+        this.tx = new TransactionTemplate(txManager);
+        this.statusThrottle = statusThrottle;
     }
 
     /** Award the sales commission for a settled subscription. Idempotent — safe to call from every
@@ -578,9 +587,42 @@ public class SubscriptionService {
      * active gateway can pull a live status (get-status), use it as a fallback for when
      * the webhook hasn't arrived (e.g. no public URL in dev).
      */
-    @Transactional
+    /** Polling-endpoint status read. NOT @Transactional on purpose: the slow gateway get-status call
+     *  must run WITHOUT holding a pooled DB connection (holding one under heavy /status polling
+     *  exhausted the pool). Reads the row in a short tx, pulls the gateway outside any tx, and persists
+     *  a terminal outcome in its own short tx. The pull is rate-limited per order (see throttle). */
     public Subscription refreshStatus(String ref) {
-        return pullLiveStatus(subs.findByRefIgnoreCase(ref).orElse(null));
+        return refreshStatus(ref, true);
+    }
+
+    /**
+     * @param throttled true for the high-volume public polling endpoint (rate-limit the live pull);
+     *                  false for the off-thread reconciliation sweep, which must always pull.
+     */
+    public Subscription refreshStatus(String ref, boolean throttled) {
+        Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);   // short read tx — connection released
+        if (s == null || s.getPayStatus() != PayStatus.pending) return s;
+        if (throttled && !statusThrottle.allow(s.getRef(), s.getCreatedAt())) return s;
+        PayStatus pulled = gateway.queryStatus(s).orElse(null);        // gateway I/O — NO DB connection held
+        if (pulled == null || pulled == PayStatus.pending) return s;
+        Subscription updated = persistPulledStatus(ref, pulled);
+        return updated != null ? updated : s;
+    }
+
+    /** Persist a terminal status pulled from the gateway, in its own short transaction. Re-checks the
+     *  row is still pending (the webhook may have settled it meanwhile) so we never double-apply. */
+    private Subscription persistPulledStatus(String ref, PayStatus pulled) {
+        Subscription updated = tx.execute(st -> {
+            Subscription s = subs.findByRefIgnoreCase(ref).orElse(null);
+            if (s == null || s.getPayStatus() != PayStatus.pending) return s;
+            if (pulled == PayStatus.failed) s.markFailed(); else s.setPayStatus(pulled);
+            if (pulled == PayStatus.paid) s.setPaidAt(Instant.now());
+            Subscription saved = subs.save(s);
+            if (pulled == PayStatus.paid) awardCommission(saved);
+            return saved;
+        });
+        statusThrottle.clear(ref);   // terminal → drop throttle bookkeeping
+        return updated;
     }
 
     /**

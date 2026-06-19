@@ -27,7 +27,7 @@ class RechargeFulfillEvidenceTest {
     private final RechargeRepository recharges = mock(RechargeRepository.class);
     private final AppUserRepository users = mock(AppUserRepository.class);
     private final RechargeService service =
-            new RechargeService(recharges, users, null, null, null, null, null, null);
+            new RechargeService(recharges, users, null, null, null, null, null, null, null, null);
 
     private Recharge paid() {
         Recharge r = new Recharge();

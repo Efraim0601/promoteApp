@@ -9,6 +9,7 @@ import com.afriland.promote.payment.GatewayClientMessages;
 import com.afriland.promote.payment.MomoDebitGuard;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.PaymentInitiationEvent;
+import com.afriland.promote.payment.LiveStatusThrottle;
 import com.afriland.promote.receipt.SaraReceipt;
 import com.afriland.promote.receipt.SaraReceiptExtractor;
 import com.afriland.promote.repo.AppUserRepository;
@@ -22,7 +23,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
@@ -61,10 +64,14 @@ public class RechargeService {
 
     private final java.security.SecureRandom rnd = new java.security.SecureRandom();
 
+    private final TransactionTemplate tx;
+    private final LiveStatusThrottle statusThrottle;
+
     public RechargeService(RechargeRepository recharges, AppUserRepository users, PaymentGateway gateway,
                            ImageStorage storage, SaraReceiptExtractor receiptExtractor,
                            CardConfigRepository configs, ReferenceSequence refs,
-                           ApplicationEventPublisher events) {
+                           ApplicationEventPublisher events, PlatformTransactionManager txManager,
+                           LiveStatusThrottle statusThrottle) {
         this.recharges = recharges;
         this.users = users;
         this.gateway = gateway;
@@ -73,6 +80,8 @@ public class RechargeService {
         this.configs = configs;
         this.refs = refs;
         this.events = events;
+        this.tx = new TransactionTemplate(txManager);
+        this.statusThrottle = statusThrottle;
     }
 
     /** Effective recharge bounds (admin-configured value, or the built-in default when unset). */
@@ -395,23 +404,39 @@ public class RechargeService {
         return v == null || v.isBlank();
     }
 
-    /** Public polling: refresh from the gateway's get-status while still pending. */
-    @Transactional
+    /** Public polling: refresh from the gateway's get-status while still pending. NOT @Transactional:
+     *  the slow gateway call runs WITHOUT holding a pooled DB connection (holding one under heavy
+     *  /status polling exhausted the pool). Rate-limited per order; webhook + reconcile stay primary. */
     public Recharge refreshStatus(String ref) {
-        return pullLiveStatus(recharges.findByRefIgnoreCase(ref).orElse(null));
+        return refreshStatus(ref, true);
     }
 
-    @Transactional
-    public Recharge pullLiveStatus(Recharge r) {
-        if (r != null && r.getPayStatus() == PayStatus.pending) {
-            PayStatus pulled = gateway.queryStatus(r).orElse(null);
-            if (pulled != null && pulled != PayStatus.pending) {
-                r.setPayStatus(pulled);
-                if (pulled == PayStatus.paid) r.setPaidAt(Instant.now());
-                recharges.save(r);
-            }
-        }
-        return r;
+    /**
+     * @param throttled true for the public polling endpoint (rate-limit the live pull); false for the
+     *                  off-thread reconciliation sweep, which must always pull.
+     */
+    public Recharge refreshStatus(String ref, boolean throttled) {
+        Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);   // short read tx — connection released
+        if (r == null || r.getPayStatus() != PayStatus.pending) return r;
+        if (throttled && !statusThrottle.allow(r.getRef(), r.getCreatedAt())) return r;
+        PayStatus pulled = gateway.queryStatus(r).orElse(null);         // gateway I/O — NO DB connection held
+        if (pulled == null || pulled == PayStatus.pending) return r;
+        Recharge updated = persistPulledStatus(ref, pulled);
+        return updated != null ? updated : r;
+    }
+
+    /** Persist a terminal status pulled from the gateway in its own short transaction. Re-checks the
+     *  row is still pending (the webhook may have settled it meanwhile) so we never double-apply. */
+    private Recharge persistPulledStatus(String ref, PayStatus pulled) {
+        Recharge updated = tx.execute(st -> {
+            Recharge r = recharges.findByRefIgnoreCase(ref).orElse(null);
+            if (r == null || r.getPayStatus() != PayStatus.pending) return r;
+            r.setPayStatus(pulled);
+            if (pulled == PayStatus.paid) r.setPaidAt(Instant.now());
+            return recharges.save(r);
+        });
+        statusThrottle.clear(ref);   // terminal → drop throttle bookkeeping
+        return updated;
     }
 
     /** MoMo simulation (validate / fail), mirrors SubscriptionService.applyPayment. */
