@@ -23,6 +23,17 @@
 		Referrer-Policy "strict-origin-when-cross-origin"
 		-Server
 	}
-	# le nginx du frontend (qui proxifie lui-même /api -> backend) sur le réseau interne
-	reverse_proxy frontend:80
+	# le nginx du frontend (qui proxifie lui-même /api -> backend) sur le réseau interne.
+	# Upstream DYNAMIQUE : Caddy ré-interroge le DNS Docker (127.0.0.11) toutes les 5 s au
+	# lieu de mettre en cache l'IP au démarrage. Sans ça, quand le conteneur frontend est
+	# recréé (un déploiement lui donne une nouvelle IP), Caddy continue de composer l'ancienne
+	# IP morte → 502 "connection refused" jusqu'au redémarrage de Caddy. Même pattern que la
+	# nginx.conf du frontend pour le backend.
+	reverse_proxy {
+		dynamic a frontend 80 {
+			refresh 5s
+			resolvers 127.0.0.11
+			versions ipv4
+		}
+	}
 }

@@ -90,6 +90,16 @@ if [ -n "$SCALE" ] && [ "$SCALE" -gt 1 ] 2>/dev/null; then
 fi
 say "Starting the stack…"; dc up -d "${SCALE_ARGS[@]}"
 
+# Caddy is a long-lived proxy that compose does NOT recreate when only the frontend/backend
+# images change. If the frontend container was recreated it got a new bridge IP, and Caddy may
+# keep dialing the stale one (→ 502 "connection refused"). Restart Caddy so it re-resolves the
+# freshly recreated upstream. (The Caddyfile also uses a dynamic resolver, so it self-heals
+# within a few seconds; this just makes recovery immediate after a deploy.)
+if [ "$LE" = 1 ] || [ "$TLS" = 1 ]; then
+  say "Restarting Caddy so it re-resolves the new frontend IP…"
+  dc restart caddy || err "Could not restart Caddy — run 'docker restart promoteapp-caddy-1' manually."
+fi
+
 # ---- 6. health check ----
 WEB_PORT="$(envval WEB_PORT)"; WEB_PORT="${WEB_PORT:-8973}"; HOST_PORT="${WEB_PORT##*:}"
 say "Waiting for the app to answer on http://localhost:${HOST_PORT} …"
