@@ -623,6 +623,26 @@ export interface PaymentTrendBucket {
   total: number;
 }
 
+/** One order's outcome in a reconciliation run (live gateway status pulled + realigned). */
+export interface ReconcilePullResult {
+  ref: string;
+  statusBefore: string | null;
+  statusAfter: string | null;
+  changed: boolean;
+  note: string | null;
+  reason: string | null;
+}
+
+/** Summary of a payment reconciliation over the last N hours. */
+export interface ReconcileReport {
+  hours: number;
+  scanned: number;
+  updated: number;
+  unchanged: number;
+  errors: number;
+  details: ReconcilePullResult[];
+}
+
 export interface ClaimResult {
   ok: boolean;
   reason: string | null;

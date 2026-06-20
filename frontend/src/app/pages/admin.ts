@@ -5,7 +5,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { ConfigStore } from '../core/config-store';
 import { Auth } from '../core/auth';
-import { ActionAudit, AdminStats, Agency, AgencyPickupStats, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, PERM_MATRIX, Profile, Recharge, Role, Subscription, UpdateUserRequest, User } from '../core/models';
+import { ActionAudit, AdminStats, Agency, AgencyPickupStats, ALL_ROLES, CardConfig, Collecte, CreateUserRequest, ImportAgenciesResult, ImportAgencyRow, ImportUserRow, ImportUsersResult, LoginAudit, PaymentStats, PaymentTrendBucket, PERM_MATRIX, Profile, Recharge, ReconcileReport, Role, Subscription, UpdateUserRequest, User } from '../core/models';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -336,6 +336,51 @@ import * as XLSX from 'xlsx';
           }
         </div>
       }
+
+      <!-- ===== Réconciliation des paiements : vérifier les N dernières heures ===== -->
+      <div class="card" style="padding:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <ic name="refresh" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">{{ i18n.t('recon_title') }}</h3>
+        </div>
+        <p class="muted" style="font-size:11.5px;line-height:1.45;margin-bottom:12px">{{ i18n.t('recon_sub') }}</p>
+        <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
+          <field [label]="i18n.t('recon_hours')" style="flex:0 0 130px">
+            <input type="number" min="1" max="168" [value]="reconHours()"
+                   (input)="reconHours.set(clampHours($any($event.target).value))" />
+          </field>
+          <button class="btn btn-primary" (click)="runReconcile()" [disabled]="reconLoading()" style="width:auto;padding:11px 18px">
+            @if (reconLoading()) { <spinner [size]="18"></spinner> } @else { <ic name="refresh" [size]="18"></ic> {{ i18n.t('recon_run') }} }
+          </button>
+        </div>
+        @if (reconError()) {
+          <div class="feedback err-box" style="font-size:12.5px;margin-top:12px"><ic name="alert" [size]="16" style="flex-shrink:0"></ic> {{ reconError() }}</div>
+        }
+        @if (reconReport(); as r) {
+          <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <div class="muted" style="font-size:11px;margin-bottom:8px">{{ i18n.t('recon_window', { hours: r.hours }) }}</div>
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+              <div class="kpi"><div class="kv">{{ r.scanned }}</div><div class="kl">{{ i18n.t('recon_scanned') }}</div></div>
+              <div class="kpi"><div class="kv" style="color:var(--success)">{{ r.updated }}</div><div class="kl">{{ i18n.t('recon_updated') }}</div></div>
+              <div class="kpi"><div class="kv" style="color:var(--muted)">{{ r.unchanged }}</div><div class="kl">{{ i18n.t('recon_unchanged') }}</div></div>
+              <div class="kpi"><div class="kv" [style.color]="r.errors ? 'var(--accent)' : 'var(--muted)'">{{ r.errors }}</div><div class="kl">{{ i18n.t('recon_errors') }}</div></div>
+            </div>
+            @if (reconChanged().length) {
+              <div style="margin-top:12px">
+                <div class="muted" style="font-size:11.5px;font-weight:700;margin-bottom:6px">{{ i18n.t('recon_changes') }}</div>
+                @for (d of reconChanged(); track d.ref) {
+                  <div class="srow" style="padding:5px 0;font-size:12px">
+                    <span class="lbl">{{ d.ref }}</span>
+                    <span class="val">{{ d.statusBefore }} → <b [style.color]="d.statusAfter === 'paid' ? 'var(--success)' : 'var(--accent)'">{{ d.statusAfter }}</b></span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="muted" style="font-size:11.5px;margin-top:10px">{{ i18n.t('recon_none') }}</p>
+            }
+          </div>
+        }
+      </div>
 
       <div class="card" style="padding:16px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
@@ -2162,6 +2207,33 @@ export class AdminComponent implements OnInit, OnDestroy {
 
   stats = signal<AdminStats | null>(null);
   payStats = signal<PaymentStats | null>(null);
+
+  // --- payment reconciliation (verify the last N hours against the live gateway) ---
+  reconHours = signal(4);
+  reconLoading = signal(false);
+  reconReport = signal<ReconcileReport | null>(null);
+  reconError = signal('');
+  /** Only the orders whose status actually moved (the regularised ones). */
+  reconChanged = computed(() => (this.reconReport()?.details ?? []).filter((d) => d.changed));
+  clampHours(v: unknown) { return Math.min(168, Math.max(1, Math.floor(Number(v) || 1))); }
+
+  runReconcile() {
+    if (this.reconLoading()) return;
+    this.reconLoading.set(true);
+    this.reconError.set('');
+    this.reconReport.set(null);
+    this.api.reconcilePayments(this.clampHours(this.reconHours())).subscribe({
+      next: (r) => { this.reconReport.set(r); this.reconLoading.set(false); },
+      error: (e) => {
+        this.reconLoading.set(false);
+        const code = e?.error?.error as string | undefined;
+        this.reconError.set(
+          code === 'reconcile_already_running' ? this.i18n.t('recon_busy')
+          : code === 'reconcile_requires_trustpayway' ? this.i18n.t('recon_no_gateway')
+          : this.i18n.t('recon_failed'));
+      },
+    });
+  }
 
   // Filtre date pour la vue d'ensemble
   overviewFrom = signal('');

@@ -6,7 +6,7 @@ import {
   Collecte, CollecteStats, CreateCollecteRequest,
   CreateRechargeRequest, CreateSubscriptionRequest, CreateUserRequest, CreateUserResult, ImportAgenciesResult, ImportAgencyRow,
   ActionAudit, ImportUserRow, ImportUsersResult, LoginAudit, Role,
-  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintReconciliation, PrintStats, PrintSupervisionStats, CashSupervisionStats, Profile, ProfileRequest, Recharge, SendNotificationRequest, Subscription, UpdateUserRequest, User,
+  LoginResponse, MapPoint, PaymentStats, PayStatus, PrintReconciliation, PrintStats, PrintSupervisionStats, CashSupervisionStats, Profile, ProfileRequest, Recharge, ReconcileReport, SendNotificationRequest, Subscription, UpdateUserRequest, User,
   Product, ProductRequest, Promotion, PromotionRequest,
   CommissionRule, CommissionRuleRequest, CommissionEntry, HierarchyStats,
   TeamMember, TeamMessageRequest,
@@ -311,6 +311,12 @@ export class Api {
   setUserRoles(id: string, roles: Role[]): Observable<User> {
     return this.http.put<User>(`${this.base}/users/${id}/roles`, { roles });
   }
+  /** Admin — reconcile MoMo payments from the last `hours` against the live gateway status
+   *  (pull get-status; recovers debited-but-expired/failed orders to paid). */
+  reconcilePayments(hours: number): Observable<ReconcileReport> {
+    return this.http.post<ReconcileReport>(`${this.base}/payment/reconcile`, null, { params: { hours } });
+  }
+
   /** Admin — recent login attempts (audit trail). */
   loginAudit(): Observable<LoginAudit[]> {
     return this.http.get<LoginAudit[]>(`${this.base}/audit/logins`);
