@@ -13,6 +13,10 @@
 # Les données (PostgreSQL + MinIO) et le certificat (caddy_data) sont CONSERVÉS :
 # ce script n'utilise jamais `down -v` ni `--fresh`.
 #
+# Réactivité : les dashboards passent par un cache court (Caffeine) côté backend et un polling
+# qui se met en pause quand l'onglet est en arrière-plan. Réglages optionnels dans .env
+# (valeurs par défaut sûres) : DB_POOL_MAX, STATS_CACHE_TTL_SECONDS.
+#
 set -euo pipefail
 cd "$(dirname "$0")"
 

@@ -5,7 +5,7 @@ import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { AgentStats, ClaimResult, Subscription } from '../core/models';
 import { isValidPhoneNumber } from 'libphonenumber-js';
-import { LIVE_REFRESH_MS, PAY_METHODS, recordStatus } from '../shared/constants';
+import { livePoll, PAY_METHODS, recordStatus } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { AvatarComponent } from '../shared/avatar';
@@ -228,7 +228,7 @@ export class AgentHomeComponent implements OnInit, OnDestroy {
   private api = inject(Api);
   private router = inject(Router);
   private receipt = inject(ReceiptService);
-  private poll?: ReturnType<typeof setInterval>;
+  private stopPoll?: () => void;
 
   stats = signal<AgentStats | null>(null);
   mine = signal<Subscription[]>([]);
@@ -278,9 +278,9 @@ export class AgentHomeComponent implements OnInit, OnDestroy {
   ngOnInit() {
     this.refresh();
     // Silent background refresh so newly paid / printed sales appear without a manual reload.
-    this.poll = setInterval(() => this.refresh(true), LIVE_REFRESH_MS);
+    this.stopPoll = livePoll(() => this.refresh(true));
   }
-  ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
+  ngOnDestroy() { this.stopPoll?.(); }
   private refresh(silent = false) {
     this.api.agentStats().subscribe((s) => this.stats.set(s));
     if (!silent) this.loading.set(true);

@@ -1,8 +1,10 @@
 package com.afriland.promote.web;
 
+import com.afriland.promote.config.CacheConfig;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.web.dto.Dtos.MapPointDto;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,8 +30,11 @@ public class MapController {
         this.users = users;
     }
 
-    /** All points to plot: every client (subscription) + every staff member. */
+    /** All points to plot: every client (subscription) + every staff member. Cached for a short window
+     *  — this loads every client + staff row, and the admin map polls/refreshes; the cache collapses
+     *  repeated loads into one DB scan per window. */
     @GetMapping("/points")
+    @Cacheable(CacheConfig.MAP_POINTS)
     public List<MapPointDto> points() {
         List<MapPointDto> out = new ArrayList<>();
 

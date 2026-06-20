@@ -7,7 +7,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { PrintReconciliation, PrintStats, Recharge, Subscription } from '../core/models';
-import { LIVE_REFRESH_MS, payById, recordStatus, formatPan } from '../shared/constants';
+import { livePoll, payById, recordStatus, formatPan } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -530,18 +530,18 @@ export class PrintPointComponent implements OnInit, OnDestroy {
   /** Only relationship officers / admins may add or correct a NIU (print agents view only). */
   get canEditNiu() { return this.auth.hasRole('AGENT', 'ADMIN'); }
 
-  private poll?: ReturnType<typeof setInterval>;
+  private stopPoll?: () => void;
   /** The last executed search query, so the live refresh re-runs the SAME search. */
   private lastQuery = '';
 
   ngOnInit() {
     this.loadStats();
     // Keep the queue/counters, the search results AND the open record live without a manual reload.
-    this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
+    this.stopPoll = livePoll(() => this.refreshLive());
     const prefill = this.route.snapshot.queryParamMap.get('ref');
     if (prefill) { this.ref.set(prefill.toUpperCase()); this.open(prefill); }
   }
-  ngOnDestroy() { if (this.poll) clearInterval(this.poll); this.clearSelfie(); }
+  ngOnDestroy() { this.stopPoll?.(); this.clearSelfie(); }
   private loadStats() { this.api.printStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} }); }
 
   /** Open the card-reconciliation table (cards I remitted vs activated) and (re)load it. */

@@ -8,14 +8,18 @@ import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.CollecteRepository;
 import com.afriland.promote.repo.CommissionEntryRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
+import com.afriland.promote.config.CacheConfig;
 import com.afriland.promote.web.dto.Dtos.HierarchyStatsDto;
 import com.afriland.promote.web.dto.Dtos.MemberStatsDto;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -47,6 +51,7 @@ public class HierarchyStatsService {
      * Per-member sales stats for the caller's scope, optionally filtered to a single product code.
      * Members with no activity are omitted so the list stays meaningful.
      */
+    @Cacheable(CacheConfig.HIERARCHY_STATS)
     public HierarchyStatsDto scopedStats(String callerId, Set<Role> callerRoles, String productCode) {
         boolean global = callerRoles.contains(Role.ADMIN) || callerRoles.contains(Role.MANAGER);
         Collection<AppUser> members = global ? users.findAll() : hierarchy.descendants(callerId);
@@ -54,6 +59,26 @@ public class HierarchyStatsService {
         boolean filterByProduct = productCode != null && !productCode.isBlank();
         boolean includeCard = !filterByProduct || ProductService.CARD_CODE.equalsIgnoreCase(productCode);
         boolean includeBank = !filterByProduct || !ProductService.CARD_CODE.equalsIgnoreCase(productCode);
+
+        // Batch-load commissions (and, for the product-filtered path, collectes) for ALL members in ONE
+        // query each, then aggregate per member in memory — instead of a full-list load per member inside
+        // the loop (the previous N+1: one commission scan + one collecte scan per member).
+        List<String> ids = members.stream().map(AppUser::getId).toList();
+        Map<String, Long> commissionByMember = new HashMap<>();
+        Map<String, Long> filteredCollectesByMember = new HashMap<>();
+        if (!ids.isEmpty()) {
+            for (CommissionEntry e : commissionEntries.findByBeneficiaryIdIn(ids)) {
+                if (filterByProduct && !productCode.equalsIgnoreCase(e.getProductCode())) continue;
+                commissionByMember.merge(e.getBeneficiaryId(), (long) e.getAmount(), Long::sum);
+            }
+            if (includeBank && filterByProduct) {
+                for (Collecte c : collectes.findByCollectedByIdIn(ids)) {
+                    if (productCode.equalsIgnoreCase(c.getProduct())) {
+                        filteredCollectesByMember.merge(c.getCollectedById(), 1L, Long::sum);
+                    }
+                }
+            }
+        }
 
         List<MemberStatsDto> rows = new ArrayList<>();
         long tSubs = 0, tAmount = 0, tCollectes = 0, tCommissions = 0;
@@ -70,15 +95,13 @@ public class HierarchyStatsService {
 
             long collectesCount = 0;
             if (includeBank) {
+                // Non-filtered path keeps the cheap indexed COUNT; filtered path reads the pre-grouped map.
                 collectesCount = filterByProduct
-                        ? collectes.findByCollectedByIdOrderByCreatedAtDesc(id).stream()
-                            .filter(c -> productCode.equalsIgnoreCase(c.getProduct())).count()
+                        ? filteredCollectesByMember.getOrDefault(id, 0L)
                         : collectes.countByCollectedById(id);
             }
 
-            long commission = commissionEntries.findByBeneficiaryIdOrderByCreatedAtDesc(id).stream()
-                    .filter(e -> !filterByProduct || productCode.equalsIgnoreCase(e.getProductCode()))
-                    .mapToLong(CommissionEntry::getAmount).sum();
+            long commission = commissionByMember.getOrDefault(id, 0L);
 
             if (subsCount == 0 && collectesCount == 0 && commission == 0) continue;
 

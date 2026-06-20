@@ -789,8 +789,9 @@ public class SubscriptionService {
         String wantPhone = local9(phone);
         String wantCni = normCniMatch(cni);
 
-        Subscription match = subs.findAll().stream()
-                .filter(s -> "self".equals(s.getChannel()))
+        // Narrow the candidate set in SQL (self channel + last-9 phone match across the 3 numbers)
+        // so the exact match runs in memory over a handful of rows, not a whole-table findAll() scan.
+        Subscription match = subs.findSelfClaimCandidates(wantPhone).stream()
                 // Look the client up by ANY of their numbers: contact, Mobile Money payer, or SARA payer
                 // (the agent often only knows the number the client paid with, not the contact number).
                 .filter(s -> phoneMatches(s, wantPhone))

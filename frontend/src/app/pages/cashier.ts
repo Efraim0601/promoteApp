@@ -7,7 +7,7 @@ import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { CashierStats, Recharge, Subscription } from '../core/models';
-import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, formatPhone } from '../shared/constants';
+import { livePoll, payById, recordStatus, formatPan, formatPhone } from '../shared/constants';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
@@ -487,7 +487,7 @@ export class CashierComponent implements OnInit, OnDestroy {
   pm = (r: Subscription) => payById(r.pay);
   status = (r: Subscription) => recordStatus(r);
 
-  private poll?: ReturnType<typeof setInterval>;
+  private stopPoll?: () => void;
   /** The last executed search query, so the live refresh re-runs the SAME search. */
   private lastQuery = '';
 
@@ -495,11 +495,11 @@ export class CashierComponent implements OnInit, OnDestroy {
     this.loadStats();
     this.loadPending();
     // Keep the queue/counters, the search results AND the open record live without a manual reload.
-    this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
+    this.stopPoll = livePoll(() => this.refreshLive());
     const prefill = this.route.snapshot.queryParamMap.get('ref');
     if (prefill) { this.ref.set(prefill.toUpperCase()); this.open(prefill); }
   }
-  ngOnDestroy() { if (this.poll) clearInterval(this.poll); this.clear(); }
+  ngOnDestroy() { this.stopPoll?.(); this.clear(); }
   private loadStats() { this.api.cashierStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} }); }
 
   /** Load the validation queue; a strong alert fires when its size grows (a new recharge to credit). */

@@ -6,8 +6,10 @@ import com.afriland.promote.model.Role;
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
+import com.afriland.promote.config.CacheConfig;
 import com.afriland.promote.util.PanUtils;
 import com.afriland.promote.web.dto.Dtos.*;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -43,6 +45,7 @@ public class StatsService {
                 .mapToLong(Subscription::getAmount).sum();
     }
 
+    @Cacheable(CacheConfig.ADMIN_STATS)
     public AdminStats adminStats(LocalDate from, LocalDate to) {
         ZoneId zone = ZoneId.systemDefault();
         Instant todayStart = startOfToday();
@@ -141,6 +144,7 @@ public class StatsService {
     /** Supervisor view — per-print-agent remittance for one day (ALL print agents, no exception), so
      *  the supervisor can validate everyone's daily print reconciliation. {@code day} = null → today.
      *  Every print agent is listed (including those with 0 that day) to confirm the full roster. */
+    @Cacheable(CacheConfig.PRINT_SUPERVISION)
     public PrintSupervisionStats printSupervision(LocalDate day) {
         ZoneId zone = ZoneId.systemDefault();
         LocalDate d = day != null ? day : LocalDate.now(zone);
@@ -165,6 +169,7 @@ public class StatsService {
     /** Supervisor view — per-cashier collection for one day (ALL cashiers, no exception), so the
      *  supervisor can validate everyone's daily cash reconciliation. {@code day} = null → today.
      *  Every cashier is listed (including those with 0 that day). */
+    @Cacheable(CacheConfig.CASH_SUPERVISION)
     public CashSupervisionStats cashSupervision(LocalDate day) {
         ZoneId zone = ZoneId.systemDefault();
         LocalDate d = day != null ? day : LocalDate.now(zone);
@@ -188,10 +193,10 @@ public class StatsService {
 
     /** Mobile Money payment funnel for the admin dashboard: volumes & success per network, failure
      *  causes (from the stored decline reason), and the confirmation latency (createdAt → paidAt). */
+    @Cacheable(CacheConfig.PAYMENT_STATS)
     public PaymentStats paymentStats() {
-        List<Subscription> momo = subscriptions.all().stream()
-                .filter(s -> "om".equals(s.getPay()) || "mtn".equals(s.getPay()))
-                .toList();
+        // MoMo rows fetched directly in SQL (was: load every subscription, filter in memory).
+        List<Subscription> momo = subs.findMomo();
         long paid = momo.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
         long failed = momo.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
         long pending = momo.stream().filter(s -> s.getPayStatus() == PayStatus.pending).count();
@@ -288,6 +293,7 @@ public class StatsService {
     }
 
     /** Pickup-agency stats: delivery-mode breakdown + ranking of branches, with optional date window. */
+    @Cacheable(CacheConfig.AGENCY_STATS)
     public AgencyPickupStats agencyStats(LocalDate from, LocalDate to) {
         ZoneId zone = ZoneId.systemDefault();
         Instant fromInst = from != null ? from.atStartOfDay(zone).toInstant() : null;

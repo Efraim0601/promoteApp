@@ -18,6 +18,22 @@ export const payById = (id: string): PayMethod => PAY_METHODS.find((p) => p.id =
 export const LIVE_REFRESH_MS = 15000;
 
 /**
+ * Background polling that PAUSES while the browser tab is hidden and resumes — with an immediate
+ * refresh — when it becomes visible again. Idle background tabs were the biggest source of wasted
+ * load: an agent who left a dashboard open in another tab kept hitting the server every
+ * LIVE_REFRESH_MS for nothing. Skipping hidden ticks cuts that fixed background traffic to zero,
+ * and the on-visible refresh means the user never sees stale data when they switch back.
+ * Returns a disposer that stops the interval and detaches the visibility listener (call it in
+ * ngOnDestroy in place of clearInterval).
+ */
+export function livePoll(cb: () => void, intervalMs: number = LIVE_REFRESH_MS): () => void {
+  const timer = setInterval(() => { if (!document.hidden) cb(); }, intervalMs);
+  const onVisible = () => { if (!document.hidden) cb(); };
+  document.addEventListener('visibilitychange', onVisible);
+  return () => { clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
+}
+
+/**
  * Smart KYC capture: live face detection on the selfie (reject filming something other than a
  * head) + live auto-framing/auto-capture on the CNI. Degrades gracefully — if the MediaPipe model
  * can't load, the camera falls back to plain manual capture. Set to false to revert every capture

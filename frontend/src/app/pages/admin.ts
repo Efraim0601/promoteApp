@@ -16,7 +16,7 @@ import { StatusBadgeComponent } from '../shared/status-badge';
 import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
 import { NotifBellComponent } from '../shared/notif-bell';
-import { LIVE_REFRESH_MS, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
+import { livePoll, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
 import { SlicePipe, NgTemplateOutlet } from '@angular/common';
 import * as XLSX from 'xlsx';
 
@@ -2101,7 +2101,7 @@ export class AdminComponent implements OnInit, OnDestroy {
   private api = inject(Api);
   private configStore = inject(ConfigStore);
   private router = inject(Router);
-  private poll?: ReturnType<typeof setInterval>;
+  private stopPoll?: () => void;
 
   /** Active sidebar section. */
   section = signal<'overview' | 'config' | 'users' | 'agencies' | 'agence-retrait' | 'transactions' | 'recharges' | 'collectes' | 'audit' | 'map' | 'habilitations'>('overview');
@@ -3211,9 +3211,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.loadedSections.add('config');
     // agencies, recharges, collectes, audit are lazy-loaded by _sectionEffect on first visit
     // Silent background refresh of the KPIs + transactions table (no spinner, keeps filters intact).
-    this.poll = setInterval(() => this.refreshLive(), LIVE_REFRESH_MS);
+    this.stopPoll = livePoll(() => this.refreshLive());
   }
-  ngOnDestroy() { if (this.poll) clearInterval(this.poll); }
+  ngOnDestroy() { this.stopPoll?.(); }
   private refreshLive() {
     this.api.adminStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
     this.api.paymentStats().subscribe({ next: (p) => this.payStats.set(p), error: () => {} });

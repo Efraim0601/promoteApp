@@ -7,9 +7,10 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:promote}
     password: ${SPRING_DATASOURCE_PASSWORD:promote}
     hikari:
-      # More concurrent DB connections so dashboard polling doesn't queue on a tiny pool.
-      maximum-pool-size: ${DB_POOL_MAX:25}
-      minimum-idle: ${DB_POOL_MIN:5}
+      # More concurrent DB connections so dashboard polling + the async payment pipeline don't queue
+      # on a tiny pool. Sized above the previous 25 (which the load test could exhaust under polling).
+      maximum-pool-size: ${DB_POOL_MAX:50}
+      minimum-idle: ${DB_POOL_MIN:10}
   jpa:
     hibernate:
       ddl-auto: update
@@ -49,6 +50,12 @@ app:
     name: ${CASHIER_NAME:Caissier Promote}
   seed:
     test-agent: ${SEED_TEST_AGENT:true}   # set false in production to skip the demo agent
+  cache:
+    # Short-TTL cache (Caffeine) over the heavy dashboard KPI aggregations. Dashboards poll ~15 s;
+    # this collapses repeated polls into one DB hit per window. Raise the TTL to shed more DB load
+    # at the cost of slightly staler counters; lower it (or 0-effect by disabling cache) for fresher.
+    stats-ttl-seconds: ${STATS_CACHE_TTL_SECONDS:30}
+    max-size: ${STATS_CACHE_MAX_SIZE:1000}
   kyc:
     cni-ocr:
       # OCR the captured CNI front and cross-check it against the typed data (advisory warning,

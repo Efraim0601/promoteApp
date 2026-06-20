@@ -25,6 +25,18 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
      *  (referrer_phone9). Both columns are indexed — replaces a full-table scan + in-memory match. */
     List<Subscription> findByAgentIdOrReferrerPhone9OrderByCreatedAtAsc(String agentId, String referrerPhone9);
 
+    /** QR-claim candidate set: self-channel rows whose contact / MoMo / SARA payer number matches the
+     *  looked-up number on its last 9 digits — narrowed in SQL so the exact phone + CNI match runs in
+     *  memory over a handful of rows instead of the whole table (replaces a {@code findAll()} scan).
+     *  The last-9 comparison mirrors {@code SubscriptionService.local9}. CNI is fine-filtered in code
+     *  (legacy rows may carry a null {@code cni_norm}), so it is deliberately not constrained here. */
+    @Query(value = "select * from subscription s where s.channel = 'self' and :want9 <> '' and ("
+            + "right(regexp_replace(coalesce(s.phone,''), '\\\\D', '', 'g'), 9) = :want9 "
+            + "or right(regexp_replace(coalesce(s.pay_phone,''), '\\\\D', '', 'g'), 9) = :want9 "
+            + "or right(regexp_replace(coalesce(s.sara_payer_phone,''), '\\\\D', '', 'g'), 9) = :want9) "
+            + "order by s.created_at desc", nativeQuery = true)
+    List<Subscription> findSelfClaimCandidates(@Param("want9") String want9);
+
     /** Resume-window de-dup: narrow the candidate set in SQL (status + method + amount + recent) so the
      *  last-9-digit phone match runs in memory over a handful of rows, not the whole table. */
     List<Subscription> findByPayStatusAndPayAndAmountAndCreatedAtAfter(
@@ -61,6 +73,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
 
     /** Backfill of {@link Subscription#getReferrerPhone9()} for legacy rows (batch-limited). */
     List<Subscription> findByReferrerPhone9IsNullAndReferrerPhoneIsNotNull(Pageable pageable);
+
+    /** MoMo subscriptions only (Orange/MTN), oldest first — backs the payment-funnel stats. Narrows the
+     *  in-memory set to MoMo rows in SQL instead of loading every subscription and filtering in Java. */
+    @Query("select s from Subscription s where lower(s.pay) in ('om', 'mtn') order by s.createdAt asc")
+    List<Subscription> findMomo();
 
     // ---- aggregated KPIs (computed in SQL instead of loading the whole table into memory) ----
     long countByPayStatus(PayStatus payStatus);

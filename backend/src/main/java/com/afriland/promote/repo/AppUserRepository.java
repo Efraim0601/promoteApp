@@ -3,6 +3,8 @@ package com.afriland.promote.repo;
 import com.afriland.promote.model.AppUser;
 import com.afriland.promote.model.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +24,16 @@ public interface AppUserRepository extends JpaRepository<AppUser, String> {
      *  referrer resolution. Filtered in code because {@code roles LIKE '%AGENT%'} would also match
      *  PRINT_AGENT. */
     default List<AppUser> findByEffectiveRole(Role role) {
-        return findAll().stream().filter(u -> u.effectiveRoles().contains(role)).toList();
+        // Narrow in SQL (primary role column OR the comma-separated roles string contains the name)
+        // instead of loading the whole users table, then fine-filter in code so a LIKE '%AGENT%' that
+        // also matched PRINT_AGENT is dropped (effectiveRoles() parses exact tokens).
+        return findByEffectiveRoleCandidates(role, role.name()).stream()
+                .filter(u -> u.effectiveRoles().contains(role)).toList();
     }
+
+    /** SQL pre-filter for {@link #findByEffectiveRole}: rows whose primary {@code role} equals the role
+     *  OR whose multi-role {@code roles} string mentions its name. Intentionally broad (PRINT_AGENT also
+     *  matches '%AGENT%') — the caller fine-filters in memory. */
+    @Query("select u from AppUser u where u.role = :role or u.roles like concat('%', :roleName, '%')")
+    List<AppUser> findByEffectiveRoleCandidates(@Param("role") Role role, @Param("roleName") String roleName);
 }
