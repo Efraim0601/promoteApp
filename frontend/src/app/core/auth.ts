@@ -70,19 +70,37 @@ export class Auth {
     this.router.navigate(['/login'], { queryParams: { expired: 1 } });
   }
 
-  /** Effective roles of the current user (the full set, or just the primary on older sessions). */
+  /** Decode the JWT payload (claims) — the SAME token the backend authorises against. Returns null
+   *  when there is no token or it can't be parsed. UTF-8 safe (names with accents). */
+  private tokenClaims(): { role?: string; roles?: string; permissions?: string } | null {
+    const seg = this.token?.split('.')[1];
+    if (!seg) return null;
+    try {
+      const b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
+      const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
+      const bytes = Uint8Array.from(atob(pad), (c) => c.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    } catch { return null; }
+  }
+
+  /** Effective roles of the current session, read FROM THE JWT — the single source of truth shared
+   *  with the backend. This guarantees the route guards and the API can never disagree (a stale
+   *  token simply carries stale roles for BOTH sides, instead of the guard trusting a separately
+   *  stored user object). Falls back to the legacy single `role` claim on very old tokens. */
   roles(): Role[] {
-    const u = this.user();
-    if (!u) return [];
-    return u.roles && u.roles.length ? u.roles : (u.role ? [u.role] : []);
+    const c = this.tokenClaims();
+    const csv = (c?.roles && c.roles.length ? c.roles : c?.role) ?? '';
+    return csv.split(',').map((s) => s.trim()).filter(Boolean) as Role[];
   }
   hasRole(...roles: Role[]): boolean {
     const mine = this.roles();
     return roles.some((r) => mine.includes(r));
   }
 
+  /** Effective permissions, also read from the JWT for the same single-source-of-truth reason. */
   permissions(): Permission[] {
-    return (this.user()?.permissions ?? []) as Permission[];
+    const csv = this.tokenClaims()?.permissions ?? '';
+    return csv.split(',').map((s) => s.trim()).filter(Boolean) as Permission[];
   }
 
   /** ADMIN bypasses all permission checks for backward compatibility with pre-profile sessions. */
