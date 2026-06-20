@@ -296,8 +296,11 @@ public class StatsService {
     @Cacheable(CacheConfig.AGENCY_STATS)
     public AgencyPickupStats agencyStats(LocalDate from, LocalDate to) {
         ZoneId zone = ZoneId.systemDefault();
-        Instant fromInst = from != null ? from.atStartOfDay(zone).toInstant() : null;
-        Instant toInst   = to   != null ? to.plusDays(1).atStartOfDay(zone).toInstant() : null;
+        // Always pass a bounded window: a null bind tested with `IS NULL` is rejected by PostgreSQL
+        // ("could not determine data type of parameter"). EPOCH .. year-9999 covers the "all time" view.
+        Instant fromInst = from != null ? from.atStartOfDay(zone).toInstant() : Instant.EPOCH;
+        Instant toInst   = to   != null ? to.plusDays(1).atStartOfDay(zone).toInstant()
+                                        : Instant.parse("9999-12-31T23:59:59Z");
         long totalAgence  = subs.countByDeliveryInWindow("agence",   fromInst, toInst);
         long totalPromote = subs.countByDeliveryInWindow("promote",  fromInst, toInst);
         long totalHome    = subs.countByDeliveryInWindow("home",     fromInst, toInst);

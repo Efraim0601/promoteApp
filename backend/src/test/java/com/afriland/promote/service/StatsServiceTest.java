@@ -5,6 +5,7 @@ import com.afriland.promote.model.Role;
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
+import com.afriland.promote.web.dto.Dtos.AgencyPickupStats;
 import com.afriland.promote.web.dto.Dtos.CashierStats;
 import com.afriland.promote.web.dto.Dtos.CashSupervisionStats;
 import com.afriland.promote.web.dto.Dtos.CashierDayRow;
@@ -94,6 +95,24 @@ class StatsServiceTest {
         service.validateCash(cash.getRef(), "validate", null, "rank-cashier", null);
         assertEquals(2, repo.countPaidOwnedOrReferred(agent, ""),
                 "collected cash becomes paid and now counts toward the ranking");
+    }
+
+    /** Agency stats must work for the "all time" view (no date window). The query passed {@code null}
+     *  bounds, which PostgreSQL rejected with "could not determine data type of parameter" — the service
+     *  now substitutes wide sentinel bounds. Also checks a far-past window excludes today's sales. */
+    @Test
+    void agencyStatsAllTimeAndBoundedWindow() {
+        // A fresh "promote"-delivery sale; created now (@CreationTimestamp), so it falls in any window
+        // that includes today and outside any window that ends before today.
+        service.create(req("om", "655990099", "AGEN9999"), "agent", "agency-stat-agent");
+
+        // All-time view (the path that crashed on PostgreSQL): must return without error and count it.
+        AgencyPickupStats allTime = stats.agencyStats(null, null);
+        assertTrue(allTime.totalPromote() >= 1, "the promote sale is counted in the all-time view");
+
+        // A window entirely in the past must exclude a sale created today.
+        AgencyPickupStats past = stats.agencyStats(LocalDate.of(2020, 1, 1), LocalDate.of(2020, 1, 2));
+        assertEquals(0, past.totalPromote(), "a 2020 window excludes a sale created today");
     }
 
     /** Supervisor daily reconciliation: print remittance and cash collection are attributed to the right
