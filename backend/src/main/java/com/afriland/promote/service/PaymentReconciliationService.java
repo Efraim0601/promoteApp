@@ -6,6 +6,7 @@ import com.afriland.promote.repo.RechargeRepository;
 import com.afriland.promote.repo.SubscriptionRepository;
 import com.afriland.promote.web.dto.Dtos.ReconcilePullResult;
 import com.afriland.promote.web.dto.Dtos.ReconcileReport;
+import com.afriland.promote.web.dto.Dtos.VerifyResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -23,7 +24,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.CONFLICT;
+import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 /**
  * Manual reconciliation: query TrustPayWay get-status for MoMo orders in a time window and align
@@ -63,6 +66,35 @@ public class PaymentReconciliationService {
         this.subscriptionService = subscriptionService;
         this.rechargeService = rechargeService;
         this.reconcileExecutor = reconcileExecutor;
+    }
+
+    /**
+     * Per-order verification — the merchant-facing reconciliation entry point (GET /api/verify/{orderId}).
+     * Resolves the order by its gateway order id (subscriptions first; ids are globally unique, then
+     * recharges), pulls the live TrustPayWay status and realigns the local record. This is exactly
+     * what regularises a "débité mais expiré/échoué" case: {@link SubscriptionService#reconcileFromGateway}
+     * recovers a {@code failed} (displayed "Expiré") order to {@code paid} once the aggregator confirms.
+     *
+     * <p>Lightweight and idempotent: no sweep mutex (it's a single targeted gateway call), and the
+     * gateway is only contacted while the order is still {@code pending}/{@code failed} — an already
+     * settled order returns its status without an external call.
+     */
+    public VerifyResult verifyOrder(String orderId) {
+        if (orderId == null || orderId.isBlank()) {
+            throw new ResponseStatusException(BAD_REQUEST, "order_id_required");
+        }
+        String id = orderId.trim();
+        Subscription sub = subscriptionService.findByOrderId(id);
+        if (sub != null) {
+            ReconcilePullResult r = subscriptionService.reconcileFromGateway(sub.getRef());
+            return new VerifyResult(id, sub.getRef(), "subscription", r.statusAfter(), r.changed(), r.reason());
+        }
+        Recharge rec = rechargeService.findByOrderId(id);
+        if (rec != null) {
+            ReconcilePullResult r = rechargeService.reconcileFromGateway(rec.getRef());
+            return new VerifyResult(id, rec.getRef(), "recharge", r.statusAfter(), r.changed(), r.reason());
+        }
+        throw new ResponseStatusException(NOT_FOUND, "order_not_found");
     }
 
     /** Shared with {@link PaymentReconciliationJob} — only one sweep at a time. */

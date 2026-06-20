@@ -370,6 +370,18 @@ public final class Dtos {
         }
     }
 
+    /** Result of a per-order verification (GET /api/verify/{orderId}): the live gateway status was
+     *  pulled and the local record realigned. {@code changed} is true when the check moved the local
+     *  status (e.g. a debited-but-"expiré"/failed order recovered to paid). {@code message} carries
+     *  the aggregator's reason on a genuine failure (null when paid / unchanged). */
+    public record VerifyResult(
+            String orderId,
+            String ref,
+            String kind,        // "subscription" | "recharge"
+            String status,      // authoritative pay status after the live check
+            boolean changed,
+            String message) {}
+
     /** Summary of a manual reconciliation run (admin script / API). */
     public record ReconcileReport(
             int hours,
