@@ -17,9 +17,15 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
     Optional<Recharge> findByGatewayRef(String gatewayRef);
     long countByPayStatus(PayStatus payStatus);
 
-    /** Reconciliation sweep: still-pending recharges in [windowStart, pullCutoff) (batch-limited). */
+    /** Reconciliation sweep: still-pending recharges in [windowStart, pullCutoff) (batch-limited).
+     *  Oldest-first so the pending sweep reaches (and can expire) the oldest pending rows first. */
     List<Recharge> findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
             PayStatus payStatus, Instant windowStart, Instant pullCutoff, Pageable pageable);
+
+    /** Failed-recharge recheck: failed recharges in [windowStart, now) (batch-limited), NEWEST first —
+     *  recent failures are the recoverable ones, so a backlog of old failures can't starve them. */
+    List<Recharge> findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+            PayStatus payStatus, Instant windowStart, Instant now, Pageable pageable);
 
     /** Recent MoMo recharges (any status) for duplicate-debit guard and resume. */
     @Query("select r from Recharge r where lower(r.pay) = lower(:pay) and r.amount = :amount "
@@ -31,12 +37,14 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
      *  on pay_status — replaces a full-table scan + in-memory filter. */
     List<Recharge> findByPayStatusAndFulfilledFalseOrderByCreatedAtAsc(PayStatus payStatus);
 
-    /** Manual reconciliation: MoMo recharges still pending/failed with a gateway id, since a cutoff (batch-limited). */
+    /** Manual reconciliation: MoMo recharges still pending/failed with a gateway id, since a cutoff
+     *  (batch-limited). NEWEST first so a large window with a backlog of old genuine failures still
+     *  reconciles the most recent (recoverable) orders rather than the oldest, unrecoverable ones. */
     @Query("select r from Recharge r where r.createdAt >= :since "
             + "and r.payStatus in (com.afriland.promote.model.PayStatus.pending, com.afriland.promote.model.PayStatus.failed) "
             + "and r.gatewayRef is not null "
             + "and lower(r.pay) in ('om', 'mtn') "
-            + "order by r.createdAt asc")
+            + "order by r.createdAt desc")
     List<Recharge> findMoMoReconcilableSince(@Param("since") Instant since, Pageable pageable);
 
     /**

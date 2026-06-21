@@ -143,9 +143,11 @@ public class PaymentReconciliationJob {
         if (recheckFailedSeconds <= 0) return;
         Instant windowStart = now.minusSeconds(recheckFailedSeconds);
 
-        List<Subscription> sFailed = subs.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+        // Newest-first: a backlog of old, genuinely-failed orders must not fill the batch and starve the
+        // recent failures, which are the ones a late operator confirmation can still flip to paid.
+        List<Subscription> sFailed = subs.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
                 PayStatus.failed, windowStart, now, page);
-        List<Recharge> rFailed = recharges.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
+        List<Recharge> rFailed = recharges.findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
                 PayStatus.failed, windowStart, now, page);
 
         int total = sFailed.size() + rFailed.size();

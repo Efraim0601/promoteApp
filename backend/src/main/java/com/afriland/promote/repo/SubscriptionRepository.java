@@ -17,9 +17,16 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     Optional<Subscription> findByRefIgnoreCase(String ref);
     Optional<Subscription> findByGatewayRef(String gatewayRef);
 
-    /** Reconciliation sweep: still-pending orders in [windowStart, pullCutoff) (batch-limited). */
+    /** Reconciliation sweep: still-pending orders in [windowStart, pullCutoff) (batch-limited).
+     *  Oldest-first so the pending sweep reaches (and can expire) the oldest pending rows first. */
     List<Subscription> findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtAsc(
             PayStatus payStatus, Instant windowStart, Instant pullCutoff, Pageable pageable);
+
+    /** Failed-order recheck: failed orders in [windowStart, now) (batch-limited), NEWEST first. Recent
+     *  failures are the recoverable ones (a late operator confirmation flips them to paid); newest-first
+     *  ensures a backlog of old, genuinely-failed orders can't fill the batch and starve them. */
+    List<Subscription> findByPayStatusAndCreatedAtGreaterThanEqualAndCreatedAtLessThanOrderByCreatedAtDesc(
+            PayStatus payStatus, Instant windowStart, Instant now, Pageable pageable);
 
     /** Agent portfolio (mine): sales the agent owns (agent_id) OR sales referring the agent's phone
      *  (referrer_phone9). Both columns are indexed — replaces a full-table scan + in-memory match. */
@@ -48,12 +55,15 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     List<Subscription> findRecentMomoAttempts(
             @Param("pay") String pay, @Param("amount") int amount, @Param("since") Instant since);
 
-    /** Manual reconciliation: MoMo orders still pending/failed with a gateway id, since a cutoff (batch-limited). */
+    /** Manual reconciliation: MoMo orders still pending/failed with a gateway id, since a cutoff
+     *  (batch-limited). NEWEST first: with a large window and a backlog of old genuine failures, the
+     *  batch must cover the most recent orders (where a débité-mais-expiré is recoverable) rather than
+     *  being consumed by the oldest, unrecoverable ones. */
     @Query("select s from Subscription s where s.createdAt >= :since "
             + "and s.payStatus in (com.afriland.promote.model.PayStatus.pending, com.afriland.promote.model.PayStatus.failed) "
             + "and s.gatewayRef is not null "
             + "and lower(s.pay) in ('om', 'mtn') "
-            + "order by s.createdAt asc")
+            + "order by s.createdAt desc")
     List<Subscription> findMoMoReconcilableSince(@Param("since") Instant since, Pageable pageable);
 
     /** True when this CNI already has a non-failed subscription (one card per CNI). */
