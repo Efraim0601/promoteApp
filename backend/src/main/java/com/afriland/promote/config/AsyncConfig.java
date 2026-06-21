@@ -21,8 +21,13 @@ import java.util.concurrent.ThreadPoolExecutor;
  * the legacy synchronous behaviour rather than dropping a payment.
  *
  * <p>{@code reconcileExecutor} runs reconciliation sweeps on its own bounded pool, separate from
- * {@code paymentExecutor}. When saturated, extra reconcile tasks are dropped (never executed on the
- * caller thread) so live payment pushes are never delayed by reconciliation back-pressure.
+ * {@code paymentExecutor}, so live payment pushes are never delayed by reconciliation back-pressure.
+ * When saturated it applies {@code CallerRunsPolicy}: the submitting reconcile thread runs the task
+ * itself rather than the task being dropped. Dropping was unsafe here — reconcile jobs are submitted as
+ * {@link java.util.concurrent.CompletableFuture}s, and a silently-discarded task leaves its future
+ * uncompleted, hanging the batch await for the full timeout (the 120 s manual-reconcile freeze that the
+ * operator sees as "Échec de la réconciliation"). Because this pool is independent of
+ * {@code paymentExecutor}, borrowing the caller thread never slows a payment.
  */
 @Configuration
 @EnableAsync
@@ -74,10 +79,17 @@ public class AsyncConfig {
         ex.setQueueCapacity(reconcileQueue);
         ex.setKeepAliveSeconds(keepAliveSeconds);
         ex.setThreadNamePrefix("reconcile-");
-        // Never borrow the submitting thread (scheduler / HTTP) — drop when saturated; payments stay fast.
-        ex.setRejectedExecutionHandler((r, executor) ->
-                log.warn("Reconcile pool saturated (active={}, queue={}) — task dropped; payments unaffected",
-                        executor.getActiveCount(), executor.getQueue().size()));
+        // Graceful back-pressure: when the pool+queue are full the submitting reconcile thread runs the task
+        // itself. We must NOT silently drop it — reconcile jobs are CompletableFutures, and a discarded task
+        // leaves its future uncompleted, hanging the batch await for the full timeout (the 120 s freeze the
+        // operator sees as "Échec de la réconciliation"). This pool is separate from paymentExecutor, so
+        // borrowing the caller thread never delays a payment.
+        ex.setRejectedExecutionHandler((r, executor) -> {
+            if (executor.isShutdown()) return;
+            log.warn("Reconcile pool saturated (active={}, queue={}) — running on caller thread; payments unaffected",
+                    executor.getActiveCount(), executor.getQueue().size());
+            r.run();
+        });
         ex.setWaitForTasksToCompleteOnShutdown(true);
         ex.setAwaitTerminationSeconds(30);
         ex.initialize();

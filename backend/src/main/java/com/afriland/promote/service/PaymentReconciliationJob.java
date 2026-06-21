@@ -121,8 +121,8 @@ public class PaymentReconciliationJob {
         int total = sPending.size() + rPending.size();
         if (total == 0) return;
 
-        // Bounded chunks so the reconcile pool never rejects a task (a dropped task's future would never
-        // complete and hang the await on the full batch timeout). Shared with the manual sweep.
+        // Bounded chunks keep parallelism matched to the pool; on overflow the pool's CallerRunsPolicy runs
+        // the task on this thread rather than dropping it, so no future is ever orphaned. Shared with the manual sweep.
         List<Supplier<Void>> jobs = new ArrayList<>(total);
         for (Subscription s : sPending) jobs.add(() -> { reconcileSubscription(s, expireCutoff); return null; });
         for (Recharge r : rPending) jobs.add(() -> { reconcileRecharge(r, expireCutoff); return null; });

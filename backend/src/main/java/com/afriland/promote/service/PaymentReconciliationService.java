@@ -137,9 +137,9 @@ public class PaymentReconciliationService {
             for (Subscription s : subRows) jobs.add(() -> subscriptionService.reconcileFromGateway(s.getRef()));
             for (Recharge r : rechRows) jobs.add(() -> rechargeService.reconcileFromGateway(r.getRef()));
 
-            // Bounded chunks so the reconcile pool never rejects a task. A rejected task would leave its
-            // future uncompleted, hanging the await for the full batch timeout (the 120s freeze seen in prod
-            // when >80 orders matched) and returning partial results.
+            // Bounded chunks keep parallelism in step with the pool. If a chunk still overflows the pool, the
+            // executor's CallerRunsPolicy runs the overflow on this thread (never drops it), so every future
+            // completes and the await can't hang on an orphaned task.
             List<ReconcilePullResult> details = runBounded(jobs, reconcileExecutor, batchTimeoutSeconds, log);
 
             int updated = 0, unchanged = 0, errors = 0;
@@ -159,10 +159,11 @@ public class PaymentReconciliationService {
 
     /**
      * Run {@code jobs} on the reconcile pool in chunks no larger than the pool can hold
-     * ({@code maxPoolSize + queueCapacity}), awaiting each chunk before submitting the next. This
-     * guarantees a task is never rejected — a rejected task is silently discarded by the pool's
-     * drop handler, so its {@link CompletableFuture} would never complete and the {@code allOf}
-     * await would block for the whole timeout. Stops submitting once the overall deadline passes and
+     * ({@code maxPoolSize + queueCapacity}), awaiting each chunk before submitting the next, so
+     * parallelism stays matched to the pool. Should a chunk still overflow (the active/worker count
+     * race at exactly capacity), the pool's {@code CallerRunsPolicy} runs the overflow on the calling
+     * thread — the task is never dropped, so every {@link CompletableFuture} completes and the
+     * {@code allOf} await can't hang on an orphan. Stops submitting once the overall deadline passes and
      * returns the results that completed normally (partial, but bounded — never a dead 120 s freeze).
      * Shared by the manual sweep and {@link PaymentReconciliationJob}.
      */
