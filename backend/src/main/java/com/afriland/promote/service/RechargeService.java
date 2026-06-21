@@ -391,7 +391,7 @@ public class RechargeService {
         }
         PaymentGateway.GatewayStatus detail;
         try {
-            detail = gateway.queryDetailedStatus(r).orElse(null);
+            detail = gateway.queryReconciledStatus(r).orElse(null);
         } catch (RuntimeException ex) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, ex.getMessage());
         }

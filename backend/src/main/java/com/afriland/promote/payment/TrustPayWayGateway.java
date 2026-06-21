@@ -244,6 +244,59 @@ public class TrustPayWayGateway implements PaymentGateway {
         }
     }
 
+    /**
+     * Reconciliation source of truth: TrustPayWay's dedicated {@code GET /api/verify/{orderId}}.
+     * Unlike {@code get-status} (which mirrors the live USSD session and can read EXPIRED while the
+     * client confirmed late), {@code verify} returns the outcome <em>after</em> their background
+     * operator-check — so it recovers "client débité mais statut expiré" by reporting COMPLETED.
+     * Keyed by our gateway order id (gatewayRef) or the aggregator transaction id; both resolve.
+     * Falls back to {@code get-status} when verify has nothing (unknown order / transient error),
+     * so reconciliation never loses the recovery it had before.
+     */
+    @Override
+    public Optional<GatewayStatus> queryReconciledStatus(Payable sub) {
+        Optional<GatewayStatus> viaVerify = verifyStatus(sub);
+        return viaVerify.isPresent() ? viaVerify : queryDetailedStatus(sub);
+    }
+
+    /** Call {@code /api/verify/{id}} and map the final status; empty on 404 / non-2xx / parse error. */
+    private Optional<GatewayStatus> verifyStatus(Payable sub) {
+        String id = sub.getGatewayRef();
+        if (id == null || id.isBlank()) id = sub.getPaymentTxId();
+        if (id == null || id.isBlank()) return Optional.empty();
+        final String lookupId = id;
+        try {
+            VerifyResponse resp = statusHttp.get()
+                    .uri("/api/verify/{id}", lookupId)
+                    .header("Authorization", "Bearer " + token())
+                    .accept(MediaType.APPLICATION_JSON)
+                    .exchange((req, res) -> {
+                        String raw = readBody(res);
+                        if (!res.getStatusCode().is2xxSuccessful() || raw == null || raw.isBlank()) {
+                            log.debug("TrustPayWay verify ref={} id={} http={} body={}",
+                                    sub.getRef(), lookupId, res.getStatusCode().value(), raw);
+                            return null;
+                        }
+                        try {
+                            return json.readValue(raw, VerifyResponse.class);
+                        } catch (Exception ex) {
+                            log.warn("TrustPayWay: unparseable verify body ref={}: {}", sub.getRef(), raw);
+                            return null;
+                        }
+                    });
+            if (resp == null) return Optional.empty();
+            Optional<PayStatus> mapped = map(resp.effectiveStatus());
+            if (mapped.isEmpty()) return Optional.empty();
+            String message = mapped.get() == PayStatus.paid ? null : resp.effectiveMessage();
+            log.debug("TrustPayWay verify ref={} id={} status={} -> {}",
+                    sub.getRef(), lookupId, resp.effectiveStatus(), mapped.get());
+            return Optional.of(new GatewayStatus(mapped.get(), message));
+        } catch (RuntimeException ex) {
+            log.warn("TrustPayWay verify failed ref={}: {}", sub.getRef(), ex.getMessage());
+            return Optional.empty();
+        }
+    }
+
     // ---- helpers ---------------------------------------------------------
 
     /** Reuse the access token until ~30 s before it expires, then re-login. */
@@ -336,6 +389,22 @@ public class TrustPayWayGateway implements PaymentGateway {
     @JsonIgnoreProperties(ignoreUnknown = true)
     record ProcessData(String status, @JsonProperty("transaction_id") String transactionId,
                        String orderId, String subscriberMsisdn) {}
+
+    /** Shape of {@code GET /api/verify/{orderId}}: a flat record with the final {@code status}
+     *  (e.g. COMPLETED) and a reason in {@code confirmationStatus} / {@code description}. */
+    @JsonIgnoreProperties(ignoreUnknown = true)
+    record VerifyResponse(String status, String confirmationStatus, String description,
+                          String orderId, String transactionId) {
+        String effectiveStatus() {
+            return status != null && !status.isBlank() ? status : null;
+        }
+        /** Aggregator reason on a non-success outcome: confirmationStatus first, else description. */
+        String effectiveMessage() {
+            if (confirmationStatus != null && !confirmationStatus.isBlank()) return confirmationStatus;
+            if (description != null && !description.isBlank()) return description;
+            return null;
+        }
+    }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     record StatusResponse(String status, String message, ProcessData data) {

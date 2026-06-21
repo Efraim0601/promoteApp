@@ -569,7 +569,7 @@ public class SubscriptionService {
         }
         PaymentGateway.GatewayStatus detail;
         try {
-            detail = gateway.queryDetailedStatus(s).orElse(null);
+            detail = gateway.queryReconciledStatus(s).orElse(null);
         } catch (RuntimeException ex) {
             return new ReconcilePullResult(ref, before.name(), before.name(), false, ex.getMessage());
         }

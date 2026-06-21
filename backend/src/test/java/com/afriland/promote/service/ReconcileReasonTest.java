@@ -47,7 +47,7 @@ class ReconcileReasonTest {
         String ref = s.getRef();
 
         // 1) pending → failed, the aggregator gives a first decline reason.
-        when(gateway.queryDetailedStatus(any()))
+        when(gateway.queryReconciledStatus(any()))
                 .thenReturn(Optional.of(new GatewayStatus(PayStatus.failed, "Solde insuffisant")));
         ReconcilePullResult r1 = service.reconcileFromGateway(ref);
         assertTrue(r1.changed());
@@ -56,7 +56,7 @@ class ReconcileReasonTest {
         assertEquals("Solde insuffisant", subs.findByRefIgnoreCase(ref).orElseThrow().getPaymentMessage());
 
         // 2) still failed, but the reason changed → portal message must be corrected.
-        when(gateway.queryDetailedStatus(any()))
+        when(gateway.queryReconciledStatus(any()))
                 .thenReturn(Optional.of(new GatewayStatus(PayStatus.failed, "Transaction annulée par l'abonné")));
         ReconcilePullResult r2 = service.reconcileFromGateway(ref);
         assertTrue(r2.changed());
@@ -70,7 +70,7 @@ class ReconcileReasonTest {
         assertFalse(r3.changed());
 
         // 4) the aggregator finally confirms success → status paid, reason cleared.
-        when(gateway.queryDetailedStatus(any()))
+        when(gateway.queryReconciledStatus(any()))
                 .thenReturn(Optional.of(new GatewayStatus(PayStatus.paid, null)));
         ReconcilePullResult r4 = service.reconcileFromGateway(ref);
         assertTrue(r4.changed());

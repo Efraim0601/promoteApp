@@ -40,6 +40,18 @@ public interface PaymentGateway {
         return Optional.empty();
     }
 
+    /**
+     * Pull the FINAL, reconciled status — used by manual/scheduled reconciliation, not the live
+     * polling path. Aggregators with a dedicated reconciliation endpoint (TrustPayWay's
+     * {@code GET /api/verify/{orderId}}, which returns the outcome after their background
+     * operator-check) override this to recover "client débité mais statut expiré": an order our
+     * local timeout force-failed that the operator actually completed. Default: same as the live
+     * status, so providers without a reconciliation endpoint are unaffected.
+     */
+    default Optional<GatewayStatus> queryReconciledStatus(Payable order) {
+        return queryDetailedStatus(order);
+    }
+
     /** A live status pulled from the aggregator: the mapped {@link PayStatus} plus the raw reason
      *  message (e.g. "Solde insuffisant"), null when none was provided. */
     record GatewayStatus(PayStatus status, String message) {}
