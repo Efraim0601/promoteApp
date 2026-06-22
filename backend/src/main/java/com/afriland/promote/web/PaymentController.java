@@ -5,14 +5,28 @@ import com.afriland.promote.model.Subscription;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.TrustPayWayGateway;
 import com.afriland.promote.payment.TrustPayWayProperties;
+import com.afriland.promote.service.ActionAuditService;
 import com.afriland.promote.service.RechargeService;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.service.PaymentReconciliationService;
+import com.afriland.promote.service.PaymentReconciliationService.ReconcileSink;
 import com.afriland.promote.web.dto.Dtos.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.IOException;
+import java.util.Map;
 
 /** Aggregator-facing payment endpoints: webhook (push notifications) + provider info. */
 @RestController
@@ -26,15 +40,23 @@ public class PaymentController {
     private final PaymentReconciliationService reconciliationService;
     private final PaymentGateway gateway;            // the active (@Primary) gateway
     private final TrustPayWayProperties trustPayWay;
+    private final ActionAuditService audit;
+    private final ObjectMapper json;
+    private final ThreadPoolTaskExecutor reconcileExecutor;
 
     public PaymentController(SubscriptionService service, RechargeService rechargeService,
                              PaymentReconciliationService reconciliationService,
-                             PaymentGateway gateway, TrustPayWayProperties trustPayWay) {
+                             PaymentGateway gateway, TrustPayWayProperties trustPayWay,
+                             ActionAuditService audit, ObjectMapper json,
+                             @Qualifier("reconcileExecutor") ThreadPoolTaskExecutor reconcileExecutor) {
         this.service = service;
         this.rechargeService = rechargeService;
         this.reconciliationService = reconciliationService;
         this.gateway = gateway;
         this.trustPayWay = trustPayWay;
+        this.audit = audit;
+        this.json = json;
+        this.reconcileExecutor = reconcileExecutor;
     }
 
     /** Lets the frontend know which gateway is live (e.g. show demo buttons only when simulated). */
@@ -55,6 +77,71 @@ public class PaymentController {
                     org.springframework.http.HttpStatus.CONFLICT, "reconcile_requires_trustpayway");
         }
         return reconciliationService.reconcileSince(hours);
+    }
+
+    /**
+     * Admin-only live verification (SSE): re-check EVERY MoMo order still pending/failed (all history,
+     * newest first, capped by {@code app.payment.reconcile.stream-max}) one at a time — the same per-order
+     * check as {@code GET /api/verify/{orderId}} — streaming one {@code log} event per order so the admin
+     * UI can show progress live, then a final {@code done} event with the summary.
+     *
+     * <p>Events: {@code start} {total}, {@code log} {index, ref, statusBefore, statusAfter, changed, note,
+     * reason}, {@code done} (the {@link ReconcileReport}), or {@code error} {error} on a conflict/failure.
+     */
+    @GetMapping(value = "/reconcile/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter reconcileStream(Authentication auth, HttpServletResponse response) {
+        if (!"trustpayway".equalsIgnoreCase(gateway.provider())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "reconcile_requires_trustpayway");
+        }
+        // Defeat nginx response buffering so each log line reaches the browser the moment it's sent.
+        response.setHeader("X-Accel-Buffering", "no");
+        SseEmitter emitter = new SseEmitter(0L); // no servlet timeout; the sweep is bounded by stream-max
+        reconcileExecutor.execute(() -> {
+            try {
+                ReconcileReport report = reconciliationService.verifyAllPendingFailed(new ReconcileSink() {
+                    @Override public void started(int total) { emit(emitter, "start", Map.of("total", total)); }
+                    @Override public void each(int index, ReconcilePullResult r) {
+                        emit(emitter, "log", Map.of(
+                                "index", index,
+                                "ref", nz(r.ref()), "statusBefore", nz(r.statusBefore()),
+                                "statusAfter", nz(r.statusAfter()), "changed", r.changed(),
+                                "note", nz(r.note()), "reason", nz(r.reason())));
+                    }
+                });
+                emit(emitter, "done", report);
+                audit.record(auth, "VERIFY_STREAM", "PAYMENT", "-",
+                        "Vérification live: " + report.updated() + " régularisé(s) sur " + report.scanned() + " vérifié(s)");
+                emitter.complete();
+            } catch (ClientGoneException gone) {
+                log.info("Live verification stopped: client disconnected");
+                emitter.complete();
+            } catch (ResponseStatusException busy) {
+                emit(emitter, "error", Map.of("error", String.valueOf(busy.getReason())));
+                emitter.complete();
+            } catch (RuntimeException e) {
+                log.warn("Live verification aborted: {}", e.toString());
+                emit(emitter, "error", Map.of("error", "stream_failed"));
+                emitter.complete();
+            }
+        });
+        return emitter;
+    }
+
+    /** Serialise + push one SSE event. A broken pipe means the admin closed the panel → abort the sweep
+     *  (so we stop hitting the gateway) by surfacing a {@link ClientGoneException} the run loop unwinds. */
+    private void emit(SseEmitter emitter, String event, Object data) {
+        try {
+            emitter.send(SseEmitter.event().name(event).data(json.writeValueAsString(data), MediaType.APPLICATION_JSON));
+        } catch (IOException io) {
+            throw new ClientGoneException(io);
+        }
+    }
+
+    private static String nz(String s) { return s == null ? "" : s; }
+
+    /** Signals the SSE client went away mid-stream; unwinds the run loop to release the sweep mutex. */
+    private static final class ClientGoneException extends RuntimeException {
+        ClientGoneException(Throwable cause) { super(cause); }
     }
 
     /**

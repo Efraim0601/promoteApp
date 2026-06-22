@@ -385,6 +385,54 @@ import * as XLSX from 'xlsx';
         }
       </div>
 
+      <!-- ===== Vérification live : régulariser TOUS les dossiers pending/failed (historique), logs en direct ===== -->
+      <div class="card" style="padding:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+          <ic name="refresh" [size]="17" style="color:var(--primary)"></ic>
+          <h3 style="font-size:15px">{{ i18n.t('vstream_title') }}</h3>
+        </div>
+        <p class="muted" style="font-size:11.5px;line-height:1.45;margin-bottom:12px">{{ i18n.t('vstream_sub') }}</p>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          @if (!streamRunning()) {
+            <button class="btn btn-primary" (click)="runStream()" style="width:auto;padding:11px 18px">
+              <ic name="refresh" [size]="18"></ic> {{ i18n.t('vstream_run') }}
+            </button>
+          } @else {
+            <button class="btn" (click)="stopStream()" style="width:auto;padding:11px 18px">
+              <spinner [size]="16"></spinner> {{ i18n.t('vstream_stop') }}
+            </button>
+          }
+          @if (streamTotal()) {
+            <span class="muted" style="font-size:12px;font-weight:700">{{ streamDone() }} / {{ streamTotal() }}</span>
+          }
+        </div>
+
+        @if (streamError()) {
+          <div class="feedback err-box" style="font-size:12.5px;margin-top:12px"><ic name="alert" [size]="16" style="flex-shrink:0"></ic> {{ streamError() }}</div>
+        }
+
+        @if (streamRunning() || streamTotal() || streamLines().length) {
+          <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+            <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+              <div class="kpi"><div class="kv">{{ streamDone() }}</div><div class="kl">{{ i18n.t('recon_scanned') }}</div></div>
+              <div class="kpi"><div class="kv" style="color:var(--success)">{{ streamUpdated() }}</div><div class="kl">{{ i18n.t('recon_updated') }}</div></div>
+              <div class="kpi"><div class="kv" style="color:var(--muted)">{{ streamUnchanged() + streamReason() }}</div><div class="kl">{{ i18n.t('recon_unchanged') }}</div></div>
+              <div class="kpi"><div class="kv" [style.color]="streamErrors() ? 'var(--accent)' : 'var(--muted)'">{{ streamErrors() }}</div><div class="kl">{{ i18n.t('recon_errors') }}</div></div>
+            </div>
+            @if (streamReason()) {
+              <p class="muted" style="font-size:11px;margin-top:8px">{{ i18n.t('recon_reason_refreshed', { count: streamReason() }) }}</p>
+            }
+            <div class="vstream-log" style="margin-top:12px;max-height:300px;overflow:auto;background:rgba(0,0,0,.03);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.65;white-space:pre-wrap;word-break:break-word">
+              @for (l of streamLines(); track l.i) {
+                <div [style.color]="l.color">{{ l.text }}</div>
+              } @empty {
+                <div class="muted">{{ i18n.t('vstream_waiting') }}</div>
+              }
+            </div>
+          </div>
+        }
+      </div>
+
       <div class="card" style="padding:16px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
           <ic name="award" [size]="17" style="color:var(--primary)"></ic>
@@ -2243,6 +2291,119 @@ export class AdminComponent implements OnInit, OnDestroy {
           : this.i18n.t('recon_failed'));
       },
     });
+  }
+
+  // --- live verification (SSE): re-check EVERY pending/failed MoMo order, streaming a log per order ---
+  streamRunning = signal(false);
+  streamTotal = signal(0);
+  streamDone = signal(0);
+  streamUpdated = signal(0);     // real regularisations (status actually moved)
+  streamReason = signal(0);      // same status, decline reason refreshed
+  streamUnchanged = signal(0);
+  streamErrors = signal(0);
+  streamError = signal('');
+  streamLines = signal<{ i: number; text: string; color: string }[]>([]);
+  private streamAbort: AbortController | null = null;
+
+  /** Open the SSE stream with the JWT Bearer header (EventSource can't set headers, so we read the
+   *  response body manually) and render one log line per verified order as it arrives. */
+  async runStream() {
+    if (this.streamRunning()) return;
+    this.streamRunning.set(true);
+    this.streamError.set('');
+    this.streamLines.set([]);
+    this.streamTotal.set(0); this.streamDone.set(0);
+    this.streamUpdated.set(0); this.streamReason.set(0); this.streamUnchanged.set(0); this.streamErrors.set(0);
+    const ctrl = new AbortController();
+    this.streamAbort = ctrl;
+    try {
+      const res = await fetch('/api/payment/reconcile/stream', {
+        headers: { Authorization: `Bearer ${this.auth.token ?? ''}`, Accept: 'text/event-stream' },
+        signal: ctrl.signal,
+      });
+      if (!res.ok || !res.body) {
+        this.streamError.set(res.status === 409 ? this.i18n.t('recon_busy') : this.i18n.t('recon_failed'));
+        return;
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        let sep: number;
+        while ((sep = buf.indexOf('\n\n')) >= 0) {
+          const frame = buf.slice(0, sep);
+          buf = buf.slice(sep + 2);
+          this.handleStreamFrame(frame);
+        }
+      }
+    } catch {
+      if (!ctrl.signal.aborted) this.streamError.set(this.i18n.t('recon_failed'));
+    } finally {
+      this.streamRunning.set(false);
+      this.streamAbort = null;
+    }
+  }
+
+  stopStream() {
+    this.streamAbort?.abort();
+    this.streamRunning.set(false);
+  }
+
+  /** Parse one SSE frame ("event: <name>\n data: <json>") and dispatch it. */
+  private handleStreamFrame(frame: string) {
+    let event = 'message';
+    const dataLines: string[] = [];
+    for (const line of frame.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).trim();
+      else if (line.startsWith('data:')) dataLines.push(line.slice(5).replace(/^ /, ''));
+    }
+    if (!dataLines.length) return;
+    let data: any;
+    try { data = JSON.parse(dataLines.join('\n')); } catch { return; }
+    if (event === 'start') { this.streamTotal.set(data.total ?? 0); return; }
+    if (event === 'error') {
+      this.streamError.set(
+        data.error === 'reconcile_already_running' ? this.i18n.t('recon_busy')
+        : data.error === 'reconcile_requires_trustpayway' ? this.i18n.t('recon_no_gateway')
+        : this.i18n.t('recon_failed'));
+      return;
+    }
+    if (event === 'log') this.appendStreamLine(data);
+    // 'done' carries the final report; the live counters already reflect it, so nothing to do.
+  }
+
+  private appendStreamLine(d: { index: number; ref: string; statusBefore: string; statusAfter: string;
+                                changed: boolean; note: string; reason: string }) {
+    this.streamDone.set(d.index);
+    const before = d.statusBefore || '?';
+    const after = d.statusAfter || '?';
+    let text: string, color: string;
+    if (!d.changed && d.note) {                          // gateway/DB error on this order
+      this.streamErrors.update((n) => n + 1);
+      text = `✗ ${d.ref} — ${d.note}`; color = 'var(--accent)';
+    } else if (d.changed && before !== after) {          // real regularisation
+      this.streamUpdated.update((n) => n + 1);
+      const recovered = after === 'paid';
+      text = `✓ ${d.ref} : ${before} → ${after}${recovered ? ' (régularisé)' : ''}`;
+      color = recovered ? 'var(--success)' : 'var(--accent)';
+    } else if (d.changed) {                              // same status, decline reason refreshed
+      this.streamReason.update((n) => n + 1);
+      text = `• ${d.ref} : ${after} (motif rafraîchi${d.reason ? ' : ' + d.reason : ''})`;
+      color = 'var(--muted)';
+    } else {                                             // already aligned
+      this.streamUnchanged.update((n) => n + 1);
+      text = `· ${d.ref} : ${after} (inchangé)`; color = 'var(--muted)';
+    }
+    // Bound the DOM: keep the last 500 lines (counters above stay exact regardless).
+    this.streamLines.update((lines) => {
+      const next = [...lines, { i: d.index, text, color }];
+      return next.length > 500 ? next.slice(next.length - 500) : next;
+    });
+    // Best-effort auto-scroll to the newest line.
+    setTimeout(() => { const el = document.querySelector('.vstream-log'); if (el) el.scrollTop = el.scrollHeight; }, 0);
   }
 
   // Filtre date pour la vue d'ensemble

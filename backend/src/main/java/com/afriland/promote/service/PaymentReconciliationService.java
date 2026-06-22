@@ -56,6 +56,11 @@ public class PaymentReconciliationService {
      *  operator can reconcile the last 24 h / 48 h on demand. The batch cap still bounds the work. */
     @Value("${app.payment.reconcile.manual-max-hours:168}")
     private int manualMaxHours;
+    /** Hard cap on the streaming "verify all pending/failed (history)" sweep, so an unbounded backlog
+     *  can't pin the gateway or the connection forever. NEWEST first, so the cap keeps the recoverable
+     *  (recent) orders. */
+    @Value("${app.payment.reconcile.stream-max:3000}")
+    private int streamMax;
 
     public PaymentReconciliationService(SubscriptionRepository subs, RechargeRepository recharges,
                                         SubscriptionService subscriptionService,
@@ -95,6 +100,74 @@ public class PaymentReconciliationService {
             return new VerifyResult(id, rec.getRef(), "recharge", r.statusAfter(), r.changed(), r.reason());
         }
         throw new ResponseStatusException(NOT_FOUND, "order_not_found");
+    }
+
+    /** Progress sink for the streaming "verify all pending/failed" sweep — lets the controller push each
+     *  per-order outcome to the admin UI over SSE as it happens. */
+    public interface ReconcileSink {
+        /** Called once with the number of candidate orders, before any is verified. */
+        void started(int total);
+        /** Called after each order is verified (1-based index), with its realignment result. */
+        void each(int index, ReconcilePullResult result);
+    }
+
+    /**
+     * Verify EVERY MoMo order still {@code pending}/{@code failed} (all history, newest first, capped by
+     * {@code stream-max}) one at a time — the same per-order live check as {@code GET /api/verify/{orderId}}
+     * — pushing each outcome to {@code sink} so the admin can watch a live log. Sequential on purpose:
+     * ordered logs and a steady, gentle load on the aggregator rather than a burst. Guarded by the shared
+     * sweep mutex, so it never overlaps the scheduled sweep or a manual {@link #reconcileSince}.
+     */
+    public ReconcileReport verifyAllPendingFailed(ReconcileSink sink) {
+        if (!tryAcquireSweep()) {
+            throw new ResponseStatusException(CONFLICT, "reconcile_already_running");
+        }
+        try {
+            var page = PageRequest.of(0, Math.max(1, streamMax));
+            List<Subscription> subRows = subs.findMoMoReconcilableSince(Instant.EPOCH, page);
+            List<Recharge> rechRows = recharges.findMoMoReconcilableSince(Instant.EPOCH, page);
+            int total = subRows.size() + rechRows.size();
+            sink.started(total);
+            log.info("Streaming verification: {} candidate MoMo order(s) (subs={}, recharges={})",
+                    total, subRows.size(), rechRows.size());
+
+            List<ReconcilePullResult> details = new ArrayList<>(total);
+            int updated = 0, unchanged = 0, errors = 0, i = 0;
+            for (Subscription s : subRows) {
+                ReconcilePullResult r = verifyOne(s.getRef(), () -> subscriptionService.reconcileFromGateway(s.getRef()));
+                details.add(r);
+                sink.each(++i, r);
+                if (isError(r)) errors++; else if (r.changed()) updated++; else unchanged++;
+            }
+            for (Recharge rec : rechRows) {
+                ReconcilePullResult r = verifyOne(rec.getRef(), () -> rechargeService.reconcileFromGateway(rec.getRef()));
+                details.add(r);
+                sink.each(++i, r);
+                if (isError(r)) errors++; else if (r.changed()) updated++; else unchanged++;
+            }
+            log.info("Streaming verification done: scanned={} updated={} unchanged={} errors={}",
+                    total, updated, unchanged, errors);
+            // hours = 0 marks an "all history" run (no time window).
+            return new ReconcileReport(0, total, updated, unchanged, errors, List.copyOf(details));
+        } finally {
+            releaseSweep();
+        }
+    }
+
+    /** A non-blank note on an unchanged result is the failure signal ({@code reconcileFromGateway}
+     *  catches gateway errors and reports them this way); {@code reason_updated} is a real change, not an error. */
+    private static boolean isError(ReconcilePullResult r) {
+        return !r.changed() && r.note() != null && !r.note().isBlank();
+    }
+
+    /** Run one per-order verification, never letting an unexpected failure abort the whole stream. */
+    private ReconcilePullResult verifyOne(String ref, Supplier<ReconcilePullResult> call) {
+        try {
+            return call.get();
+        } catch (RuntimeException ex) {
+            log.warn("Streaming verification failed for {}: {}", ref, ex.toString());
+            return new ReconcilePullResult(ref, null, null, false, ex.getMessage());
+        }
     }
 
     /** Shared with {@link PaymentReconciliationJob} — only one sweep at a time. */
