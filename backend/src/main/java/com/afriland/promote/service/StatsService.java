@@ -194,9 +194,19 @@ public class StatsService {
     /** Mobile Money payment funnel for the admin dashboard: volumes & success per network, failure
      *  causes (from the stored decline reason), and the confirmation latency (createdAt → paidAt). */
     @Cacheable(CacheConfig.PAYMENT_STATS)
-    public PaymentStats paymentStats() {
+    public PaymentStats paymentStats(LocalDate from, LocalDate to) {
+        ZoneId zone = ZoneId.systemDefault();
         // MoMo rows fetched directly in SQL (was: load every subscription, filter in memory).
-        List<Subscription> momo = subs.findMomo();
+        // Honour the dashboard's period filter when a window is supplied; otherwise stay cumulative.
+        List<Subscription> momo;
+        if (from != null || to != null) {
+            Instant fromInst = from != null ? from.atStartOfDay(zone).toInstant() : Instant.EPOCH;
+            Instant toInst   = to   != null ? to.plusDays(1).atStartOfDay(zone).toInstant()
+                                            : startOfToday().plusSeconds(86400L * 3650);
+            momo = subs.findMomoBetween(fromInst, toInst);
+        } else {
+            momo = subs.findMomo();
+        }
         long paid = momo.stream().filter(s -> s.getPayStatus() == PayStatus.paid).count();
         long failed = momo.stream().filter(s -> s.getPayStatus() == PayStatus.failed).count();
         long pending = momo.stream().filter(s -> s.getPayStatus() == PayStatus.pending).count();

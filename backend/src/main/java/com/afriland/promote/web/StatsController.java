@@ -98,8 +98,12 @@ public class StatsController {
 
     /** Admin — Mobile Money payment funnel (acceptance, confirmation latency, failure causes, by network). */
     @GetMapping("/payments")
-    public PaymentStats payments() {
-        return stats.paymentStats();
+    public PaymentStats payments(
+            @RequestParam(required = false) String from,
+            @RequestParam(required = false) String to) {
+        LocalDate fromDate = (from != null && !from.isBlank()) ? LocalDate.parse(from) : null;
+        LocalDate toDate   = (to   != null && !to.isBlank())   ? LocalDate.parse(to)   : null;
+        return stats.paymentStats(fromDate, toDate);
     }
 
     /** Admin — pickup-agency stats: delivery breakdown + branch ranking, with optional date window. */

@@ -242,12 +242,12 @@ import * as XLSX from 'xlsx';
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px">
         <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
-        <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
+        <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
         <div class="kpi" (click)="showFailed()" style="cursor:pointer"
              [style.borderColor]="technicalFailed() ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'"
              [style.background]="technicalFailed() ? 'var(--accent-soft)' : 'var(--surface)'">
           <div class="kv" style="color:var(--accent)">{{ technicalFailed() }}</div>
-          <div class="kl">{{ i18n.t('pay_funnel_technical_failed') }}</div>
+          <div class="kl">{{ i18n.t('pay_funnel_technical_failed') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div>
         </div>
       </div>
 
@@ -256,7 +256,7 @@ import * as XLSX from 'xlsx';
         <div class="card" style="padding:16px">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
             <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
-            <h3 style="font-size:15px">{{ i18n.t('pay_funnel_title') }}</h3>
+            <h3 style="font-size:15px">{{ i18n.t('pay_funnel_title') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</h3>
             <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;color:var(--success)" [title]="i18n.t('live_auto')"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</span>
           </div>
           <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
@@ -2416,6 +2416,9 @@ export class AdminComponent implements OnInit, OnDestroy {
     this.statsLoading.set(true);
     this.api.adminStats(from || undefined, to || undefined)
       .subscribe({ next: (s) => { this.stats.set(s); this.statsLoading.set(false); }, error: () => this.statsLoading.set(false) });
+    // The MoMo funnel (incl. the "Échecs réseau / indéterminés" card) must honour the same window.
+    this.api.paymentStats(from || undefined, to || undefined)
+      .subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
   });
   txs = signal<Subscription[]>([]);
   // Per-section loading flags so each panel can show a spinner while its request is in flight.
@@ -3458,8 +3461,10 @@ export class AdminComponent implements OnInit, OnDestroy {
   }
   ngOnDestroy() { this.stopPoll?.(); }
   private refreshLive() {
-    this.api.adminStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
-    this.api.paymentStats().subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
+    // Keep the active period filter intact across silent polls (else the KPIs snap back to cumulative).
+    const from = this.overviewFrom() || undefined, to = this.overviewTo() || undefined;
+    this.api.adminStats(from, to).subscribe({ next: (s) => this.stats.set(s), error: () => {} });
+    this.api.paymentStats(from, to).subscribe({ next: (p) => this.payStats.set(p), error: () => {} });
   }
 
   private loadUsers() {

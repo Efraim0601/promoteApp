@@ -89,6 +89,12 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     @Query("select s from Subscription s where lower(s.pay) in ('om', 'mtn') order by s.createdAt asc")
     List<Subscription> findMomo();
 
+    /** Same as {@link #findMomo()} but restricted to a creation-date window — backs the date-filtered
+     *  payment-funnel stats so the MoMo KPIs honour the dashboard's period filter. */
+    @Query("select s from Subscription s where lower(s.pay) in ('om', 'mtn') "
+            + "and s.createdAt >= :from and s.createdAt < :to order by s.createdAt asc")
+    List<Subscription> findMomoBetween(Instant from, Instant to);
+
     // ---- aggregated KPIs (computed in SQL instead of loading the whole table into memory) ----
     long countByPayStatus(PayStatus payStatus);
     long countByPayStatusAndPrintedFalse(PayStatus payStatus);    // admin "pending" == cash, not yet printed

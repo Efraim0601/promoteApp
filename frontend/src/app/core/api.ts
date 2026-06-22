@@ -377,9 +377,13 @@ export class Api {
     if (day) params['day'] = day;
     return this.http.get<CashSupervisionStats>(`${this.base}/stats/cashier/supervision`, { params });
   }
-  /** Admin — Mobile Money payment funnel (acceptance, latency, failure causes, by network). */
-  paymentStats(): Observable<PaymentStats> {
-    return this.http.get<PaymentStats>(`${this.base}/stats/payments`);
+  /** Admin — Mobile Money payment funnel (acceptance, latency, failure causes, by network).
+   *  Optional date window so the MoMo KPIs honour the dashboard's period filter. */
+  paymentStats(from?: string, to?: string): Observable<PaymentStats> {
+    const params: Record<string, string> = {};
+    if (from) params['from'] = from;
+    if (to)   params['to']   = to;
+    return this.http.get<PaymentStats>(`${this.base}/stats/payments`, { params });
   }
 
   // ---- notifications ----
