@@ -222,20 +222,25 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Stri
     /** Monitoring dashboard — count paid today per agent. */
     long countByAgentIdAndPayStatusAndPaidAtGreaterThanEqual(String agentId, PayStatus payStatus, Instant since);
 
-    /** Agency stats — subscriptions grouped by chosen pickup branch over a half-open window [from, to).
-     *  The window is always bounded (the caller substitutes wide sentinels for an "all time" view); a
-     *  null parameter tested with {@code IS NULL} would be rejected by PostgreSQL (could not determine
-     *  the bind type), so the predicates are kept as plain comparisons. */
+    /** Agency stats — PAID subscriptions grouped by chosen pickup branch over a half-open window
+     *  [from, to). Only settled sales count (a chosen pickup branch on an unpaid/failed order is not a
+     *  delivery to fulfil). The window is always bounded (the caller substitutes wide sentinels for an
+     *  "all time" view); a null parameter tested with {@code IS NULL} would be rejected by PostgreSQL
+     *  (could not determine the bind type), so the predicates are kept as plain comparisons. */
     @Query("SELECT s.pickupAgencyId, s.pickupAgencyName, COUNT(s) FROM Subscription s "
             + "WHERE s.delivery = 'agence' AND s.pickupAgencyId IS NOT NULL "
+            + "AND s.payStatus = com.afriland.promote.model.PayStatus.paid "
             + "AND s.createdAt >= :from AND s.createdAt < :to "
             + "GROUP BY s.pickupAgencyId, s.pickupAgencyName ORDER BY COUNT(s) DESC")
     List<Object[]> countGroupedByPickupAgency(
             @Param("from") java.time.Instant from, @Param("to") java.time.Instant to);
 
-    /** Agency stats — delivery-mode count over a half-open window [from, to). Always bounded by the
-     *  caller (sentinels for "all time") so PostgreSQL never sees a typeless {@code :param IS NULL}. */
+    /** Agency stats — PAID delivery-mode count over a half-open window [from, to). Only settled sales
+     *  count (the breakdown reflects deliveries to fulfil, not abandoned/failed payment attempts).
+     *  Always bounded by the caller (sentinels for "all time") so PostgreSQL never sees a typeless
+     *  {@code :param IS NULL}. */
     @Query("SELECT COUNT(s) FROM Subscription s WHERE s.delivery = :delivery "
+            + "AND s.payStatus = com.afriland.promote.model.PayStatus.paid "
             + "AND s.createdAt >= :from AND s.createdAt < :to")
     long countByDeliveryInWindow(
             @Param("delivery") String delivery,

@@ -102,13 +102,19 @@ class StatsServiceTest {
      *  now substitutes wide sentinel bounds. Also checks a far-past window excludes today's sales. */
     @Test
     void agencyStatsAllTimeAndBoundedWindow() {
-        // A fresh "promote"-delivery sale; created now (@CreationTimestamp), so it falls in any window
-        // that includes today and outside any window that ends before today.
-        service.create(req("om", "655990099", "AGEN9999"), "agent", "agency-stat-agent");
+        // A fresh PAID "promote"-delivery sale; created now (@CreationTimestamp), so it falls in any
+        // window that includes today and outside any window that ends before today. Only paid sales are
+        // counted, so it must be validated first.
+        Subscription paid = service.create(req("om", "655990099", "AGEN9999"), "agent", "agency-stat-agent");
+        service.applyPayment(paid.getRef(), "validate", null);
 
-        // All-time view (the path that crashed on PostgreSQL): must return without error and count it.
+        // An unpaid (pending) promote sale must NOT inflate the breakdown — settled sales only.
+        service.create(req("om", "655990088", "AGEN9998"), "agent", "agency-stat-agent");
+
+        // All-time view (the path that crashed on PostgreSQL): must return without error and count the
+        // paid sale only.
         AgencyPickupStats allTime = stats.agencyStats(null, null);
-        assertTrue(allTime.totalPromote() >= 1, "the promote sale is counted in the all-time view");
+        assertTrue(allTime.totalPromote() >= 1, "the paid promote sale is counted in the all-time view");
 
         // A window entirely in the past must exclude a sale created today.
         AgencyPickupStats past = stats.agencyStats(LocalDate.of(2020, 1, 1), LocalDate.of(2020, 1, 2));
