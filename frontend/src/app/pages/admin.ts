@@ -361,8 +361,8 @@ import * as XLSX from 'xlsx';
             <div class="muted" style="font-size:11px;margin-bottom:8px">{{ i18n.t('recon_window', { hours: r.hours }) }}</div>
             <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
               <div class="kpi"><div class="kv">{{ r.scanned }}</div><div class="kl">{{ i18n.t('recon_scanned') }}</div></div>
-              <div class="kpi"><div class="kv" style="color:var(--success)">{{ r.updated }}</div><div class="kl">{{ i18n.t('recon_updated') }}</div></div>
-              <div class="kpi"><div class="kv" style="color:var(--muted)">{{ r.unchanged }}</div><div class="kl">{{ i18n.t('recon_unchanged') }}</div></div>
+              <div class="kpi"><div class="kv" style="color:var(--success)">{{ reconChanged().length }}</div><div class="kl">{{ i18n.t('recon_updated') }}</div></div>
+              <div class="kpi"><div class="kv" style="color:var(--muted)">{{ r.unchanged + reconReasonRefreshed() }}</div><div class="kl">{{ i18n.t('recon_unchanged') }}</div></div>
               <div class="kpi"><div class="kv" [style.color]="r.errors ? 'var(--accent)' : 'var(--muted)'">{{ r.errors }}</div><div class="kl">{{ i18n.t('recon_errors') }}</div></div>
             </div>
             @if (reconChanged().length) {
@@ -377,6 +377,9 @@ import * as XLSX from 'xlsx';
               </div>
             } @else {
               <p class="muted" style="font-size:11.5px;margin-top:10px">{{ i18n.t('recon_none') }}</p>
+            }
+            @if (reconReasonRefreshed()) {
+              <p class="muted" style="font-size:11px;margin-top:8px">{{ i18n.t('recon_reason_refreshed', { count: reconReasonRefreshed() }) }}</p>
             }
           </div>
         }
@@ -2213,8 +2216,15 @@ export class AdminComponent implements OnInit, OnDestroy {
   reconLoading = signal(false);
   reconReport = signal<ReconcileReport | null>(null);
   reconError = signal('');
-  /** Only the orders whose status actually moved (the regularised ones). */
-  reconChanged = computed(() => (this.reconReport()?.details ?? []).filter((d) => d.changed));
+  /** True regularisations: the pay status actually moved (e.g. failed → paid). A reconcile pass also
+   *  flags changed=true when it merely refreshed the aggregator's decline message on an order that stays
+   *  failed/pending (statusBefore === statusAfter) — those are NOT regularisations and would otherwise
+   *  show as a confusing "failed → failed". We keep only the real status moves here. */
+  reconChanged = computed(() => (this.reconReport()?.details ?? [])
+    .filter((d) => d.changed && d.statusBefore !== d.statusAfter));
+  /** Count of orders whose status did not move but whose failure reason was refreshed. */
+  reconReasonRefreshed = computed(() => (this.reconReport()?.details ?? [])
+    .filter((d) => d.changed && d.statusBefore === d.statusAfter).length);
   clampHours(v: unknown) { return Math.min(168, Math.max(1, Math.floor(Number(v) || 1))); }
 
   runReconcile() {
