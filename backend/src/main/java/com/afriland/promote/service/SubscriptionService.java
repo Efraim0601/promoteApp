@@ -140,13 +140,13 @@ public class SubscriptionService {
                 .anyMatch(s -> MomoDebitGuard.blocksDuplicatePush(s, debitGuardSeconds));
     }
 
-    /** Offre Promote : la carte est gratuite — le client règle la recharge initiale + le Pass
-     *  Premium (+ transport si livraison à domicile, option non proposée actuellement). */
+    /** Promotion terminée : la carte n'est plus offerte. Le client règle le prix de la carte +
+     *  la recharge initiale + le Pass Premium (+ transport si livraison à domicile). */
     private int total(CardConfig cfg, String delivery, String cardType) {
         int transport = "home".equals(delivery) ? cfg.getTransport() : 0;
         // Carte bancaire (défaut) et carte prépayée ont chacune leur couple de montants configurables.
         int passPremium = "prepaid".equals(cardType) ? cfg.passPremiumOr() : cfg.passPremiumBancaireOr();
-        return rechargePortion(cfg, cardType) + passPremium + transport;
+        return cfg.getPrice() + rechargePortion(cfg, cardType) + passPremium + transport;
     }
 
     /** Part « recharge initiale » du total selon le type de carte (le reste = vente de la carte) ;

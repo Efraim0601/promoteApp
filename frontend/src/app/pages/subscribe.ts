@@ -221,7 +221,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
   readonly isBancaire = false;
   get rechargeInitiale() { return this.config.rechargeInitiale || 0; }
   get passPremium() { return this.config.passPremium || 0; }
-  get total() { return this.rechargeInitiale + this.passPremium + this.transport; }
+  get total() { return (this.config.price || 0) + this.rechargeInitiale + this.passPremium + this.transport; }
   get cardLabel() { return this.i18n.t('offer_card_label'); }
   get fullName() { return (this.form.prenom + ' ' + this.form.nom).trim(); }
   get pm() { return payById(this.form.pay); }

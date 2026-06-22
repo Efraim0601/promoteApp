@@ -488,12 +488,13 @@ const FR: Record<string, string> = {
   transport_fee: 'Frais de transport (domicile)',
   cfg_recharge_title: 'Recharge — montants autorisés', cfg_recharge_min: 'Montant minimum', cfg_recharge_max: 'Montant maximum',
   // ---- Offre Promote (carte gratuite + cashback) ----
-  cfg_offer_title: 'Offre Promote', cfg_offer_sub: 'Carte gratuite : le client règle la recharge initiale + le Pass Premium (= total de la souscription).',
+  cfg_offer_title: 'Carte prépayée', cfg_offer_sub: 'Le client règle le prix de la carte + la recharge initiale + le Pass Premium (= total de la souscription).',
   cfg_offer_prepaid_title: 'Carte prépayée', cfg_offer_bancaire_title: 'Carte bancaire',
   offer_title: 'OFFRE PROMOTE', offer_card_label: 'Carte prépayée', offer_card_label_bancaire: 'Carte bancaire', offer_free: 'OFFERTE',
   offer_cashback: '1% de cashback sur tous vos paiements pendant Promote.',
   offer_conditions: 'Pour en profiter',
   offer_recharge_initiale: 'Recharge initiale', offer_pass_premium: 'Pass Premium (accès permanent à promote)',
+  product_card_price: 'Prix de la carte',
   // ---- Choix du type de carte (souscription) ----
   cardtype_choose_label: 'Quelle carte souhaitez-vous payer ?',
   cardtype_bancaire_title: 'Carte prépayé en agence', cardtype_bancaire_desc: 'Payer une carte bancaire.',
@@ -1095,12 +1096,13 @@ const EN: Record<string, string> = {
   transport_fee: 'Transport fee (home)', arrived_via: 'Arrived via link / QR',
   cfg_recharge_title: 'Recharge — allowed amounts', cfg_recharge_min: 'Minimum amount', cfg_recharge_max: 'Maximum amount',
   // ---- Promote offer (free card + cashback) ----
-  cfg_offer_title: 'Promote offer', cfg_offer_sub: 'Free card: the client pays the initial top-up + the Premium Pass (= subscription total).',
+  cfg_offer_title: 'Prepaid card', cfg_offer_sub: 'The client pays the card price + the initial top-up + the Premium Pass (= subscription total).',
   cfg_offer_prepaid_title: 'Prepaid card', cfg_offer_bancaire_title: 'Bank card',
   offer_title: 'PROMOTE OFFER', offer_card_label: 'Prepaid card', offer_card_label_bancaire: 'Bank card', offer_free: 'FREE',
   offer_cashback: '1% cashback on all your payments during Promote.',
   offer_conditions: 'To qualify',
   offer_recharge_initiale: 'Initial top-up', offer_pass_premium: 'Premium Pass (permanent access to promote)',
+  product_card_price: 'Card price',
   // ---- Card type choice (subscription) ----
   cardtype_choose_label: 'Which card would you like to pay for?',
   cardtype_bancaire_title: 'Prepaid card at branch', cardtype_bancaire_desc: 'Pay for a bank card.',
