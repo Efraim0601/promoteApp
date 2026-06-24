@@ -56,4 +56,15 @@ public interface RechargeRepository extends JpaRepository<Recharge, String> {
             + "or regexp_replace(coalesce(r.phone,''), '\\\\D', '', 'g') like concat('%', :digits, '%'))) "
             + "order by r.created_at desc limit 30", nativeQuery = true)
     List<Recharge> searchByAny(@Param("needle") String needle, @Param("digits") String digits);
+
+    /**
+     * Full recharge history of one client/card, oldest first (chronological). Matches by exact card
+     * PAN (the strong key — same physical card) OR by the holder's phone (last 9 digits, country-code
+     * agnostic — every top-up the person made). Either key may be blank; a blank key matches nothing.
+     */
+    @Query(value = "select * from recharge r where "
+            + "(:pan <> '' and regexp_replace(coalesce(r.pan,''), '\\\\D', '', 'g') = :pan) "
+            + "or (:phone9 <> '' and right(regexp_replace(coalesce(r.phone,''), '\\\\D', '', 'g'), 9) = :phone9) "
+            + "order by r.created_at asc", nativeQuery = true)
+    List<Recharge> findForCard(@Param("pan") String pan, @Param("phone9") String phone9);
 }

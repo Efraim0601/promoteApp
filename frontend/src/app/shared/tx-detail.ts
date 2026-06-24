@@ -9,6 +9,7 @@ import { SpinnerComponent } from './spinner';
 import { ImagePreview } from './image-preview';
 import { ReceiptService } from './receipt';
 import { PhotoCaptureComponent } from './photo-capture';
+import { RechargeHistoryComponent } from './recharge-history';
 
 /**
  * Full detail of a subscription — every field the client filled in, plus the
@@ -19,7 +20,7 @@ import { PhotoCaptureComponent } from './photo-capture';
 @Component({
   selector: 'tx-detail',
   standalone: true,
-  imports: [IconComponent, SpinnerComponent, PhotoCaptureComponent],
+  imports: [IconComponent, SpinnerComponent, PhotoCaptureComponent, RechargeHistoryComponent],
   template: `
     <div class="card" style="margin:2px 2px 8px;padding:13px 14px;background:var(--surface-2)">
       <!-- Retake panel (selfie ou CNI) -->
@@ -103,6 +104,8 @@ import { PhotoCaptureComponent } from './photo-capture';
       @if (showPrint) {
         <button class="btn btn-outline" (click)="openPrint.emit(t.ref)" style="margin-top:8px;padding:9px;font-size:13px"><ic name="printer" [size]="15"></ic> {{ i18n.t('tx_open_print') }}</button>
       }
+
+      <div style="margin-top:10px"><recharge-history [sub]="t"></recharge-history></div>
     </div>`,
 })
 export class TxDetailComponent implements OnInit, OnDestroy {

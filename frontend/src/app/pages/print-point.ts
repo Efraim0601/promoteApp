@@ -15,12 +15,13 @@ import { PhotoCaptureComponent } from '../shared/photo-capture';
 import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
 import { NotifBellComponent } from '../shared/notif-bell';
+import { RechargeHistoryComponent } from '../shared/recharge-history';
 
 /** Print point — retrieve a KYC file by reference, then print & hand over the card. */
 @Component({
   selector: 'page-print-point',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent, ClientPhotoComponent, NotifBellComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent, ClientPhotoComponent, NotifBellComponent, RechargeHistoryComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -116,15 +117,18 @@ import { NotifBellComponent } from '../shared/notif-bell';
         <div class="card" style="overflow:hidden">
           <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px">{{ results().length }} {{ i18n.t('pp_results') }}</div>
           @for (s of results(); track s.ref) {
-            <button (click)="open(s.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:11px;padding:11px 14px;border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer">
-              <client-photo [refId]="s.ref" [name]="s.fullName" [hasSelfie]="s.hasSelfie" [size]="44"></client-photo>
-              <div style="min-width:0;flex:1">
-                <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.fullName }}</div>
-                <div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.ref }} · {{ s.phone }}@if (s.cni) { · {{ i18n.t('cni_short') }} {{ s.cni }} }</div>
-              </div>
-              <status-badge [status]="status(s)"></status-badge>
-              <ic name="chevR" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
-            </button>
+            <div style="border-bottom:1px solid var(--border)">
+              <button (click)="open(s.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:11px;padding:11px 14px;border:none;background:transparent;cursor:pointer">
+                <client-photo [refId]="s.ref" [name]="s.fullName" [hasSelfie]="s.hasSelfie" [size]="44"></client-photo>
+                <div style="min-width:0;flex:1">
+                  <div style="font-size:14px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.fullName }}</div>
+                  <div class="muted" style="font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ s.ref }} · {{ s.phone }}@if (s.cni) { · {{ i18n.t('cni_short') }} {{ s.cni }} }</div>
+                </div>
+                <status-badge [status]="status(s)"></status-badge>
+                <ic name="chevR" [size]="16" style="color:var(--muted);flex-shrink:0"></ic>
+              </button>
+              <div style="padding:0 14px 11px"><recharge-history [sub]="s"></recharge-history></div>
+            </div>
           }
         </div>
       }

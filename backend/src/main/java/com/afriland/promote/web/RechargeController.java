@@ -52,6 +52,14 @@ public class RechargeController {
         return service.search(q).stream().map(RechargeDto::of).toList();
     }
 
+    /** Staff — full recharge history of a card/client (by PAN and/or phone), oldest first. Lets any
+     *  profile see, from a found sale, whether the card was topped up and every occurrence (date + amount). */
+    @GetMapping("/for-card")
+    public List<RechargeDto> forCard(@RequestParam(required = false) String pan,
+                                     @RequestParam(required = false) String phone) {
+        return service.forCard(pan, phone).stream().map(RechargeDto::of).toList();
+    }
+
     /** Staff — fetch a single recharge. */
     @GetMapping("/{ref}")
     public ResponseEntity<RechargeDto> byRef(@PathVariable String ref) {

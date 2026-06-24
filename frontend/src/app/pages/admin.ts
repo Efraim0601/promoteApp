@@ -3976,37 +3976,104 @@ export class AdminComponent implements OnInit, OnDestroy {
     });
   });
 
+  /** Normalised digit keys used to link a card sale to its recharges (mirror of the backend). */
+  private static onlyDigits(v?: string | null) { return (v ?? '').replace(/\D/g, ''); }
+  private static phone9(v?: string | null) { const d = AdminComponent.onlyDigits(v); return d.length > 9 ? d.slice(-9) : d; }
+
+  /** Index every recharge by card PAN and by holder phone (last 9 digits) for a fast client-side join. */
+  private rechargeIndex() {
+    const byPan = new Map<string, Recharge[]>();
+    const byPhone = new Map<string, Recharge[]>();
+    for (const r of this.recharges()) {
+      const pan = AdminComponent.onlyDigits(r.pan);
+      const ph9 = AdminComponent.phone9(r.phone);
+      if (pan) (byPan.get(pan) ?? byPan.set(pan, []).get(pan)!).push(r);
+      if (ph9) (byPhone.get(ph9) ?? byPhone.set(ph9, []).get(ph9)!).push(r);
+    }
+    return { byPan, byPhone };
+  }
+  /** Recharges of one card/client (by PAN and/or phone), de-duplicated, oldest first. */
+  private rechargesFor(s: Subscription, idx: { byPan: Map<string, Recharge[]>; byPhone: Map<string, Recharge[]> }) {
+    const pan = AdminComponent.onlyDigits(s.pan);
+    const ph9 = AdminComponent.phone9(s.phone);
+    const seen = new Map<string, Recharge>();
+    if (pan) for (const r of idx.byPan.get(pan) ?? []) seen.set(r.ref, r);
+    if (ph9) for (const r of idx.byPhone.get(ph9) ?? []) seen.set(r.ref, r);
+    return [...seen.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  }
+
+  /** Export the withdrawal-agency clients. Ensures recharges are loaded first so the workbook can
+   *  carry, alongside the client + agency data, every recharge occurrence of those clients. */
   exportAgenceRetrait() {
+    if (!this.filteredAgenceRetrait().length) return;
+    if (!this.recharges().length) {
+      this.api.recharges().subscribe({
+        next: (r) => { this.recharges.set(r); this.buildAgenceRetraitXlsx(); },
+        error: () => this.buildAgenceRetraitXlsx(),
+      });
+    } else {
+      this.buildAgenceRetraitXlsx();
+    }
+  }
+
+  private buildAgenceRetraitXlsx() {
     const rows = this.filteredAgenceRetrait();
     if (!rows.length) return;
     const today = new Date().toISOString().slice(0, 10);
     const payLabel: Record<string, string> = { om: 'Orange Money', mtn: 'MTN MoMo', cash: 'Espèces', sara: 'Virement SARA' };
     const cardLabel: Record<string, string> = { prepaid: 'Prépayée', bancaire: 'Bancaire' };
-    const header = ['Référence', 'Nom complet', 'Téléphone', 'CNI', 'Agence de retrait', 'Type de carte',
-                    'Montant (FCFA)', 'Méthode de paiement', 'Canal', 'Statut', 'Date de souscription'];
-    const data: (string | number)[][] = [
-      header,
-      ...rows.map(r => [
-        r.ref,
-        r.fullName,
-        r.phone,
-        r.cni ?? '',
-        r.pickupAgencyName ?? '',
-        cardLabel[r.cardType ?? ''] ?? (r.cardType ?? ''),
-        r.amount,
-        payLabel[r.pay] ?? r.pay,
-        r.channel === 'agent' ? 'Agent' : 'Client (QR)',
-        r.printed ? 'Remise' : 'En attente',
+    const idx = this.rechargeIndex();
+
+    // --- Sheet 1: client info + pickup agency, with a recharge summary per client ---
+    const header = ['Référence', 'Nom complet', 'Téléphone', 'Email', 'CNI', 'NIU', 'Quartier', 'Ville', 'Région',
+                    'Agence de retrait', 'Type de carte', 'N° carte', 'PAN', 'Montant (FCFA)', 'Méthode de paiement',
+                    'Canal', 'Statut', 'Date de souscription', 'Nb recharges', 'Total rechargé (FCFA)', 'Dernière recharge'];
+    const data: (string | number)[][] = [header];
+    for (const r of rows) {
+      const rch = this.rechargesFor(r, idx);
+      const credited = rch.filter(x => x.status === 'fulfilled');
+      const last = rch.length ? rch[rch.length - 1] : null;
+      data.push([
+        r.ref, r.fullName, r.phone, r.email ?? '', r.cni ?? '', r.niu ?? '',
+        r.quartier ?? '', r.ville ?? '', r.region ?? '',
+        r.pickupAgencyName ?? '', cardLabel[r.cardType ?? ''] ?? (r.cardType ?? ''),
+        r.cardNumber ?? '', r.pan ?? '', r.amount, payLabel[r.pay] ?? r.pay,
+        r.channel === 'agent' ? 'Agent' : 'Client (QR)', r.printed ? 'Remise' : 'En attente',
         this.fmtDateTime(r.createdAt),
-      ]),
-    ];
+        rch.length, credited.reduce((s, x) => s + x.amount, 0), last ? this.fmtDateTime(last.createdAt) : '',
+      ]);
+    }
     const ws = XLSX.utils.aoa_to_sheet(data);
-    ws['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 24 },
-                  { wch: 12 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 18 }];
-    // Freeze the header row
+    ws['!cols'] = [{ wch: 12 }, { wch: 26 }, { wch: 14 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 16 }, { wch: 14 },
+                  { wch: 14 }, { wch: 24 }, { wch: 12 }, { wch: 16 }, { wch: 20 }, { wch: 14 }, { wch: 18 }, { wch: 12 },
+                  { wch: 12 }, { wch: 18 }, { wch: 12 }, { wch: 18 }, { wch: 18 }];
     ws['!freeze'] = { xSplit: 0, ySplit: 1 };
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Retraits agence');
+
+    // --- Sheet 2: every recharge occurrence of those clients, chronological ---
+    const rHeader = ['Client', 'Téléphone', 'CNI', 'Agence de retrait', 'PAN carte', 'Réf souscription',
+                     'Réf recharge', 'Date', 'Montant (FCFA)', 'Méthode de paiement', 'Statut', 'Crédité par', 'Date crédit'];
+    const rData: (string | number)[][] = [rHeader];
+    for (const r of rows) {
+      for (const x of this.rechargesFor(r, idx)) {
+        rData.push([
+          r.fullName, r.phone, r.cni ?? '', r.pickupAgencyName ?? '', x.pan ?? r.pan ?? '', r.ref,
+          x.ref, this.fmtDateTime(x.createdAt), x.amount,
+          x.pay === 'cash' ? 'Espèces' : (payLabel[x.pay] ?? x.pay), x.status,
+          x.fulfilledBy ?? '', x.fulfilledAt ? this.fmtDateTime(x.fulfilledAt) : '',
+        ]);
+      }
+    }
+    if (rData.length > 1) {
+      const rws = XLSX.utils.aoa_to_sheet(rData);
+      rws['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 14 }, { wch: 24 }, { wch: 20 }, { wch: 12 }, { wch: 12 },
+                     { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }];
+      rws['!freeze'] = { xSplit: 0, ySplit: 1 };
+      XLSX.utils.book_append_sheet(wb, rws, 'Recharges');
+    }
+
     XLSX.writeFile(wb, `retraits-agence_${today}.xlsx`);
   }
 

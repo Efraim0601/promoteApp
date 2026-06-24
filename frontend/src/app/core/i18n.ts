@@ -471,6 +471,8 @@ const FR: Record<string, string> = {
   pp_sara_extracted_hint: 'Pré-rempli automatiquement depuis le reçu. Vérifiez face au reçu avant de valider.',
   st_paid: 'Payée', st_pending: 'Paiement en attente', st_to_print: 'Payée — à imprimer', st_awaiting: 'KYC en attente', st_cash: 'À payer (espèces)', st_sara_pending: 'SARA — à valider', st_failed: 'Échouée', st_expired: 'Expiré · délai dépassé', st_printed: 'Imprimée',
   st_to_fulfill: 'Payée — à créditer', st_fulfilled: 'Rechargée',
+  rh_title: 'Recharges de la carte', rh_none: 'Aucune recharge pour cette carte.',
+  rh_done: 'créditée(s)', rh_total: 'Total crédité', rh_export: 'Extraire',
   // ---- cashier: recharge fulfillment queue ----
   cash_tab_cash: 'Encaissement espèces', cash_tab_gab: 'Encaissement GAB', cash_tab_recharges: 'Recharges',
   cash_rch_title: 'Recharges à valider', cash_rch_sub: 'Créditez la carte du client, puis validez la recharge.',
@@ -1079,6 +1081,8 @@ const EN: Record<string, string> = {
   pp_sara_extracted_hint: 'Auto-filled from the receipt. Check against the receipt before validating.',
   st_paid: 'Paid', st_pending: 'Payment pending', st_to_print: 'Paid — to print', st_awaiting: 'Pending KYC', st_cash: 'Cash due', st_sara_pending: 'SARA — to validate', st_failed: 'Failed', st_expired: 'Expired · timed out', st_printed: 'Printed',
   st_to_fulfill: 'Paid — to credit', st_fulfilled: 'Recharged',
+  rh_title: 'Card recharges', rh_none: 'No recharge for this card.',
+  rh_done: 'credited', rh_total: 'Total credited', rh_export: 'Export',
   // ---- cashier: recharge fulfillment queue ----
   cash_tab_cash: 'Cash payment', cash_tab_gab: 'GAB payment', cash_tab_recharges: 'Recharges',
   cash_rch_title: 'Recharges to validate', cash_rch_sub: 'Credit the customer\'s card, then validate the recharge.',

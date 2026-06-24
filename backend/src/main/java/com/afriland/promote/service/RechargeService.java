@@ -340,6 +340,19 @@ public class RechargeService {
         return recharges.searchByAny(needle, digits == null ? "" : digits);
     }
 
+    /**
+     * Full recharge history of a client/card, chronological (oldest first). Matches by the card PAN
+     * and/or the holder's phone — so a staff member who found a sale can see every top-up that card
+     * (or that person) has had. Both args may be null; returns empty when neither resolves to digits.
+     */
+    public List<Recharge> forCard(String pan, String phone) {
+        String panDigits = pan == null ? "" : pan.replaceAll("\\D", "");
+        String phoneDigits = phone == null ? "" : phone.replaceAll("\\D", "");
+        String phone9 = phoneDigits.length() > 9 ? phoneDigits.substring(phoneDigits.length() - 9) : phoneDigits;
+        if (panDigits.isEmpty() && phone9.isEmpty()) return List.of();
+        return recharges.findForCard(panDigits, phone9);
+    }
+
     public Recharge findByOrderId(String orderId) {
         if (orderId == null) return null;
         return recharges.findByGatewayRef(orderId).or(() -> recharges.findByRefIgnoreCase(orderId)).orElse(null);

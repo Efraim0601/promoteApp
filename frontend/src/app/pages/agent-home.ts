@@ -16,11 +16,12 @@ import { SpinnerComponent } from '../shared/spinner';
 import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
 import { ReceiptService } from '../shared/receipt';
 import { NotifBellComponent } from '../shared/notif-bell';
+import { RechargeHistoryComponent } from '../shared/recharge-history';
 
 @Component({
   selector: 'page-agent-home',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, StatusBadgeComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent, NotifBellComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, StatusBadgeComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent, NotifBellComponent, RechargeHistoryComponent],
   template: `
   <div class="scr">
     <app-bar>
@@ -203,6 +204,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
                       @if (vReceiptBusy() === s.ref) { <spinner tone="primary" [size]="15"></spinner> } @else { <ic name="download" [size]="15"></ic> {{ i18n.t('receipt_download') }} }
                     </button>
                   </div>
+                  <recharge-history [sub]="s"></recharge-history>
                 </div>
               }
             }

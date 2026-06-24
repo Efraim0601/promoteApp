@@ -220,6 +220,13 @@ export class Api {
   searchRecharges(q: string): Observable<Recharge[]> {
     return this.http.get<Recharge[]>(`${this.base}/recharges/search`, { params: { q } });
   }
+  /** Staff — full chronological recharge history of a card/client (by PAN and/or phone). */
+  rechargesForCard(pan?: string | null, phone?: string | null): Observable<Recharge[]> {
+    let params: Record<string, string> = {};
+    if (pan) params['pan'] = pan;
+    if (phone) params['phone'] = phone;
+    return this.http.get<Recharge[]>(`${this.base}/recharges/for-card`, { params });
+  }
   /** Staff — fetch a single recharge by reference. */
   rechargeByRef(ref: string): Observable<Recharge> {
     return this.http.get<Recharge>(`${this.base}/recharges/${ref}`);
