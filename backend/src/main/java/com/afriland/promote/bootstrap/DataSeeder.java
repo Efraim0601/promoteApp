@@ -144,7 +144,20 @@ public class DataSeeder implements CommandLineRunner {
         // (The print-point screen is also accessible to ADMIN and AGENT.)
         if (seedTestAgent) {
             users.save(AppUser.builder().id("a1").name("Awa Fall").email("awa.fall@afrilandfirstbank.com")
-                    .passwordHash(encoder.encode("promote")).role(Role.AGENT).agency("Agence Akwa").phone("699123456").build());
+                    .passwordHash(encoder.encode("promote")).role(Role.AGENT).agency("Agence Akwa")
+                    .phone("699123456").parentUserId("chef").build());
+            // Demo accounts covering the remaining roles so every profile can be exercised in test:
+            // a small org tree admin → manager → superviseur → chef d'équipe → (agent a1, collecteur).
+            // Gated by the same demo flag (test-agent), so production — which sets it false — is unaffected.
+            String demoPw = encoder.encode("promote");
+            users.save(AppUser.builder().id("manager").name("Carine MBALLA").email("manager@afrilandfirstbank.com")
+                    .passwordHash(demoPw).role(Role.MANAGER).phone("699000002").parentUserId("admin").build());
+            users.save(AppUser.builder().id("superviseur").name("Paul ESSOMBA").email("superviseur@afrilandfirstbank.com")
+                    .passwordHash(demoPw).role(Role.SUPERVISEUR).agency("Agence Akwa").phone("699000010").parentUserId("manager").build());
+            users.save(AppUser.builder().id("chef").name("Yvan NGAMENI").email("chef@afrilandfirstbank.com")
+                    .passwordHash(demoPw).role(Role.CHEF_EQUIPE).agency("Agence Akwa").phone("699000020").parentUserId("superviseur").build());
+            users.save(AppUser.builder().id("collecteur").name("Larissa NANA").email("collecteur@afrilandfirstbank.com")
+                    .passwordHash(demoPw).role(Role.COLLECTEUR).agency("Agence Akwa").phone("690110001").parentUserId("chef").build());
         }
     }
 
