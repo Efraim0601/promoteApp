@@ -10,6 +10,9 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
+  # Tests sur H2 : schéma créé par Hibernate (create-drop). Flyway (scripts PostgreSQL) désactivé.
+  flyway:
+    enabled: false
 
 app:
   admin:

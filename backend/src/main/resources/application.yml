@@ -13,11 +13,22 @@ spring:
       minimum-idle: ${DB_POOL_MIN:10}
   jpa:
     hibernate:
-      ddl-auto: update
+      # Le schéma est désormais géré par Flyway (V1__baseline + migrations versionnées).
+      # `validate` : Hibernate vérifie au démarrage que les entités correspondent au schéma migré,
+      # sans jamais le modifier. Surchargeable (JPA_DDL_AUTO) le temps d'un éventuel cutover prod.
+      ddl-auto: ${JPA_DDL_AUTO:validate}
     open-in-view: false
     properties:
       hibernate:
         format_sql: false
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    # Base de prod déjà peuplée (créée jadis par ddl-auto) : Flyway pose un marqueur de baseline à
+    # la version 1 SANS exécuter V1 (données préservées). Base vide (CI / nouvelle install) : V1
+    # crée tout le schéma. Les V2+ s'appliquent dans les deux cas.
+    baseline-on-migrate: true
+    baseline-version: 1
+    baseline-description: baseline (schéma gelé depuis ddl-auto)
   # SMTP (Office 365 by default). Set MAIL_USERNAME / MAIL_PASSWORD in .env.
   mail:
     host: ${MAIL_HOST:smtp.office365.com}

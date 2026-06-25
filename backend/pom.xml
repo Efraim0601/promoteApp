@@ -73,6 +73,19 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+
+        <!-- Flyway — versioned schema migrations (replaces ddl-auto: update on PostgreSQL).
+             V1 is the baseline frozen from the current Hibernate schema; ddl-auto is now `validate`,
+             so the running entities are checked against the migrated schema at startup. Flyway is
+             disabled on the H2 dev/test profiles (they keep create-drop). -->
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-core</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
         <!-- H2 (local dev profile) -->
         <dependency>
             <groupId>com.h2database</groupId>
