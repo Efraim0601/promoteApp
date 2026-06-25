@@ -17,13 +17,14 @@ import { PhotoCaptureComponent } from '../shared/photo-capture';
 import { ReceiptUploadComponent } from '../shared/receipt-upload';
 import { NotifBellComponent } from '../shared/notif-bell';
 import { RechargeHistoryComponent } from '../shared/recharge-history';
+import { RevealDirective } from '../shared/reveal';
 
 /** Cashier — retrieve a subscription, verify the client's identity, then validate the in-person
  *  cash payment (cash → paid). The printed card is then handed over at the print point. */
 @Component({
   selector: 'page-cashier',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent, ReceiptUploadComponent, NotifBellComponent, RechargeHistoryComponent, SlicePipe],
+  imports: [AppBarComponent, IconComponent, FieldComponent, StatusBadgeComponent, SpinnerComponent, PhotoCaptureComponent, ReceiptUploadComponent, NotifBellComponent, RechargeHistoryComponent, SlicePipe, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
@@ -31,8 +32,8 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div>
+    <div class="scr-body" reveal="screen">
+      <div data-reveal="item">
         <div class="kicker"><ic name="store" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('card_name') }}</div>
         <h1 style="font-size:23px;margin-top:6px">{{ i18n.t('cash_title') }}</h1>
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('cash_sub') }}</p>
@@ -47,7 +48,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       }
 
       <!-- Tabs: cash/GAB collection vs recharge validation vs agency pickups. -->
-      <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap" data-reveal="item">
         <button class="btn" [class.btn-primary]="mode()==='especes'" [class.btn-outline]="mode()!=='especes'" (click)="setMode('especes')" style="flex:1;min-width:100px;padding:9px;font-size:12.5px"><ic name="store" [size]="15"></ic> {{ i18n.t('cash_tab_cash') }}</button>
         <button class="btn" [class.btn-primary]="mode()==='gab'" [class.btn-outline]="mode()!=='gab'" (click)="setMode('gab')" style="flex:1;min-width:80px;padding:9px;font-size:12.5px"><ic name="hash" [size]="15"></ic> {{ i18n.t('cash_tab_gab') }}</button>
         <button class="btn" [class.btn-primary]="mode()==='recharges'" [class.btn-outline]="mode()!=='recharges'" (click)="setMode('recharges')" style="flex:1;min-width:100px;padding:9px;font-size:12.5px"><ic name="phone" [size]="15"></ic> {{ i18n.t('cash_tab_recharges') }}@if (pendingRch().length) { <span style="margin-left:5px;background:var(--warning);color:#fff;border-radius:99px;padding:1px 7px;font-size:11px">{{ pendingRch().length }}</span> }</button>
@@ -57,7 +58,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       @if (mode() === 'especes' || mode() === 'gab') {
       <!-- The cashier can also initiate a new subscription or a recharge (hidden while viewing a record). -->
       @if (!rec() && !rRec()) {
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div style="display:flex;gap:10px;flex-wrap:wrap" data-reveal="card">
           <button class="btn btn-primary" (click)="newSub()" style="flex:1;min-width:150px"><ic name="plus" [size]="18"></ic> {{ i18n.t('new_sub_btn') }}</button>
           <button class="btn btn-outline" (click)="newRecharge()" style="flex:1;min-width:150px"><ic name="phone" [size]="18"></ic> {{ i18n.t('new_recharge_btn') }}</button>
           @if (auth.hasRole('COLLECTEUR')) {
@@ -69,9 +70,9 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       <!-- Cashier KPIs (hidden while viewing a single record) -->
       @if (!rec() && stats(); as st) {
         <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
-          <div class="kpi"><div class="kv" style="color:var(--primary)">{{ st.myCount }}</div><div class="kl">{{ i18n.t('cash_kpi_mine') }}</div></div>
-          <div class="kpi"><div class="kv" style="color:var(--success)">{{ st.myCountToday }}</div><div class="kl">{{ i18n.t('kpi_today') }}</div></div>
-          <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.pendingCount }}</div><div class="kl">{{ i18n.t('cash_kpi_queue') }}</div></div>
+          <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--primary)">{{ st.myCount }}</div><div class="kl">{{ i18n.t('cash_kpi_mine') }}</div></div>
+          <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--success)">{{ st.myCountToday }}</div><div class="kl">{{ i18n.t('kpi_today') }}</div></div>
+          <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.pendingCount }}</div><div class="kl">{{ i18n.t('cash_kpi_queue') }}</div></div>
         </div>
         <p class="muted" style="font-size:11.5px;margin-top:-4px;text-align:center">
           {{ i18n.t('cash_kpi_collected') }} : <b style="color:var(--text)">{{ i18n.money(st.myCollected) }}</b>
@@ -80,7 +81,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
         <p class="muted" style="font-size:10.5px;margin-top:-8px;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</p>
       }
 
-      <field [label]="i18n.t('pp_input')">
+      <field [label]="i18n.t('pp_input')" data-reveal="input">
         <div style="display:flex;gap:8px">
           <div class="input-prefix" style="flex:1">
             <span class="pfx"><ic name="search" [size]="16"></ic></span>
@@ -98,7 +99,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       }
 
       @if (!rec() && results().length) {
-        <div class="card" style="overflow:hidden">
+        <div class="card" style="overflow:hidden" data-reveal="card">
           <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px">{{ results().length }} {{ i18n.t('pp_results') }}</div>
           @for (s of results(); track s.ref) {
             <div style="border-bottom:1px solid var(--border)">
@@ -118,7 +119,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
 
       <!-- Recharge matches (separate list — top-up records have no KYC file). -->
       @if (!rec() && !rRec() && rechargeResults().length) {
-        <div class="card" style="overflow:hidden">
+        <div class="card" style="overflow:hidden" data-reveal="card">
           <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px"><ic name="phone" [size]="12" style="vertical-align:-1px;margin-right:4px"></ic>{{ i18n.t('cash_recharges') }}</div>
           @for (r of rechargeResults(); track r.ref) {
             <button (click)="openRecharge(r.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:11px;padding:11px 14px;border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer">
@@ -134,7 +135,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       }
 
       @if (!searched()) {
-        <div class="card" style="padding:14px;display:flex;gap:9px;align-items:center">
+        <div class="card" style="padding:14px;display:flex;gap:9px;align-items:center" data-reveal="card">
           <ic name="hash" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
           <span class="muted" style="font-size:12px;line-height:1.4">{{ i18n.t('pp_hint') }}</span>
         </div>
@@ -286,7 +287,8 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       }
       } @else if (mode() === 'agence') {
         <!-- Clients ayant choisi ce point de retrait agence -->
-        <div>
+        <div reveal="screen" style="display:contents">
+        <div data-reveal="item">
           <h2 style="font-size:17px;margin-bottom:2px">Retraits en agence</h2>
           <p class="muted" style="font-size:12.5px;line-height:1.4">Souscriptions dont le point de retrait correspond à votre agence.</p>
         </div>
@@ -296,7 +298,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
           <div class="card" style="padding:20px;text-align:center"><span class="muted" style="font-size:13px">Aucun retrait en attente pour cette agence.</span></div>
         } @else {
           @for (r of agencySubs(); track r.ref) {
-            <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:8px">
+            <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:8px" data-reveal="card">
               <div style="display:flex;align-items:center;gap:8px">
                 <div style="min-width:0;flex:1">
                   <div style="font-size:15px;font-weight:800">{{ r.fullName }}</div>
@@ -316,22 +318,24 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
             </div>
           }
         }
+        </div>
       } @else if (mode() === 'recharges') {
-        <div>
+        <div reveal="screen" style="display:contents">
+        <div data-reveal="item">
           <h2 style="font-size:17px;margin-bottom:2px">{{ i18n.t('cash_rch_title') }}</h2>
           <p class="muted" style="font-size:12.5px;line-height:1.4">{{ i18n.t('cash_rch_sub') }}</p>
         </div>
-        <div style="display:flex;gap:8px">
+        <div style="display:flex;gap:8px" data-reveal="item">
           <button class="btn" [class.btn-primary]="rchView()==='queue'" [class.btn-outline]="rchView()!=='queue'" (click)="rchView.set('queue')" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('cash_rch_queue') }} ({{ pendingRch().length }})</button>
           <button class="btn" [class.btn-primary]="rchView()==='all'" [class.btn-outline]="rchView()!=='all'" (click)="loadAllRch()" style="flex:1;padding:8px;font-size:12.5px">{{ i18n.t('cash_rch_all') }}</button>
         </div>
 
         @if (rchView() === 'queue') {
           @if (!pendingRch().length) {
-            <div class="card" style="padding:20px;text-align:center"><span class="muted" style="font-size:13px">{{ i18n.t('cash_rch_empty') }}</span></div>
+            <div class="card" style="padding:20px;text-align:center" data-reveal="card"><span class="muted" style="font-size:13px">{{ i18n.t('cash_rch_empty') }}</span></div>
           } @else {
             @for (r of pendingRch(); track r.ref) {
-              <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px">
+              <div class="card" style="padding:14px;display:flex;flex-direction:column;gap:10px" data-reveal="card">
                 <div style="display:flex;align-items:center;gap:8px">
                   <div style="min-width:0;flex:1">
                     <div style="font-size:15px;font-weight:800">{{ r.fullName }}</div>
@@ -354,9 +358,9 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
           @if (allRchLoading()) {
             <div class="load-center"><spinner tone="primary" [size]="20"></spinner> {{ i18n.t('loading') }}</div>
           } @else if (!allRch().length) {
-            <div class="card" style="padding:20px;text-align:center"><span class="muted" style="font-size:13px">{{ i18n.t('rch_empty') }}</span></div>
+            <div class="card" style="padding:20px;text-align:center" data-reveal="card"><span class="muted" style="font-size:13px">{{ i18n.t('rch_empty') }}</span></div>
           } @else {
-            <div class="card" style="overflow:hidden">
+            <div class="card" style="overflow:hidden" data-reveal="card">
               @for (r of allRch(); track r.ref) {
                 <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;border-bottom:1px solid var(--border)">
                   <div style="min-width:0;flex:1">
@@ -372,6 +376,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
             </div>
           }
         }
+        </div>
       }
 
       <div style="flex:1"></div>

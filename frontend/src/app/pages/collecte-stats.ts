@@ -8,6 +8,7 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { SpinnerComponent } from '../shared/spinner';
 import { NotifBellComponent } from '../shared/notif-bell';
+import { RevealDirective } from '../shared/reveal';
 
 /**
  * Collecte supervisor view: global statistics of bank-product sales (collectes), in a page of its
@@ -16,18 +17,18 @@ import { NotifBellComponent } from '../shared/notif-bell';
 @Component({
   selector: 'page-collecte-stats',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, SpinnerComponent, NotifBellComponent],
+  imports: [AppBarComponent, IconComponent, SpinnerComponent, NotifBellComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
       <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div class="kicker" style="margin-bottom:4px"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('cs_kicker') }}</div>
+    <div class="scr-body" reveal="screen">
+      <div class="kicker" style="margin-bottom:4px" data-reveal="item"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('cs_kicker') }}</div>
 
       <!-- Header row: title + action buttons -->
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px" data-reveal="item">
         <h1 style="font-size:21px;margin:0;flex:1">{{ i18n.t('cs_title') }}</h1>
         <button class="icon-btn" (click)="load()" [title]="i18n.t('map_reload')" style="flex-shrink:0"><ic name="refresh" [size]="16"></ic></button>
         @if (stats() && !loading()) {
@@ -40,14 +41,14 @@ import { NotifBellComponent } from '../shared/notif-bell';
         <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
       } @else if (stats(); as s) {
         <!-- Total -->
-        <div class="card" style="padding:16px;text-align:center;margin-bottom:12px">
+        <div class="card" style="padding:16px;text-align:center;margin-bottom:12px" data-reveal="kpi">
           <div style="font-size:34px;font-weight:800;color:var(--primary);line-height:1">{{ s.total }}</div>
           <div class="muted" style="font-size:12px;font-weight:700;margin-top:4px;text-transform:uppercase;letter-spacing:.04em">{{ i18n.t('cs_total') }}</div>
         </div>
 
         <!-- By product -->
-        <div class="kicker" style="margin-bottom:6px">{{ i18n.t('cs_by_product') }}</div>
-        <div class="card" style="padding:12px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px">
+        <div class="kicker" style="margin-bottom:6px" data-reveal="item">{{ i18n.t('cs_by_product') }}</div>
+        <div class="card" style="padding:12px 14px;margin-bottom:12px;display:flex;flex-direction:column;gap:10px" data-reveal="card">
           @for (b of s.byProduct; track b.key) {
             <div>
               <div style="display:flex;align-items:center;gap:8px;font-size:13px;margin-bottom:3px">
@@ -63,11 +64,11 @@ import { NotifBellComponent } from '../shared/notif-bell';
         </div>
 
         <!-- By commercial -->
-        <div class="kicker" style="margin-bottom:6px">{{ i18n.t('cs_by_commercial') }} · {{ s.byCommercial.length }}</div>
+        <div class="kicker" style="margin-bottom:6px" data-reveal="item">{{ i18n.t('cs_by_commercial') }} · {{ s.byCommercial.length }}</div>
         @if (!s.byCommercial.length) {
           <p class="muted" style="font-size:12.5px">{{ i18n.t('cs_empty') }}</p>
         } @else {
-          <div class="card" style="padding:4px 0;overflow:hidden">
+          <div class="card" style="padding:4px 0;overflow:hidden" data-reveal="item">
             @for (b of s.byCommercial; track b.key; let i = $index) {
               <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)">
                 <span style="width:22px;height:22px;border-radius:50%;background:var(--surface-2);font-size:11px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0">{{ i + 1 }}</span>

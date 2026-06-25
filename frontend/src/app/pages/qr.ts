@@ -4,24 +4,25 @@ import { I18n } from '../core/i18n';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { QrCodeComponent } from '../shared/qr-code';
+import { RevealDirective } from '../shared/reveal';
 
 /** Stand QR screen: shows a REAL QR encoding the client subscription URL.
  *  Scanning it with a phone opens the real /client form on that phone. */
 @Component({
   selector: 'page-qr',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, QrCodeComponent],
+  imports: [AppBarComponent, IconComponent, QrCodeComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
       <button appbar-left class="back-link" (click)="back()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
     </app-bar>
-    <div class="scr-body" style="align-items:center;text-align:center">
-      <div style="width:100%">
+    <div class="scr-body" style="align-items:center;text-align:center" reveal="screen">
+      <div style="width:100%" data-reveal="item">
         <div class="kicker" style="text-align:center">{{ i18n.t('card_name') }}</div>
         <h1 style="font-size:23px;margin-top:8px">{{ i18n.t('qr_title') }}</h1>
       </div>
-      <div class="card" style="padding:22px;display:inline-flex;flex-direction:column;align-items:center;gap:14px;margin-top:6px">
+      <div class="card" data-reveal="logo" style="padding:22px;display:inline-flex;flex-direction:column;align-items:center;gap:14px;margin-top:6px">
         <div style="position:relative;padding:10px;border-radius:18px;background:var(--surface-2)">
           <qr-code [data]="clientUrl" [size]="196"></qr-code>
           <span class="corner tl"></span><span class="corner tr"></span><span class="corner bl"></span><span class="corner br"></span>
@@ -30,7 +31,7 @@ import { QrCodeComponent } from '../shared/qr-code';
           {{ clientUrl }}
         </div>
       </div>
-      <p class="muted" style="font-size:13px;line-height:1.5;max-width:300px">{{ i18n.t('qr_desc') }}</p>
+      <p class="muted" data-reveal="item" style="font-size:13px;line-height:1.5;max-width:300px">{{ i18n.t('qr_desc') }}</p>
       <div style="flex:1"></div>
     </div>
     <div class="scr-foot">

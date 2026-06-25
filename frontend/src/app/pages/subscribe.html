@@ -44,8 +44,8 @@
 @else if (proc() === 'paying') {
   <div class="scr">
     <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t(isSelf ? 'badge_self' : 'badge_agent') }}</span></app-bar>
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;padding:10px 0">
-      <div style="position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center">
+    <div reveal="screen" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;padding:10px 0">
+      <div data-reveal="logo" style="position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center">
         <span style="position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb, var(--primary) 22%, transparent);animation:ripple 1.8s ease-out infinite"></span>
         <span style="position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb, var(--primary) 22%, transparent);animation:ripple 1.8s ease-out infinite 0.9s"></span>
         <span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:72px;height:72px;border-radius:22px;font-size:20px;box-shadow:var(--shadow-lg);overflow:hidden">@if (pm.logo) { <img [src]="pm.logo" [alt]="pm.name" style="width:100%;height:100%;object-fit:contain;padding:8px;box-sizing:border-box" /> } @else { {{ pm.short }} }</span>
@@ -103,9 +103,9 @@
 @else if (proc() === 'failed') {
   <div class="scr">
     <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t(isSelf ? 'badge_self' : 'badge_agent') }}</span></app-bar>
-    <div class="scr-body">
+    <div class="scr-body" reveal="screen">
       <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px">
-        <div style="width:86px;height:86px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);animation:pop .45s cubic-bezier(.2,.8,.3,1.2)">
+        <div data-reveal="fail" style="width:86px;height:86px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent)">
           <ic name="alert" [size]="42" [sw]="2.5"></ic>
         </div>
         <div>
@@ -131,9 +131,9 @@
         </div>
       </div>
     </div>
-    <div class="scr-foot">
-      <button class="btn btn-primary" (click)="retry()"><ic name="refresh" [size]="18"></ic> {{ i18n.t('retry') }}</button>
-      <button class="btn btn-ghost" (click)="exit()">{{ i18n.t('home_btn') }}</button>
+    <div class="scr-foot" reveal="screen">
+      <button class="btn btn-primary" data-reveal="button" (click)="retry()"><ic name="refresh" [size]="18"></ic> {{ i18n.t('retry') }}</button>
+      <button class="btn btn-ghost" data-reveal="button" (click)="exit()">{{ i18n.t('home_btn') }}</button>
     </div>
   </div>
 }
@@ -142,19 +142,20 @@
 @else if (proc() === 'reference') {
   <div class="scr">
     <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t(isSelf ? 'badge_self' : 'badge_agent') }}</span></app-bar>
-    <div class="scr-body">
+    <div class="scr-body" reveal="screen">
       <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px">
-        <div [style.background]="(isCash || isSaraPending) ? 'color-mix(in srgb, var(--af-gold) 22%, transparent)' : 'var(--success)'"
+        <div #successCheck data-reveal="check"
+             [style.background]="(isCash || isSaraPending) ? 'color-mix(in srgb, var(--af-gold) 22%, transparent)' : 'var(--success)'"
              [style.color]="(isCash || isSaraPending) ? '#8a6400' : '#fff'"
-             style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:pop .45s cubic-bezier(.2,.8,.3,1.2)">
+             style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center">
           <ic [name]="(isCash || isSaraPending) ? 'clock' : 'check'" [size]="32" [sw]="2.5"></ic>
         </div>
-        <div>
+        <div data-reveal="item">
           <h1 style="font-size:22px">{{ i18n.t((isCash || isSaraPending) ? 'ref_done_title' : 'paid_success_title') }}</h1>
           <p class="muted" style="font-size:13px;line-height:1.5;max-width:300px;margin-top:7px">{{ i18n.t(isSaraPending ? 'ref_done_sara' : isCash ? 'ref_done_cash' : 'ref_done_paid') }}</p>
         </div>
 
-        <div class="card" style="padding:18px;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px">
+        <div class="card" data-reveal="card" style="padding:18px;width:100%;display:flex;flex-direction:column;align-items:center;gap:12px">
           <div style="padding:8px;border-radius:14px;background:var(--surface-2)"><qr-code [data]="refUrl" [size]="150"></qr-code></div>
           <div style="width:100%">
             <div class="kicker" style="text-align:center">{{ i18n.t('ref_label') }}</div>
@@ -166,9 +167,9 @@
           </div>
         </div>
 
-        <p class="muted" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t(isSaraPending ? 'ref_instr_sara' : 'ref_instr') }}</p>
+        <p class="muted" data-reveal="item" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t(isSaraPending ? 'ref_instr_sara' : 'ref_instr') }}</p>
 
-        <div class="card" style="width:100%;padding:14px 16px;display:flex;gap:11px;align-items:flex-start;text-align:left;background:color-mix(in srgb, var(--af-gold) 14%, transparent);border-color:color-mix(in srgb, var(--af-gold) 45%, transparent)">
+        <div class="card" data-reveal="card" style="width:100%;padding:14px 16px;display:flex;gap:11px;align-items:flex-start;text-align:left;background:color-mix(in srgb, var(--af-gold) 14%, transparent);border-color:color-mix(in srgb, var(--af-gold) 45%, transparent)">
           <span style="width:34px;height:34px;border-radius:10px;background:var(--af-gold);color:#5a4200;display:flex;align-items:center;justify-content:center;flex-shrink:0"><ic name="store" [size]="18"></ic></span>
           <div style="min-width:0">
             <div style="font-size:13px;font-weight:800;color:#5a4200">{{ i18n.t('pickup_title') }}</div>
@@ -176,21 +177,21 @@
           </div>
         </div>
 
-        <div class="card" style="padding:4px 16px;width:100%">
+        <div class="card" data-reveal="card" style="padding:4px 16px;width:100%">
           <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid'"></status-badge></span></div>
           <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(total) }}</span></div>
         </div>
 
-        <button class="btn btn-outline" (click)="downloadReceipt()" [disabled]="receiptBusy()" style="width:100%">
+        <button class="btn btn-outline" data-reveal="button" (click)="downloadReceipt()" [disabled]="receiptBusy()" style="width:100%">
           @if (receiptBusy()) { <spinner tone="primary"></spinner> } @else { <ic name="download" [size]="17"></ic> {{ i18n.t('receipt_download') }} }
         </button>
       </div>
     </div>
-    <div class="scr-foot">
-      <button class="btn btn-primary" (click)="reset()"><ic name="plus" [size]="18"></ic> {{ i18n.t(isSelf ? 'start' : 'new_sub') }}</button>
+    <div class="scr-foot" reveal="screen">
+      <button class="btn btn-primary" data-reveal="button" (click)="reset()"><ic name="plus" [size]="18"></ic> {{ i18n.t(isSelf ? 'start' : 'new_sub') }}</button>
       <div style="display:flex;gap:10px">
-        <button class="btn btn-ghost" (click)="home()" style="font-size:13px">{{ i18n.t('home_btn') }}</button>
-        @if (!isSelf) { <button class="btn btn-ghost" (click)="goPrint()" style="font-size:13px"><ic name="printer" [size]="16"></ic> {{ i18n.t('printpoint_link') }}</button> }
+        <button class="btn btn-ghost" data-reveal="button" (click)="home()" style="font-size:13px">{{ i18n.t('home_btn') }}</button>
+        @if (!isSelf) { <button class="btn btn-ghost" data-reveal="button" (click)="goPrint()" style="font-size:13px"><ic name="printer" [size]="16"></ic> {{ i18n.t('printpoint_link') }}</button> }
       </div>
     </div>
   </div>
@@ -203,10 +204,10 @@
       <button appbar-left class="back-link" (click)="prev()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
       <span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t(isSelf ? 'badge_self' : 'badge_agent') }}</span>
     </app-bar>
-    <div class="scr-body">
-      <div><steps [n]="STEP_COUNT" [current]="step()" [clickable]="true" [maxReachable]="maxReachableStep" [labels]="stepLabels" (pick)="goToStep($event)"></steps></div>
+    <div class="scr-body" reveal="screen">
+      <div data-reveal="item"><steps [n]="STEP_COUNT" [current]="step()" [clickable]="true" [maxReachable]="maxReachableStep" [labels]="stepLabels" (pick)="goToStep($event)"></steps></div>
 
-      <div>
+      <div data-reveal="item">
         <div class="kicker" style="margin-top:4px">{{ i18n.t('step') }} {{ step() + 1 }} {{ i18n.t('of') }} {{ STEP_COUNT }} · {{ i18n.t(stepKey(step())) }}</div>
         <h1 style="font-size:22px;margin-top:5px">{{ i18n.t(headTitle) }}</h1>
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t(headSub) }}</p>
@@ -214,9 +215,9 @@
 
       <!-- Step 0: identity -->
       @if (step() === 0) {
-        <field [label]="i18n.t('prenom')" [err]="e('prenom')"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('prenom_ph')" [value]="form.prenom" (input)="set('prenom', $any($event.target).value)" /></div></field>
-        <field [label]="i18n.t('nom')" [err]="e('nom')"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('nom_ph')" [value]="form.nom" (input)="set('nom', $any($event.target).value)" /></div></field>
-        <field [label]="i18n.t('sexe')" [err]="e('sexe')">
+        <field [label]="i18n.t('prenom')" [err]="e('prenom')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('prenom_ph')" [value]="form.prenom" (input)="set('prenom', $any($event.target).value)" /></div></field>
+        <field [label]="i18n.t('nom')" [err]="e('nom')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('nom_ph')" [value]="form.nom" (input)="set('nom', $any($event.target).value)" /></div></field>
+        <field [label]="i18n.t('sexe')" [err]="e('sexe')" data-reveal="input">
           <div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span>
             <select [value]="form.sexe" (change)="set('sexe', $any($event.target).value)">
               <option value="" disabled>{{ i18n.t('sexe_ph') }}</option>
@@ -225,7 +226,7 @@
             </select>
           </div>
         </field>
-        <field [label]="i18n.t('doc_type_label')">
+        <field [label]="i18n.t('doc_type_label')" data-reveal="input">
           <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
             <select [value]="form.docType" (change)="set('docType', $any($event.target).value)">
               <option value="cni">{{ i18n.t('doc_cni') }}</option>
@@ -235,21 +236,21 @@
           </div>
         </field>
         @if (form.docType === 'cni') {
-          <cni-field [label]="docNumLabel" [hint]="i18n.t('cni_hint')" [value]="form.cni" (valueChange)="set('cni', $event)" [err]="e('cni')"></cni-field>
+          <cni-field [label]="docNumLabel" [hint]="i18n.t('cni_hint')" [value]="form.cni" (valueChange)="set('cni', $event)" [err]="e('cni')" data-reveal="input"></cni-field>
         } @else {
-          <field [label]="docNumLabel" [err]="e('cni')"><div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span><input autocapitalize="characters" style="text-transform:uppercase" [placeholder]="i18n.t('doc_num_ph')" [value]="form.cni" (input)="set('cni', $any($event.target).value.toUpperCase())" /></div></field>
+          <field [label]="docNumLabel" [err]="e('cni')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span><input autocapitalize="characters" style="text-transform:uppercase" [placeholder]="i18n.t('doc_num_ph')" [value]="form.cni" (input)="set('cni', $any($event.target).value.toUpperCase())" /></div></field>
         }
-        <field [label]="i18n.t('niu_label')" [hint]="i18n.t('niu_hint')"><div class="input-prefix"><span class="pfx"><ic name="hash" [size]="17"></ic></span><input [placeholder]="i18n.t('niu_ph')" [value]="form.niu" (input)="set('niu', $any($event.target).value)" /></div></field>
-        <expiry-field [label]="i18n.t('cni_exp')" [value]="form.cniExp" (valueChange)="set('cniExp', $event)" [err]="e('cniExp')"></expiry-field>
+        <field [label]="i18n.t('niu_label')" [hint]="i18n.t('niu_hint')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="hash" [size]="17"></ic></span><input [placeholder]="i18n.t('niu_ph')" [value]="form.niu" (input)="set('niu', $any($event.target).value)" /></div></field>
+        <expiry-field [label]="i18n.t('cni_exp')" [value]="form.cniExp" (valueChange)="set('cniExp', $event)" [err]="e('cniExp')" data-reveal="input"></expiry-field>
         @if (form.docType === 'cni') {
-          <field [label]="i18n.t('naissance_label')" [hint]="i18n.t('naissance_hint')" [err]="e('naissance')"><div class="input-prefix"><span class="pfx"><ic name="calendar" [size]="17"></ic></span><input type="date" [value]="form.naissance" (input)="set('naissance', $any($event.target).value)" /></div></field>
+          <field [label]="i18n.t('naissance_label')" [hint]="i18n.t('naissance_hint')" [err]="e('naissance')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="calendar" [size]="17"></ic></span><input type="date" [value]="form.naissance" (input)="set('naissance', $any($event.target).value)" /></div></field>
         }
-        <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
-        <field [label]="i18n.t('email_label')" [err]="e('email')"><div class="input-prefix"><span class="pfx"><ic name="mail" [size]="17"></ic></span><input type="email" [placeholder]="i18n.t('email_ph')" [value]="form.email" (input)="set('email', $any($event.target).value)" /></div></field>
-        <field [label]="i18n.t('quartier')" [err]="e('quartier')"><div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span><input [placeholder]="i18n.t('quartier_ph')" [value]="form.quartier" (input)="set('quartier', $any($event.target).value)" /></div></field>
-        <field [label]="i18n.t('ville_label')" [err]="e('ville')"><div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span><input [placeholder]="i18n.t('ville_ph')" [value]="form.ville" (input)="set('ville', $any($event.target).value)" /></div></field>
+        <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')" data-reveal="input"></phone-field>
+        <field [label]="i18n.t('email_label')" [err]="e('email')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="mail" [size]="17"></ic></span><input type="email" [placeholder]="i18n.t('email_ph')" [value]="form.email" (input)="set('email', $any($event.target).value)" /></div></field>
+        <field [label]="i18n.t('quartier')" [err]="e('quartier')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span><input [placeholder]="i18n.t('quartier_ph')" [value]="form.quartier" (input)="set('quartier', $any($event.target).value)" /></div></field>
+        <field [label]="i18n.t('ville_label')" [err]="e('ville')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span><input [placeholder]="i18n.t('ville_ph')" [value]="form.ville" (input)="set('ville', $any($event.target).value)" /></div></field>
 
-        <div style="border-top:1px solid var(--border);padding-top:16px">
+        <div style="border-top:1px solid var(--border);padding-top:16px" data-reveal="input">
           <phone-field [label]="i18n.t('ref_phone_label3')" [value]="form.refPhone" (valueChange)="set('refPhone', $event)" [hint]="i18n.t('ref_phone_hint3')"></phone-field>
           @if (refAgent()) {
             <div style="display:flex;align-items:center;gap:9px;margin-top:10px;padding:10px 12px;border-radius:var(--radius);background:var(--success-soft)">
@@ -269,16 +270,16 @@
 
       <!-- Step 1: ID document (CNI recto + verso, rear camera) -->
       @else if (step() === 1) {
-        <div style="font-size:13px;font-weight:700;margin-top:2px">{{ docLabel }} — {{ i18n.t('side_recto') }}</div>
-        <photo-capture [imageData]="form.cniRectoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
+        <div style="font-size:13px;font-weight:700;margin-top:2px" data-reveal="item">{{ docLabel }} — {{ i18n.t('side_recto') }}</div>
+        <photo-capture data-reveal="card" [imageData]="form.cniRectoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
           detect="document" [autoCapture]="true"
           [guide]="i18n.t('cni_recto_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniRecto($event)" (retake)="onRetakeRecto()"></photo-capture>
         @if (cniOcrWarning()) {
           <div class="err" style="text-align:center;font-weight:700;font-size:12.5px">{{ i18n.t(cniOcrWarning()!) }}</div>
         }
         @if (needsVerso) {
-          <div style="font-size:13px;font-weight:700;margin-top:6px">{{ docLabel }} — {{ i18n.t('side_verso') }}</div>
-          <photo-capture [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
+          <div style="font-size:13px;font-weight:700;margin-top:6px" data-reveal="item">{{ docLabel }} — {{ i18n.t('side_verso') }}</div>
+          <photo-capture data-reveal="card" [imageData]="form.cniVersoData" facing="environment" [boxW]="280" [boxH]="180" [qualityCheck]="true"
             detect="document" [autoCapture]="true"
             [guide]="i18n.t('cni_verso_guide')" tipsTitle="cni_tips_title" [tips]="cniTips" (captured)="onCniVerso($event)" (retake)="onRetakeVerso()"></photo-capture>
         }
@@ -287,7 +288,7 @@
 
       <!-- Step 2: client photo -->
       @else if (step() === 2) {
-        <photo-capture [imageData]="form.selfieData" facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
+        <photo-capture data-reveal="card" [imageData]="form.selfieData" facing="user" [allowFlip]="true" [round]="true" [boxW]="200" [boxH]="200"
           [allowGallery]="false" detect="off" [autoCapture]="false"
           [guide]="i18n.t('photo_guide')" (captured)="onSelfie($event)" (retake)="onRetakeSelfie()"></photo-capture>
       }
@@ -296,10 +297,10 @@
       @else if (step() === 3) {
         <!-- Retrait de la carte : stand Promote (par défaut) ou retrait en agence. -->
         @if (deliveryTiles.length > 1) {
-          <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('delivery_choose_label') }}</div>
-          <tile-choice [options]="deliveryTiles" [value]="form.delivery" (valueChange)="setDelivery($event)"></tile-choice>
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px" data-reveal="item">{{ i18n.t('delivery_choose_label') }}</div>
+          <tile-choice data-reveal="card" [options]="deliveryTiles" [value]="form.delivery" (valueChange)="setDelivery($event)"></tile-choice>
           @if (form.delivery === 'agence') {
-            <div style="margin-top:10px">
+            <div style="margin-top:10px" data-reveal="input">
               <field [label]="i18n.t('pickup_agency_label')"
                      [err]="touched() && !form.pickupAgencyId ? i18n.t('pickup_agency_required') : null">
                 <div class="input-prefix"><span class="pfx"><ic name="pin" [size]="17"></ic></span>
@@ -315,16 +316,16 @@
           }
           <div style="height:14px"></div>
         }
-        <tile-choice [options]="payTiles" [value]="form.pay" (valueChange)="set('pay', $event)"></tile-choice>
+        <tile-choice data-reveal="card" [options]="payTiles" [value]="form.pay" (valueChange)="set('pay', $event)"></tile-choice>
         @if (isMomo) {
-          <div style="margin-top:10px">
+          <div style="margin-top:10px" data-reveal="input">
             <phone-field [label]="i18n.t('pay_phone_label', { op: pm.name })" [value]="form.payPhone" (valueChange)="set('payPhone', $event)"
               [hint]="i18n.t('pay_phone_hint')" [err]="payPhoneErrorShown"></phone-field>
           </div>
         }
         @if (form.pay === 'sara') {
           <!-- SARA is settled in the SARA app first; the client then uploads the proof here. -->
-          <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:11px;background:var(--surface-2)">
+          <div class="card" data-reveal="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:11px;background:var(--surface-2)">
             <div style="display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--primary)"><ic name="phone" [size]="16"></ic> {{ i18n.t('sara_steps_title') }}</div>
             <ol style="margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:9px">
               @for (s of saraSteps; track $index) {
@@ -336,7 +337,7 @@
             </ol>
           </div>
           <!-- Collection account the client must credit in the SARA app before uploading the receipt. -->
-          <div class="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--primary)">
+          <div class="card" data-reveal="card" style="padding:14px;margin-top:10px;display:flex;flex-direction:column;gap:6px;border:1px solid var(--primary)">
             <div style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--primary)">{{ i18n.t('sara_account_title') }}</div>
             <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
               <span style="font-size:22px;font-weight:800;letter-spacing:.04em">{{ i18n.t('sara_account_number') }}</span>
@@ -344,8 +345,8 @@
             </div>
             <p class="muted" style="font-size:11.5px;line-height:1.45;margin:0">{{ i18n.t('sara_account_hint') }}</p>
           </div>
-          <div style="font-size:13px;font-weight:700;margin-top:12px">{{ i18n.t('sara_receipt_label') }}</div>
-          <receipt-upload [imageData]="form.saraReceiptData" [guide]="i18n.t('sara_receipt_guide')" (captured)="onSaraReceipt($event)"></receipt-upload>
+          <div style="font-size:13px;font-weight:700;margin-top:12px" data-reveal="item">{{ i18n.t('sara_receipt_label') }}</div>
+          <receipt-upload data-reveal="card" [imageData]="form.saraReceiptData" [guide]="i18n.t('sara_receipt_guide')" (captured)="onSaraReceipt($event)"></receipt-upload>
           @if (touched() && !form.saraReceiptKey) { <div class="err" style="text-align:center;font-weight:700">{{ i18n.t('sara_receipt_required') }}</div> }
 
           <!-- After upload: show what was read from the receipt; the reference is the key field and is editable. -->
@@ -393,8 +394,8 @@
 
       <!-- Step 4: recap -->
       @else {
-        <promote-card [holder]="fullName"></promote-card>
-        <div class="card" style="padding:4px 16px">
+        <promote-card data-reveal="logo" [holder]="fullName"></promote-card>
+        <div class="card" data-reveal="card" style="padding:4px 16px">
           <div class="srow"><span class="lbl">{{ i18n.t('client') }}</span><span class="val">{{ fullName }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('sexe') }}</span><span class="val">{{ form.sexe === 'M' ? i18n.t('sexe_m') : i18n.t('sexe_f') }}</span></div>
           <div class="srow"><span class="lbl">{{ docLabel }}</span><span class="val">{{ form.cni }}</span></div>
@@ -409,7 +410,7 @@
           <div class="srow"><span class="lbl">{{ i18n.t('delivery_label') }}</span><span class="val">{{ form.delivery === 'agence' ? pickupAgencyName : i18n.t('del_promote_title') }}</span></div>
           @if (refAgent()) { <div class="srow"><span class="lbl">{{ i18n.t('referred_by') }}</span><span class="val">{{ refAgent()!.name }}</span></div> }
         </div>
-        <div class="card" style="padding:4px 16px">
+        <div class="card" data-reveal="card" style="padding:4px 16px">
           <div class="srow"><span class="lbl">{{ i18n.t('cardtype_label') }}</span><span class="val">{{ cardLabel }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('product_card_price') }}</span><span class="val">{{ i18n.money(config.price) }}</span></div>
           <div class="srow"><span class="lbl">{{ i18n.t('offer_recharge_initiale') }}</span><span class="val">{{ i18n.money(rechargeInitiale) }}</span></div>
@@ -419,14 +420,14 @@
       }
     </div>
 
-    <div class="scr-foot">
+    <div class="scr-foot" reveal="screen">
       @if (submitError()) {
         <p class="err" style="text-align:center;font-weight:700;margin-bottom:10px">{{ i18n.t(submitError()) }}</p>
       }
       @if (step() < lastStep) {
-        <button class="btn btn-primary" (click)="next()">{{ i18n.t('continue') }} <ic name="arrowR" [size]="19"></ic></button>
+        <button class="btn btn-primary" data-reveal="button" (click)="next()">{{ i18n.t('continue') }} <ic name="arrowR" [size]="19"></ic></button>
       } @else {
-        <button class="btn btn-primary" (click)="confirm()" [disabled]="busy() || !formComplete">
+        <button class="btn btn-primary" data-reveal="button" (click)="confirm()" [disabled]="busy() || !formComplete">
           @if (busy()) { <spinner></spinner> }
           @else if (form.pay === 'cash') { <ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('confirm_cash') }} }
           @else if (form.pay === 'sara') { <ic name="check" [size]="19" [sw]="2.4"></ic> {{ i18n.t('confirm_sara') }} }

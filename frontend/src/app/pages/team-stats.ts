@@ -9,6 +9,7 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { SpinnerComponent } from '../shared/spinner';
 import { NotifBellComponent } from '../shared/notif-bell';
+import { RevealDirective } from '../shared/reveal';
 
 /**
  * Hierarchy-scoped sales dashboard, shared by every level of the management chain. The backend
@@ -19,16 +20,16 @@ import { NotifBellComponent } from '../shared/notif-bell';
 @Component({
   selector: 'page-team-stats',
   standalone: true,
-  imports: [FormsModule, DecimalPipe, AppBarComponent, IconComponent, SpinnerComponent, NotifBellComponent],
+  imports: [FormsModule, DecimalPipe, AppBarComponent, IconComponent, SpinnerComponent, NotifBellComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
       <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div class="kicker" style="margin-bottom:4px"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>Statistiques de vente</div>
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+    <div class="scr-body" reveal="screen">
+      <div class="kicker" style="margin-bottom:4px" data-reveal="item"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>Statistiques de vente</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap" data-reveal="item">
         <h1 style="font-size:21px;margin:0;flex:1">{{ scopeLabel() }}</h1>
         <label style="font-size:12px">Produit
           <select [(ngModel)]="productCode" (ngModelChange)="load()" style="margin-left:6px">
@@ -44,26 +45,26 @@ import { NotifBellComponent } from '../shared/notif-bell';
       } @else if (stats(); as s) {
         <!-- Totals -->
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px">
-          <div class="card" style="padding:12px;text-align:center">
+          <div class="card" style="padding:12px;text-align:center" data-reveal="kpi">
             <div style="font-size:26px;font-weight:800;color:var(--primary);line-height:1">{{ s.totalSubscriptions | number }}</div>
             <div class="muted" style="font-size:11px;font-weight:700;margin-top:4px;text-transform:uppercase">Souscriptions</div>
           </div>
-          <div class="card" style="padding:12px;text-align:center">
+          <div class="card" style="padding:12px;text-align:center" data-reveal="kpi">
             <div style="font-size:26px;font-weight:800;color:var(--primary);line-height:1">{{ s.totalCollectes | number }}</div>
             <div class="muted" style="font-size:11px;font-weight:700;margin-top:4px;text-transform:uppercase">Collectes</div>
           </div>
-          <div class="card" style="padding:12px;text-align:center">
+          <div class="card" style="padding:12px;text-align:center" data-reveal="kpi">
             <div style="font-size:22px;font-weight:800;line-height:1">{{ s.totalCommissions | number }}</div>
             <div class="muted" style="font-size:11px;font-weight:700;margin-top:4px;text-transform:uppercase">Commissions (XAF)</div>
           </div>
         </div>
 
         <!-- Members -->
-        <div class="kicker" style="margin-bottom:6px">Équipe · {{ s.members.length }}</div>
+        <div class="kicker" style="margin-bottom:6px" data-reveal="item">Équipe · {{ s.members.length }}</div>
         @if (!s.members.length) {
           <p class="muted" style="font-size:12.5px">Aucune vente sur le périmètre.</p>
         } @else {
-          <div class="card" style="padding:0;overflow:hidden">
+          <div class="card" style="padding:0;overflow:hidden" data-reveal="item">
             <div style="display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase">
               <span style="flex:1">Membre</span>
               <span style="width:48px;text-align:right">Sousc.</span>
@@ -89,8 +90,8 @@ import { NotifBellComponent } from '../shared/notif-bell';
 
       <!-- Team roster + messaging -->
       @if (roster().length) {
-        <div class="kicker" style="margin:18px 0 6px">Mon équipe · {{ roster().length }}</div>
-        <div class="card" style="padding:4px 0;overflow:hidden;margin-bottom:12px">
+        <div class="kicker" style="margin:18px 0 6px" data-reveal="item">Mon équipe · {{ roster().length }}</div>
+        <div class="card" style="padding:4px 0;overflow:hidden;margin-bottom:12px" data-reveal="card">
           @for (m of roster(); track m.id) {
             <label style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:12.5px;cursor:pointer">
               <input type="checkbox" [checked]="selected().has(m.id)" (change)="toggleSelect(m.id)" style="width:auto" />
@@ -100,7 +101,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
           }
         </div>
 
-        <div class="card" style="padding:14px">
+        <div class="card" style="padding:14px" data-reveal="card">
           <div class="kicker" style="margin-bottom:8px">Envoyer un message {{ selected().size ? '(' + selected().size + ' sélectionné·s)' : '(toute l’équipe)' }}</div>
           <input [(ngModel)]="msgTitle" placeholder="Titre" style="width:100%;margin-bottom:8px" />
           <textarea [(ngModel)]="msgBody" placeholder="Votre message…" rows="3" style="width:100%;margin-bottom:8px"></textarea>

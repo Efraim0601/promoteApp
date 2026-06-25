@@ -48,8 +48,9 @@ import { NotifBellComponent } from '../shared/notif-bell';
       @if (loading()) {
         <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
       } @else {
+        <div reveal="screen">
         <!-- New product -->
-        <div class="card" style="padding:14px;margin-bottom:14px">
+        <div class="card" style="padding:14px;margin-bottom:14px" data-reveal="card">
           <div class="kicker" style="margin-bottom:8px">Nouveau produit</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
             <label style="flex:1;min-width:140px">Libellé
@@ -73,7 +74,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
 
         <!-- Product list -->
         @for (p of products(); track p.id) {
-          <div class="card" style="padding:12px 14px;margin-bottom:10px">
+          <div class="card" style="padding:12px 14px;margin-bottom:10px" data-reveal="card">
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <span class="badge" [style.background]="p.kind === 'CARD' ? 'var(--primary)' : 'var(--surface-2)'"
                     [style.color]="p.kind === 'CARD' ? '#fff' : 'var(--muted)'" style="font-size:10px">{{ p.kind === 'CARD' ? 'Carte' : 'Bancaire' }}</span>
@@ -153,6 +154,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
           </div>
         }
         @if (!products().length) { <p class="muted" style="text-align:center">Aucun produit.</p> }
+        </div>
       }
       }
 
@@ -160,8 +162,9 @@ import { NotifBellComponent } from '../shared/notif-bell';
       @if (cLoading()) {
         <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
       } @else {
+        <div reveal="screen">
         <!-- New commission rule -->
-        <div class="card" style="padding:14px;margin-bottom:14px">
+        <div class="card" style="padding:14px;margin-bottom:14px" data-reveal="card">
           <div class="kicker" style="margin-bottom:8px">Nouvelle règle de commission</div>
           <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end">
             <label style="width:120px">Portée
@@ -211,9 +214,9 @@ import { NotifBellComponent } from '../shared/notif-bell';
         </div>
 
         <!-- Rules list -->
-        <div class="kicker" style="margin-bottom:6px">Règles · {{ rules().length }}</div>
+        <div class="kicker" style="margin-bottom:6px" data-reveal="item">Règles · {{ rules().length }}</div>
         @for (r of rules(); track r.id) {
-          <div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px">
+          <div class="card" style="padding:10px 14px;margin-bottom:8px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12.5px" data-reveal="card">
             <span class="badge" [style.background]="r.active ? '#ecfdf3' : 'var(--surface-2)'" [style.color]="r.active ? '#067647' : 'var(--muted)'" style="font-size:10px">{{ r.active ? 'Active' : 'Inactive' }}</span>
             <span><b>{{ r.scopeType === 'PRODUCT' ? 'Produit' : 'Groupe' }}</b> {{ r.scopeCode }}</span>
             <span class="muted">→</span>
@@ -227,11 +230,11 @@ import { NotifBellComponent } from '../shared/notif-bell';
         @if (!rules().length) { <p class="muted" style="font-size:12.5px">Aucune règle de commission.</p> }
 
         <!-- Ledger -->
-        <div class="kicker" style="margin:16px 0 6px">Commissions générées · total {{ totalCommissions() | number }} XAF</div>
+        <div class="kicker" style="margin:16px 0 6px" data-reveal="item">Commissions générées · total {{ totalCommissions() | number }} XAF</div>
         @if (!entries().length) {
           <p class="muted" style="font-size:12.5px">Aucune commission générée pour l’instant.</p>
         } @else {
-          <div class="card" style="padding:4px 0;overflow:hidden">
+          <div class="card" style="padding:4px 0;overflow:hidden" data-reveal="item">
             @for (e of entries(); track e.id) {
               <div style="display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--border);font-size:12.5px">
                 <span style="min-width:0;flex:1;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ e.beneficiaryName || e.beneficiaryId }}</span>
@@ -242,6 +245,7 @@ import { NotifBellComponent } from '../shared/notif-bell';
             }
           </div>
         }
+        </div>
       }
       }
     </div>

@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { I18n } from '../core/i18n';
 import { Api } from '../core/api';
@@ -21,6 +21,7 @@ import { TileChoiceComponent, TileOption } from '../shared/tile-choice';
 import { SpinnerComponent } from '../shared/spinner';
 import { PromoteCardComponent } from '../shared/promote-card';
 import { QrCodeComponent } from '../shared/qr-code';
+import { RevealDirective, burstConfetti } from '../shared/reveal';
 
 const STEP_KEYS = ['step_identity', 'step_documents', 'step_photo', 'step_payment', 'step_recap'];
 const STEP_COUNT = STEP_KEYS.length;
@@ -67,11 +68,14 @@ function isValidBirth(d: string): boolean {
     AppBarComponent, IconComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent,
     ExpiryFieldComponent, StepsComponent, StatusBadgeComponent, AvatarComponent,
     PhotoCaptureComponent, ReceiptUploadComponent, TileChoiceComponent, PromoteCardComponent, QrCodeComponent,
-    SpinnerComponent,
+    SpinnerComponent, RevealDirective,
   ],
   templateUrl: './subscribe.html',
 })
 export class SubscribeComponent implements OnInit, OnDestroy {
+  /** Success check badge — confetti origin once the reference/success screen appears. */
+  @ViewChild('successCheck') successCheck?: ElementRef<HTMLElement>;
+
   i18n = inject(I18n);
   private api = inject(Api);
   private auth = inject(Auth);
@@ -509,8 +513,8 @@ export class SubscribeComponent implements OnInit, OnDestroy {
         this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage,
           fullName: s.fullName, pay: s.pay, payPhone: s.payPhone, createdAt: s.createdAt });
         // cash and SARA money are settled off-platform → straight to the reference screen, no polling.
-        if (this.form.pay === 'cash' || this.form.pay === 'sara') { this.proc.set('reference'); }
-        else if (s.payStatus === 'paid') { this.proc.set('reference'); }
+        if (this.form.pay === 'cash' || this.form.pay === 'sara') { this.proc.set('reference'); this.celebrate(); }
+        else if (s.payStatus === 'paid') { this.proc.set('reference'); this.celebrate(); }
         else if (s.payStatus === 'failed') { this.proc.set('failed'); } // gateway rejected the push
         else {
           this.proc.set('paying');
@@ -530,6 +534,11 @@ export class SubscribeComponent implements OnInit, OnDestroy {
         this.submitError.set(known.includes(code ?? '') ? code! : 'submit_failed');
       },
     });
+  }
+
+  /** Celebrate on the success/reference screen — confetti from the check badge once it's rendered. */
+  private celebrate() {
+    setTimeout(() => { if (this.successCheck?.nativeElement) burstConfetti(this.successCheck.nativeElement); }, 50);
   }
 
   private runMomo() {
@@ -558,6 +567,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
             this.polling = false;
             this.result.set({ ...(this.result() ?? { ref }), payStatus: 'paid' });
             this.proc.set('reference');
+            this.celebrate();
           } else if (s.payStatus === 'failed') {
             this.polling = false;
             // Keep the decline reason (e.g. "Solde insuffisant") so the failure screen can explain it.
@@ -593,6 +603,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
         if (s.payStatus === 'paid') {
           this.result.set({ ...(this.result() ?? { ref }), payStatus: 'paid' });
           this.proc.set('reference');
+          this.celebrate();
         } else if (s.payStatus === 'failed') {
           this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: s.message ?? this.result()?.message });
           this.proc.set('failed');
@@ -622,6 +633,7 @@ export class SubscribeComponent implements OnInit, OnDestroy {
         if (outcome === 'validate') {
           this.result.set({ ...base, payStatus: 'paid' });
           this.proc.set('reference');
+          this.celebrate();
         } else {
           this.result.set({ ...base, payStatus: 'failed', message: s.paymentMessage ?? 'Refusé par le client' });
           this.proc.set('failed');

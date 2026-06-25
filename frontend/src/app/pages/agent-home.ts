@@ -17,19 +17,20 @@ import { FieldComponent, PhoneFieldComponent } from '../shared/fields';
 import { ReceiptService } from '../shared/receipt';
 import { NotifBellComponent } from '../shared/notif-bell';
 import { RechargeHistoryComponent } from '../shared/recharge-history';
+import { RevealDirective } from '../shared/reveal';
 
 @Component({
   selector: 'page-agent-home',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, StatusBadgeComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent, NotifBellComponent, RechargeHistoryComponent],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, TxRowComponent, TxDetailComponent, StatusBadgeComponent, SpinnerComponent, FieldComponent, PhoneFieldComponent, NotifBellComponent, RechargeHistoryComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
       <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div style="display:flex;align-items:center;gap:12px">
+    <div class="scr-body" reveal="screen">
+      <div style="display:flex;align-items:center;gap:12px" data-reveal="item">
         <avatar [name]="auth.user()!.name" role="agent" [size]="46"></avatar>
         <div style="min-width:0">
           <div class="muted" style="font-size:12.5px;font-weight:600">{{ i18n.t('greeting') }},</div>
@@ -39,12 +40,12 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       </div>
 
       <!-- Deux actions principales côte à côte (menu niveau 1) -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" data-reveal="card">
         <button class="btn btn-primary" (click)="newSub()" style="padding:12px 8px;font-size:13.5px"><ic name="plus" [size]="18"></ic> {{ i18n.t('new_sub_btn') }}</button>
         <button class="btn btn-outline" (click)="newRecharge()" style="padding:12px 8px;font-size:13.5px"><ic name="phone" [size]="17"></ic> {{ i18n.t('new_recharge_btn') }}</button>
       </div>
       <!-- Actions secondaires (menu niveau 2) -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <div style="display:flex;gap:8px;flex-wrap:wrap" data-reveal="card">
         @if (auth.hasRole('COLLECTEUR')) {
           <button class="btn btn-outline" (click)="goCollecte()" style="flex:1;padding:9px;font-size:13px"><ic name="store" [size]="16"></ic> {{ i18n.t('nav_collectes') }}</button>
         }
@@ -53,13 +54,13 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-        <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_my_subs') }}</div></div>
-        <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
-        <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
-        <div class="kpi"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(stats()?.collected ?? 0) }}</div><div class="kl">{{ i18n.t('kpi_collected') }}</div></div>
+        <div class="kpi" data-reveal="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_my_subs') }}</div></div>
+        <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}</div></div>
+        <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}</div></div>
+        <div class="kpi" data-reveal="kpi"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(stats()?.collected ?? 0) }}</div><div class="kl">{{ i18n.t('kpi_collected') }}</div></div>
       </div>
 
-      <div class="card" style="overflow:hidden">
+      <div class="card" style="overflow:hidden" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('my_sales') }}</h3>

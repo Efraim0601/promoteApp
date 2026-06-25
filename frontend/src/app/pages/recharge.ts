@@ -1,4 +1,4 @@
-import { Component, OnDestroy, OnInit, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild, effect, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
 import { I18n } from '../core/i18n';
@@ -17,6 +17,7 @@ import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
 import { PromoteCardComponent } from '../shared/promote-card';
 import { ReceiptService } from '../shared/receipt';
+import { RevealDirective, burstConfetti } from '../shared/reveal';
 
 /** Free-entry amount bounds — must match RechargeService.MIN_AMOUNT / MAX_AMOUNT on the backend. */
 const MIN_AMOUNT = 500;
@@ -40,21 +41,22 @@ interface RechargeForm {
   imports: [
     AppBarComponent, IconComponent, FieldComponent, PhoneFieldComponent, TileChoiceComponent,
     ReceiptUploadComponent, StatusBadgeComponent, SpinnerComponent, PromoteCardComponent,
+    RevealDirective,
   ],
   template: `
   <!-- ===== Welcome ===== -->
   @if (showWelcome) {
     <div class="scr">
       <app-bar><button appbar-left class="back-link" (click)="exit()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button></app-bar>
-      <div class="scr-body">
+      <div class="scr-body" reveal="screen">
         <div style="display:flex;flex-direction:column;gap:16px">
-          <div class="kicker">{{ i18n.t('home_kicker') }}</div>
-          <promote-card></promote-card>
-          <div>
+          <div class="kicker" data-reveal="item">{{ i18n.t('home_kicker') }}</div>
+          <promote-card data-reveal="logo"></promote-card>
+          <div data-reveal="item">
             <h1 style="font-size:23px">{{ i18n.t('recharge_welcome_title') }}</h1>
             <p class="muted" style="font-size:13.5px;line-height:1.55;margin-top:8px">{{ i18n.t('recharge_welcome_desc') }}</p>
           </div>
-          <div class="card" style="padding:6px 14px">
+          <div class="card" data-reveal="card" style="padding:6px 14px">
             <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="user" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('recharge_welcome_step1') }}</span></div>
             <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="idcard" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('recharge_welcome_step2') }}</span></div>
             <div class="srow"><span class="lbl" style="display:inline-flex;align-items:center;gap:8px"><ic name="phone" [size]="17" style="color:var(--primary)"></ic> {{ i18n.t('recharge_welcome_step3') }}</span></div>
@@ -71,8 +73,8 @@ interface RechargeForm {
   @else if (proc() === 'paying') {
     <div class="scr">
       <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t('badge_self') }}</span></app-bar>
-      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;padding:10px 0">
-        <div style="position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:18px;padding:10px 0" reveal="screen">
+        <div data-reveal="logo" style="position:relative;width:120px;height:120px;display:flex;align-items:center;justify-content:center">
           <span style="position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb, var(--primary) 22%, transparent);animation:ripple 1.8s ease-out infinite"></span>
           <span style="position:absolute;inset:0;border-radius:50%;background:color-mix(in srgb, var(--primary) 22%, transparent);animation:ripple 1.8s ease-out infinite 0.9s"></span>
           <span class="op-logo" [style.background]="pm.bg" [style.color]="pm.fg" style="width:72px;height:72px;border-radius:22px;font-size:20px;box-shadow:var(--shadow-lg);overflow:hidden">@if (pm.logo) { <img [src]="pm.logo" [alt]="pm.name" style="width:100%;height:100%;object-fit:contain;padding:8px;box-sizing:border-box" /> } @else { {{ pm.short }} }</span>
@@ -124,12 +126,12 @@ interface RechargeForm {
   @else if (proc() === 'failed') {
     <div class="scr">
       <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t('badge_self') }}</span></app-bar>
-      <div class="scr-body">
+      <div class="scr-body" reveal="screen">
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:16px">
-          <div style="width:86px;height:86px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent);animation:pop .45s cubic-bezier(.2,.8,.3,1.2)">
+          <div data-reveal="fail" style="width:86px;height:86px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--accent-soft);color:var(--accent)">
             <ic name="alert" [size]="42" [sw]="2.5"></ic>
           </div>
-          <div>
+          <div data-reveal="item">
             <h1 style="font-size:22px">{{ i18n.t('failed_title') }}</h1>
             <p class="muted" style="font-size:13.5px;line-height:1.5;max-width:290px;margin-top:8px">{{ i18n.t('failed_desc', { op: pm.name }) }}</p>
             @if (result()?.paymentMessage) {
@@ -149,19 +151,20 @@ interface RechargeForm {
   @else if (proc() === 'reference') {
     <div class="scr">
       <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t('badge_self') }}</span></app-bar>
-      <div class="scr-body">
+      <div class="scr-body" reveal="screen">
         <div style="display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px">
-          <div [style.background]="(isCash || isSaraPending) ? 'color-mix(in srgb, var(--af-gold) 22%, transparent)' : 'var(--success)'"
+          <div #checkEl data-reveal="check"
+               [style.background]="(isCash || isSaraPending) ? 'color-mix(in srgb, var(--af-gold) 22%, transparent)' : 'var(--success)'"
                [style.color]="(isCash || isSaraPending) ? '#8a6400' : '#fff'"
-               style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;animation:pop .45s cubic-bezier(.2,.8,.3,1.2)">
+               style="width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center">
             <ic [name]="(isCash || isSaraPending) ? 'clock' : 'check'" [size]="32" [sw]="2.5"></ic>
           </div>
-          <div>
+          <div data-reveal="item">
             <h1 style="font-size:22px">{{ i18n.t((isCash || isSaraPending) ? 'recharge_done_pending_title' : 'recharge_done_paid_title') }}</h1>
             <p class="muted" style="font-size:13px;line-height:1.5;max-width:300px;margin-top:7px">{{ i18n.t(isSaraPending ? 'recharge_done_sara_desc' : isCash ? 'recharge_done_cash_desc' : 'recharge_done_paid_desc') }}</p>
           </div>
 
-          <div class="card" style="padding:18px;width:100%;display:flex;flex-direction:column;align-items:center;gap:8px">
+          <div class="card" data-reveal="card" style="padding:18px;width:100%;display:flex;flex-direction:column;align-items:center;gap:8px">
             <div class="kicker" style="text-align:center">{{ i18n.t('ref_label') }}</div>
             <button (click)="copyRef()" style="width:100%;border:1.5px dashed var(--border);background:var(--field-bg);border-radius:var(--radius);padding:11px 14px;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;color:var(--text)">
               <span style="font-family:var(--font-head);font-weight:800;font-size:22px;letter-spacing:.08em;white-space:nowrap">{{ result()!.ref }}</span>
@@ -170,9 +173,9 @@ interface RechargeForm {
             @if (copied()) { <div style="font-size:11px;color:var(--success);font-weight:700">{{ i18n.t('copied') }}</div> }
           </div>
 
-          <p class="muted" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t('recharge_ref_instr') }}</p>
+          <p class="muted" data-reveal="item" style="font-size:12.5px;line-height:1.5;max-width:310px">{{ i18n.t('recharge_ref_instr') }}</p>
 
-          <div class="card" style="padding:4px 16px;width:100%">
+          <div class="card" data-reveal="card" style="padding:4px 16px;width:100%">
             <div class="srow"><span class="lbl">{{ i18n.t('recharge_pan_short') }}</span><span class="val">{{ fmtPan(result()!.pan) }}</span></div>
             <div class="srow"><span class="lbl">{{ i18n.t('ref_status_pay') }}</span><span class="val"><status-badge [status]="isSaraPending ? 'sara_pending' : isCash ? 'cash' : 'paid_done'"></status-badge></span></div>
             <div class="srow total"><span class="lbl">{{ i18n.t('total') }}</span><span class="val">{{ i18n.money(result()!.amount) }}</span></div>
@@ -197,19 +200,19 @@ interface RechargeForm {
         <button appbar-left class="back-link" (click)="back()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
         <span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t('badge_self') }}</span>
       </app-bar>
-      <div class="scr-body">
-        <div>
+      <div class="scr-body" reveal="screen">
+        <div data-reveal="item">
           <div class="kicker" style="margin-top:4px">{{ i18n.t('recharge_welcome_title') }}</div>
           <h1 style="font-size:22px;margin-top:5px">{{ i18n.t('recharge_title') }}</h1>
           <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('recharge_sub') }}</p>
         </div>
 
-        <field [label]="i18n.t('prenom')" [err]="e('prenom')"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('prenom_ph')" [value]="form.prenom" (input)="set('prenom', $any($event.target).value)" /></div></field>
-        <field [label]="i18n.t('nom')" [err]="e('nom')"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('nom_ph')" [value]="form.nom" (input)="set('nom', $any($event.target).value)" /></div></field>
+        <field [label]="i18n.t('prenom')" [err]="e('prenom')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('prenom_ph')" [value]="form.prenom" (input)="set('prenom', $any($event.target).value)" /></div></field>
+        <field [label]="i18n.t('nom')" [err]="e('nom')" data-reveal="input"><div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span><input [placeholder]="i18n.t('nom_ph')" [value]="form.nom" (input)="set('nom', $any($event.target).value)" /></div></field>
 
-        <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')"></phone-field>
+        <phone-field [label]="i18n.t('tel')" [value]="form.phone" (valueChange)="set('phone', $event)" [hint]="i18n.t('tel_hint')" [err]="e('phone')" data-reveal="input"></phone-field>
 
-        <field [label]="i18n.t('recharge_pan_label')" [hint]="i18n.t('recharge_pan_hint')" [err]="e('pan')">
+        <field [label]="i18n.t('recharge_pan_label')" [hint]="i18n.t('recharge_pan_hint')" [err]="e('pan')" data-reveal="input">
           <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
             <ic name="idcard" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
             <input #panPrefix inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form.panPrefix"
@@ -222,13 +225,13 @@ interface RechargeForm {
           </div>
         </field>
 
-        <field [label]="i18n.t('recharge_amount_label')" [hint]="amountHint" [err]="e('amount')">
+        <field [label]="i18n.t('recharge_amount_label')" [hint]="amountHint" [err]="e('amount')" data-reveal="input">
           <div class="input-prefix"><span class="pfx"><ic name="hash" [size]="17"></ic></span>
             <input inputmode="numeric" [placeholder]="i18n.t('recharge_amount_ph')" [value]="form.amount" (input)="onAmount($any($event.target).value)" />
           </div>
         </field>
 
-        <div style="border-top:1px solid var(--border);padding-top:16px">
+        <div data-reveal="item" style="border-top:1px solid var(--border);padding-top:16px">
           <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('recharge_pay_title') }}</div>
           <tile-choice [options]="payTiles" [value]="form.pay" (valueChange)="set('pay', $event)"></tile-choice>
 
@@ -299,7 +302,19 @@ export class RechargeComponent implements OnInit, OnDestroy {
   private router = inject(Router);
   private receipt = inject(ReceiptService);
 
+  /** Central success icon — burst confetti once the reference (success) state becomes active. */
+  @ViewChild('checkEl') checkEl?: ElementRef<HTMLElement>;
+
   private geoFix: GeoFix | null = null;
+
+  constructor() {
+    // When the "reference" success state appears, fire the confetti from the check icon.
+    effect(() => {
+      if (this.proc() === 'reference' && !this.isCash && !this.isSaraPending) {
+        setTimeout(() => { if (this.checkEl?.nativeElement) burstConfetti(this.checkEl.nativeElement); }, 50);
+      }
+    });
+  }
 
   started = signal(false);
   proc = signal<null | 'paying' | 'reference' | 'failed'>(null);

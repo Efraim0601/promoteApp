@@ -7,12 +7,13 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
 import { SpinnerComponent } from '../shared/spinner';
+import { RevealDirective } from '../shared/reveal';
 
 /** Self-service password change. Also the forced screen on first login (mustChangePassword). */
 @Component({
   selector: 'page-change-password',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, SpinnerComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, SpinnerComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
@@ -20,8 +21,8 @@ import { SpinnerComponent } from '../shared/spinner';
         <button appbar-left class="back-link" (click)="back()" style="margin-right:2px"><ic name="chevL" [size]="20"></ic></button>
       }
     </app-bar>
-    <div class="scr-body">
-      <div style="text-align:center;margin-top:6px">
+    <div class="scr-body" reveal="screen">
+      <div style="text-align:center;margin-top:6px" data-reveal="logo">
         <span style="width:56px;height:56px;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--primary) 12%, var(--surface));color:var(--primary)">
           <ic name="lock" [size]="26"></ic>
         </span>
@@ -31,7 +32,7 @@ import { SpinnerComponent } from '../shared/spinner';
         }
       </div>
 
-      <field [label]="i18n.t('cp_current')">
+      <field [label]="i18n.t('cp_current')" data-reveal="input">
         <div class="input-prefix">
           <span class="pfx"><ic name="lock" [size]="16"></ic></span>
           <input [type]="show() ? 'text' : 'password'" autocomplete="current-password"
@@ -39,7 +40,7 @@ import { SpinnerComponent } from '../shared/spinner';
         </div>
       </field>
 
-      <field [label]="i18n.t('cp_new')" [hint]="i18n.t('cp_policy')">
+      <field [label]="i18n.t('cp_new')" [hint]="i18n.t('cp_policy')" data-reveal="input">
         <div class="input-prefix">
           <span class="pfx"><ic name="lock" [size]="16"></ic></span>
           <input [type]="show() ? 'text' : 'password'" autocomplete="new-password"
@@ -51,7 +52,7 @@ import { SpinnerComponent } from '../shared/spinner';
         </div>
       </field>
 
-      <field [label]="i18n.t('cp_confirm')" [err]="confirm() && !match() ? i18n.t('cp_mismatch') : null">
+      <field [label]="i18n.t('cp_confirm')" [err]="confirm() && !match() ? i18n.t('cp_mismatch') : null" data-reveal="input">
         <div class="input-prefix">
           <span class="pfx"><ic name="lock" [size]="16"></ic></span>
           <input [type]="show() ? 'text' : 'password'" autocomplete="new-password"
@@ -63,7 +64,7 @@ import { SpinnerComponent } from '../shared/spinner';
         <div class="feedback err-box" style="font-size:12.5px"><ic name="alert" [size]="18" style="flex-shrink:0"></ic> {{ i18n.t(err()!) }}</div>
       }
 
-      <button class="btn btn-primary" (click)="submit()" [disabled]="!canSubmit() || busy()">
+      <button class="btn btn-primary" data-reveal="button" (click)="submit()" [disabled]="!canSubmit() || busy()">
         @if (busy()) { <spinner></spinner> } @else { <ic name="check" [size]="18" [sw]="2.4"></ic> {{ i18n.t('cp_submit') }} }
       </button>
 

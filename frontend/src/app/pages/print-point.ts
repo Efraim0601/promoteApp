@@ -16,12 +16,13 @@ import { StatusBadgeComponent } from '../shared/status-badge';
 import { SpinnerComponent } from '../shared/spinner';
 import { NotifBellComponent } from '../shared/notif-bell';
 import { RechargeHistoryComponent } from '../shared/recharge-history';
+import { RevealDirective } from '../shared/reveal';
 
 /** Print point — retrieve a KYC file by reference, then print & hand over the card. */
 @Component({
   selector: 'page-print-point',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent, ClientPhotoComponent, NotifBellComponent, RechargeHistoryComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, PhotoCaptureComponent, StatusBadgeComponent, SpinnerComponent, ClientPhotoComponent, NotifBellComponent, RechargeHistoryComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
@@ -29,8 +30,8 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div>
+    <div class="scr-body" reveal="screen">
+      <div data-reveal="item">
         <div class="kicker"><ic name="printer" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('card_name') }}</div>
         <h1 style="font-size:23px;margin-top:6px">{{ i18n.t('pp_title') }}</h1>
         <p class="muted" style="font-size:13px;margin-top:5px">{{ i18n.t('pp_sub') }}</p>
@@ -38,8 +39,9 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
 
       @if (cardsView()) {
         <!-- Card reconciliation: cards this printer remitted vs activated, to check against physical stock. -->
-        <button class="btn btn-ghost" (click)="closeCards()" style="width:auto;align-self:flex-start;padding:8px 4px;font-size:13px"><ic name="chevL" [size]="18"></ic> {{ i18n.t('pp_recon_back') }}</button>
-        <div>
+        <div reveal="screen" style="display:contents">
+        <button class="btn btn-ghost" (click)="closeCards()" style="width:auto;align-self:flex-start;padding:8px 4px;font-size:13px" data-reveal="item"><ic name="chevL" [size]="18"></ic> {{ i18n.t('pp_recon_back') }}</button>
+        <div data-reveal="item">
           <h2 style="font-size:19px">{{ i18n.t('pp_recon_title') }}</h2>
           <p class="muted" style="font-size:12.5px;margin-top:4px;line-height:1.4">{{ i18n.t('pp_recon_sub') }}</p>
         </div>
@@ -47,14 +49,14 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
           <div class="load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
         } @else if (cards(); as c) {
           <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-            <div class="kpi"><div class="kv" style="color:var(--primary)">{{ c.remises }}</div><div class="kl">{{ i18n.t('pp_recon_remises') }}</div></div>
-            <div class="kpi"><div class="kv" style="color:var(--success)">{{ c.activated }}</div><div class="kl">{{ i18n.t('pp_recon_activated') }}</div></div>
-            <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ c.pending }}</div><div class="kl">{{ i18n.t('pp_recon_pending') }}</div></div>
+            <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--primary)">{{ c.remises }}</div><div class="kl">{{ i18n.t('pp_recon_remises') }}</div></div>
+            <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--success)">{{ c.activated }}</div><div class="kl">{{ i18n.t('pp_recon_activated') }}</div></div>
+            <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--af-gold)">{{ c.pending }}</div><div class="kl">{{ i18n.t('pp_recon_pending') }}</div></div>
           </div>
           @if (!c.cards.length) {
-            <div class="card" style="padding:18px;text-align:center"><p class="muted" style="font-size:13px">{{ i18n.t('pp_recon_empty') }}</p></div>
+            <div class="card" style="padding:18px;text-align:center" data-reveal="card"><p class="muted" style="font-size:13px">{{ i18n.t('pp_recon_empty') }}</p></div>
           } @else {
-            <div class="card" style="overflow:hidden">
+            <div class="card" style="overflow:hidden" data-reveal="card">
               <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px;display:flex;align-items:center;justify-content:space-between">
                 <span class="muted">{{ c.cards.length }} {{ i18n.t('pp_recon_cards') }}</span>
                 <button (click)="loadCards()" [disabled]="cardsLoading()" style="background:none;border:none;color:var(--primary);font-weight:700;font-size:11.5px;cursor:pointer">{{ i18n.t('pp_recon_refresh') }}</button>
@@ -76,6 +78,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
             </div>
           }
         }
+        </div>
       } @else {
 
       @if (auth.hasRole('COLLECTEUR')) {
@@ -85,9 +88,9 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       <!-- Print-point KPIs (hidden while viewing a single record) -->
       @if (!rec() && stats(); as st) {
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
-          <div class="kpi"><div class="kv" style="color:var(--primary)">{{ st.myPrinted }}</div><div class="kl">{{ i18n.t('pp_kpi_mine') }}</div></div>
-          <div class="kpi"><div class="kv" style="color:var(--success)">{{ st.myPrintedToday }}</div><div class="kl">{{ i18n.t('kpi_today') }}</div></div>
-          <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.queue }}</div><div class="kl">{{ i18n.t('pp_kpi_queue') }}</div></div>
+          <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--primary)">{{ st.myPrinted }}</div><div class="kl">{{ i18n.t('pp_kpi_mine') }}</div></div>
+          <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--success)">{{ st.myPrintedToday }}</div><div class="kl">{{ i18n.t('kpi_today') }}</div></div>
+          <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--af-gold)">{{ st.queue }}</div><div class="kl">{{ i18n.t('pp_kpi_queue') }}</div></div>
         </div>
         <p class="muted" style="font-size:10.5px;margin-top:-4px;text-align:center;display:flex;align-items:center;justify-content:center;gap:5px;color:var(--success)"><span class="live-dot"></span>{{ i18n.t('live_auto') }}</p>
       }
@@ -96,7 +99,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
         <button class="btn btn-outline" (click)="openCards()" style="width:100%;margin-bottom:10px"><ic name="idcard" [size]="18"></ic> {{ i18n.t('pp_my_cards') }}</button>
       }
 
-      <field [label]="i18n.t('pp_input')">
+      <field [label]="i18n.t('pp_input')" data-reveal="input">
         <div style="display:flex;gap:8px">
           <div class="input-prefix" style="flex:1">
             <span class="pfx"><ic name="search" [size]="16"></ic></span>
@@ -114,7 +117,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       }
 
       @if (!rec() && results().length) {
-        <div class="card" style="overflow:hidden">
+        <div class="card" style="overflow:hidden" data-reveal="card">
           <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px">{{ results().length }} {{ i18n.t('pp_results') }}</div>
           @for (s of results(); track s.ref) {
             <div style="border-bottom:1px solid var(--border)">
@@ -135,7 +138,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
 
       <!-- Recharge matches (top-ups have no KYC; SARA ones are validated here). -->
       @if (!rec() && !rRec() && rechargeResults().length) {
-        <div class="card" style="overflow:hidden">
+        <div class="card" style="overflow:hidden" data-reveal="card">
           <div class="muted" style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11.5px"><ic name="phone" [size]="12" style="vertical-align:-1px;margin-right:4px"></ic>{{ i18n.t('pp_recharges') }}</div>
           @for (r of rechargeResults(); track r.ref) {
             <button (click)="openRecharge(r.ref)" style="width:100%;text-align:left;display:flex;align-items:center;gap:11px;padding:11px 14px;border:none;border-bottom:1px solid var(--border);background:transparent;cursor:pointer">
@@ -151,7 +154,7 @@ import { RechargeHistoryComponent } from '../shared/recharge-history';
       }
 
       @if (!searched()) {
-        <div class="card" style="padding:14px;display:flex;gap:9px;align-items:center">
+        <div class="card" style="padding:14px;display:flex;gap:9px;align-items:center" data-reveal="card">
           <ic name="hash" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
           <span class="muted" style="font-size:12px;line-height:1.4">{{ i18n.t('pp_hint') }}</span>
         </div>

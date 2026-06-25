@@ -16,6 +16,7 @@ import { StatusBadgeComponent } from '../shared/status-badge';
 import { ClientPhotoComponent } from '../shared/client-photo';
 import { AdminMapComponent } from './admin-map';
 import { NotifBellComponent } from '../shared/notif-bell';
+import { RevealDirective } from '../shared/reveal';
 import { livePoll, payById, recordStatus, formatPan, COLLECTE_PRODUCTS } from '../shared/constants';
 import { SlicePipe, NgTemplateOutlet } from '@angular/common';
 import * as XLSX from 'xlsx';
@@ -23,7 +24,7 @@ import * as XLSX from 'xlsx';
 @Component({
   selector: 'page-admin',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent, NotifBellComponent, FormsModule, SlicePipe, NgTemplateOutlet],
+  imports: [AppBarComponent, IconComponent, AvatarComponent, FieldComponent, TxDetailComponent, SpinnerComponent, StatusBadgeComponent, ClientPhotoComponent, AdminMapComponent, NotifBellComponent, FormsModule, SlicePipe, NgTemplateOutlet, RevealDirective],
   template: `
   <div class="scr">
     <app-bar class="appbar-wide">
@@ -84,7 +85,7 @@ import * as XLSX from 'xlsx';
         @if (rLoading()) {
           <div class="card load-center"><spinner tone="primary" [size]="22"></spinner> {{ i18n.t('loading') }}</div>
         } @else if (rchKpi(); as k) {
-        <div class="card" style="padding:16px;margin-bottom:12px">
+        <div class="card" style="padding:16px;margin-bottom:12px" data-reveal="card">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
             <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
             <h3 style="font-size:15px">{{ i18n.t('rch_kpi_title') }}</h3>
@@ -162,8 +163,9 @@ import * as XLSX from 'xlsx';
 
       <!-- ========== OVERVIEW ========== -->
       @if (section() === 'overview') {
+      <div reveal="screen">
       <!-- En-tête avec filtre date (le filtre ne s'applique qu'à l'onglet Achat) -->
-      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px" data-reveal="item">
         <h1 style="font-size:21px;margin:0;flex:1;min-width:140px">{{ i18n.t('nav_overview') }}</h1>
         @if (overviewTab() === 'achat') {
         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
@@ -199,7 +201,7 @@ import * as XLSX from 'xlsx';
       } @else {
 
       <!-- ===== AUJOURD'HUI — section permanente indépendante du filtre ===== -->
-      <div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--primary)">
+      <div class="card" style="padding:14px 16px;margin-bottom:10px;border-left:3px solid var(--primary)" data-reveal="card">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px">
           <ic name="calendar" [size]="15" style="color:var(--primary)"></ic>
           <span style="font-size:12px;font-weight:800;color:var(--primary);text-transform:uppercase;letter-spacing:.07em">Aujourd'hui</span>
@@ -230,9 +232,9 @@ import * as XLSX from 'xlsx';
 
       <!-- ===== KPIs globaux (filtrables par date) ===== -->
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
-        <div class="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
-        <div class="kpi"><div class="kv" style="color:var(--primary)">{{ stats()?.totalPrinted ?? 0 }}</div><div class="kl">Cartes récupérées{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
-        <div class="kpi" style="position:relative;overflow:hidden">
+        <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--success)">{{ stats()?.paid ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_success') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
+        <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--primary)">{{ stats()?.totalPrinted ?? 0 }}</div><div class="kl">Cartes récupérées{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
+        <div class="kpi" data-reveal="kpi" style="position:relative;overflow:hidden">
           <div class="kv amount-block" style="color:var(--primary)">
             <span class="amount-main">{{ fmtAmount(stats()?.collected ?? 0) }}</span>
             <span class="amount-unit">FCFA</span>
@@ -241,9 +243,9 @@ import * as XLSX from 'xlsx';
         </div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px">
-        <div class="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
-        <div class="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
-        <div class="kpi" (click)="showFailed()" style="cursor:pointer"
+        <div class="kpi" data-reveal="kpi"><div class="kv">{{ stats()?.total ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_total') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
+        <div class="kpi" data-reveal="kpi"><div class="kv" style="color:var(--af-gold)">{{ stats()?.pending ?? 0 }}</div><div class="kl">{{ i18n.t('kpi_pending') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</div></div>
+        <div class="kpi" data-reveal="kpi" (click)="showFailed()" style="cursor:pointer"
              [style.borderColor]="technicalFailed() ? 'color-mix(in srgb, var(--accent) 45%, var(--border))' : 'var(--border)'"
              [style.background]="technicalFailed() ? 'var(--accent-soft)' : 'var(--surface)'">
           <div class="kv" style="color:var(--accent)">{{ technicalFailed() }}</div>
@@ -253,7 +255,7 @@ import * as XLSX from 'xlsx';
 
       <!-- ===== Mobile Money payment funnel ===== -->
       @if (payStats(); as p) {
-        <div class="card" style="padding:16px">
+        <div class="card" style="padding:16px" data-reveal="card">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
             <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
             <h3 style="font-size:15px">{{ i18n.t('pay_funnel_title') }}{{ (overviewFrom() || overviewTo()) ? ' (période)' : '' }}</h3>
@@ -338,7 +340,7 @@ import * as XLSX from 'xlsx';
       }
 
       <!-- ===== Réconciliation des paiements : vérifier les N dernières heures ===== -->
-      <div class="card" style="padding:16px">
+      <div class="card" style="padding:16px" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <ic name="refresh" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('recon_title') }}</h3>
@@ -386,7 +388,7 @@ import * as XLSX from 'xlsx';
       </div>
 
       <!-- ===== Vérification live : régulariser TOUS les dossiers pending/failed (historique), logs en direct ===== -->
-      <div class="card" style="padding:16px">
+      <div class="card" style="padding:16px" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
           <ic name="refresh" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('vstream_title') }}</h3>
@@ -433,7 +435,7 @@ import * as XLSX from 'xlsx';
         }
       </div>
 
-      <div class="card" style="padding:16px">
+      <div class="card" style="padding:16px" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
           <ic name="award" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('by_agent') }}</h3>
@@ -471,12 +473,14 @@ import * as XLSX from 'xlsx';
       }
       }
 
+      </div>
       }
 
       <!-- ========== CONFIG ========== -->
       @if (section() === 'config') {
-      <h1 style="font-size:21px">{{ i18n.t('nav_config') }}</h1>
-      <div class="card" style="padding:16px">
+      <div reveal="screen">
+      <h1 style="font-size:21px" data-reveal="item">{{ i18n.t('nav_config') }}</h1>
+      <div class="card" style="padding:16px" data-reveal="card">
         <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:14px">
           <ic name="gear" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
           <div style="min-width:0">
@@ -549,15 +553,17 @@ import * as XLSX from 'xlsx';
         }
       </div>
 
+      </div>
       }
 
       <!-- ========== USERS ========== -->
       @if (section() === 'users') {
-      <h1 style="font-size:21px">{{ i18n.t('nav_users') }}</h1>
-      <p class="muted" style="font-size:13px;line-height:1.45;margin-top:-8px;margin-bottom:12px">{{ i18n.t('users_sub') }}</p>
+      <div reveal="screen">
+      <h1 style="font-size:21px" data-reveal="item">{{ i18n.t('nav_users') }}</h1>
+      <p class="muted" style="font-size:13px;line-height:1.45;margin-top:-8px;margin-bottom:12px" data-reveal="item">{{ i18n.t('users_sub') }}</p>
 
       <!-- Toolbar: search + filters + actions -->
-      <div class="card" style="padding:14px 16px;margin-bottom:12px">
+      <div class="card" style="padding:14px 16px;margin-bottom:12px" data-reveal="card">
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
           <div class="input-prefix" style="flex:1;min-width:200px">
             <span class="pfx"><ic name="search" [size]="16"></ic></span>
@@ -621,7 +627,7 @@ import * as XLSX from 'xlsx';
       }
 
       <!-- Main accounts list -->
-      <div class="card" style="padding:16px">
+      <div class="card" style="padding:16px" data-reveal="card">
         <div class="kicker" style="margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-weight:600;font-size:12px">
             <input type="checkbox" [checked]="isAllPageSelected()" [indeterminate]="isSomePageSelected()" (change)="toggleSelectAllPage()" style="cursor:pointer" />
@@ -1056,14 +1062,16 @@ import * as XLSX from 'xlsx';
       </div>
       }
 
+      </div>
       }
 
       <!-- ========== PICKUP AGENCIES (lieux de retrait) ========== -->
       @if (section() === 'agencies') {
-      <h1 style="font-size:21px">{{ i18n.t('nav_agencies') }}</h1>
+      <div reveal="screen">
+      <h1 style="font-size:21px" data-reveal="item">{{ i18n.t('nav_agencies') }}</h1>
 
       <!-- Pickup-agency statistics -->
-      <div class="card" style="padding:16px">
+      <div class="card" style="padding:16px" data-reveal="card">
         <!-- Header -->
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
           <ic name="chart" [size]="16" style="color:var(--primary)"></ic>
@@ -1220,7 +1228,7 @@ import * as XLSX from 'xlsx';
       </div>
 
       <!-- Import pickup agencies -->
-      <div class="card" style="padding:16px;margin-top:12px">
+      <div class="card" style="padding:16px;margin-top:12px" data-reveal="card">
         <div style="display:flex;align-items:flex-start;gap:9px;margin-bottom:12px">
           <ic name="download" [size]="17" style="color:var(--primary);flex-shrink:0;margin-top:2px"></ic>
           <div style="min-width:0">
@@ -1328,11 +1336,13 @@ import * as XLSX from 'xlsx';
         </div>
       }
 
+      </div>
       }
 
       <!-- ========== RETRAITS AGENCE ========== -->
       @if (section() === 'agence-retrait') {
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+      <div reveal="screen">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px" data-reveal="item">
         <h1 style="font-size:21px;margin:0;flex:1">{{ i18n.t('nav_agence_retrait') }}</h1>
         @if (filteredAgenceRetrait().length) {
           <button class="btn btn-ghost" (click)="exportAgenceRetrait()" style="padding:5px 11px;font-size:12px"><ic name="download" [size]="14"></ic> Exporter Excel</button>
@@ -1343,11 +1353,11 @@ import * as XLSX from 'xlsx';
       <!-- KPIs -->
       @if (!agenceRetraitLoading()) {
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">
-        <div class="kpi" style="padding:12px 14px">
+        <div class="kpi" data-reveal="kpi" style="padding:12px 14px">
           <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px">Total demandes</div>
           <div style="font-size:28px;font-weight:800;line-height:1">{{ agenceRetrait().length }}</div>
         </div>
-        <div class="kpi" style="padding:12px 14px;cursor:pointer"
+        <div class="kpi" data-reveal="kpi" style="padding:12px 14px;cursor:pointer"
              [style.borderColor]="agenceRetraitPending() ? 'color-mix(in srgb,var(--warning) 45%,var(--border))' : 'var(--border)'"
              [style.background]="agenceRetraitPending() ? 'var(--warning-soft)' : 'var(--surface)'"
              (click)="agenceRetraitStatus.set(agenceRetraitStatus() === 'pending' ? 'all' : 'pending')">
@@ -1357,7 +1367,7 @@ import * as XLSX from 'xlsx';
             <div style="font-size:11px;color:var(--muted);margin-top:4px">{{ (agenceRetraitPending() * 100 / agenceRetrait().length).toFixed(0) }}% du total</div>
           }
         </div>
-        <div class="kpi" style="padding:12px 14px">
+        <div class="kpi" data-reveal="kpi" style="padding:12px 14px">
           <div style="font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--success);margin-bottom:6px">Cartes remises</div>
           <div style="font-size:28px;font-weight:800;line-height:1;color:var(--success)">{{ agenceRetraitDone() }}</div>
           @if (agenceRetrait().length) {
@@ -1367,7 +1377,7 @@ import * as XLSX from 'xlsx';
       </div>
       }
 
-      <div class="card" style="overflow:hidden;max-width:900px">
+      <div class="card" style="overflow:hidden;max-width:900px" data-reveal="card">
         <div style="padding:14px 14px 10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
           <ic name="pin" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">Demandes de retrait en agence</h3>
@@ -1439,38 +1449,41 @@ import * as XLSX from 'xlsx';
           </div>
         }
       </div>
+
+      </div>
       }
 
       <!-- ========== TRANSACTIONS (wider than the 760px content cap, for the detailed table) ========== -->
       @if (section() === 'transactions') {
-      <h1 style="font-size:21px">{{ i18n.t('nav_transactions') }}</h1>
+      <div reveal="screen">
+      <h1 style="font-size:21px" data-reveal="item">{{ i18n.t('nav_transactions') }}</h1>
 
       <!-- KPIs synthèse — visibles dès l'arrivée sur la page -->
       @if (!txLoading()) {
       <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-bottom:12px">
-        <div class="kpi" style="padding:10px 12px">
+        <div class="kpi" data-reveal="kpi" style="padding:10px 12px">
           <div class="kv" style="font-size:22px">{{ txKpiTotal() }}</div>
           <div class="kl">{{ i18n.t('kpi_total') }}</div>
         </div>
-        <div class="kpi" style="padding:10px 12px">
+        <div class="kpi" data-reveal="kpi" style="padding:10px 12px">
           <div class="kv" style="font-size:22px;color:var(--success)">{{ txKpiPaid() }}</div>
           <div class="kl">{{ i18n.t('kpi_success') }}</div>
         </div>
-        <div class="kpi" style="padding:10px 12px;cursor:pointer"
+        <div class="kpi" data-reveal="kpi" style="padding:10px 12px;cursor:pointer"
              [style.borderColor]="txKpiCash() ? 'color-mix(in srgb,var(--warning) 45%,var(--border))' : 'var(--border)'"
              [style.background]="txKpiCash() ? 'var(--warning-soft)' : 'var(--surface)'"
              (click)="showPayFilter('cash')" title="Filtrer les paiements espèces en attente">
           <div class="kv" style="font-size:22px;color:var(--warning)">{{ txKpiCash() }}</div>
           <div class="kl">Espèces en attente</div>
         </div>
-        <div class="kpi" style="padding:10px 12px">
+        <div class="kpi" data-reveal="kpi" style="padding:10px 12px">
           <div class="kv" style="font-size:22px;color:var(--primary)">{{ txKpiActivated() }}</div>
           <div class="kl">Cartes activées (PAN)</div>
         </div>
       </div>
       }
 
-      <div class="card" style="overflow:hidden;max-width:1180px">
+      <div class="card" style="overflow:hidden;max-width:1180px" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="chart" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('all_sales') }}</h3>
@@ -1630,16 +1643,19 @@ import * as XLSX from 'xlsx';
           </div>
         }
       </div>
+
+      </div>
       }
 
       <!-- ========== RECHARGES (paiements de recharge de carte prépayée) ========== -->
       @if (section() === 'recharges') {
-      <h1 style="font-size:21px">{{ i18n.t('nav_recharges') }}</h1>
+      <div reveal="screen">
+      <h1 style="font-size:21px" data-reveal="item">{{ i18n.t('nav_recharges') }}</h1>
 
       <!-- ===== Recharge KPI dashboard (shared with the overview "Recharge" tab) ===== -->
       <ng-container [ngTemplateOutlet]="rchStatsTpl"></ng-container>
 
-      <div class="card" style="overflow:hidden;max-width:1180px">
+      <div class="card" style="overflow:hidden;max-width:1180px" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="phone" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('rch_all') }}</h3>
@@ -1740,14 +1756,17 @@ import * as XLSX from 'xlsx';
           </div>
         }
       </div>
+
+      </div>
       }
 
       <!-- ========== COLLECTES (ventes de produits bancaires) ========== -->
       @if (section() === 'collectes') {
-      <h1 style="font-size:21px">{{ i18n.t('nav_collectes') }}</h1>
+      <div reveal="screen">
+      <h1 style="font-size:21px" data-reveal="item">{{ i18n.t('nav_collectes') }}</h1>
 
       <!-- Stats -->
-      <div class="card" style="padding:14px;margin-top:12px">
+      <div class="card" style="padding:14px;margin-top:12px" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <ic name="chart" [size]="16" style="color:var(--primary)"></ic>
           <h3 style="font-size:14.5px">{{ i18n.t('col_stats_title') }}</h3>
@@ -1775,7 +1794,7 @@ import * as XLSX from 'xlsx';
         }
       </div>
 
-      <div class="card" style="overflow:hidden;max-width:1180px;margin-top:12px">
+      <div class="card" style="overflow:hidden;max-width:1180px;margin-top:12px" data-reveal="card">
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="store" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('col_all') }}</h3>
@@ -1865,6 +1884,8 @@ import * as XLSX from 'xlsx';
           </div>
         }
       </div>
+
+      </div>
       }
 
       <!-- ========== AUDIT (journal des connexions) ========== -->
@@ -1884,7 +1905,7 @@ import * as XLSX from 'xlsx';
 
       <!-- ── Connexions ── -->
       @if (auditTab() === 'logins') {
-      <div class="card" style="overflow:hidden;max-width:1180px">
+      <div class="card" style="overflow:hidden;max-width:1180px" reveal="card" data-reveal>
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="shield" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('audit_title') }}</h3>
@@ -1964,7 +1985,7 @@ import * as XLSX from 'xlsx';
 
       <!-- ── Actions ── -->
       @if (auditTab() === 'actions') {
-      <div class="card" style="overflow:hidden;max-width:1180px">
+      <div class="card" style="overflow:hidden;max-width:1180px" reveal="card" data-reveal>
         <div style="display:flex;align-items:center;gap:8px;padding:14px 14px 10px;flex-wrap:wrap">
           <ic name="edit" [size]="17" style="color:var(--primary)"></ic>
           <h3 style="font-size:15px">{{ i18n.t('act_title') }}</h3>
@@ -2048,20 +2069,23 @@ import * as XLSX from 'xlsx';
 
       <!-- ========== MAP ========== -->
       @if (section() === 'map') {
-        <div class="card" style="padding:16px">
+        <div reveal="screen">
+        <div class="card" style="padding:16px" data-reveal="card">
           <h2 style="font-size:16px;margin-bottom:4px">{{ i18n.t('nav_map') }}</h2>
           <p class="muted" style="font-size:12.5px;margin-bottom:14px">{{ i18n.t('map_sub') }}</p>
           <admin-map></admin-map>
+        </div>
         </div>
       }
 
       <!-- ========== HABILITATIONS ========== -->
       @if (section() === 'habilitations') {
-      <h1 style="font-size:21px">{{ i18n.t('hab_title') }}</h1>
-      <p class="muted" style="font-size:13px;margin-top:-8px;margin-bottom:14px">{{ i18n.t('hab_sub') }}</p>
+      <div reveal="screen">
+      <h1 style="font-size:21px" data-reveal="item">{{ i18n.t('hab_title') }}</h1>
+      <p class="muted" style="font-size:13px;margin-top:-8px;margin-bottom:14px" data-reveal="item">{{ i18n.t('hab_sub') }}</p>
 
       <!-- Profile list -->
-      <div class="card" style="padding:16px;margin-bottom:14px">
+      <div class="card" style="padding:16px;margin-bottom:14px" data-reveal="card">
         <div class="kicker" style="margin-bottom:12px;display:flex;align-items:center;gap:8px">
           <span>{{ i18n.t('hab_profiles') }} · {{ profilesList().length }}</span>
           <button class="btn btn-primary" (click)="startNewProfile()" [disabled]="editProfileId() !== null"
@@ -2114,7 +2138,7 @@ import * as XLSX from 'xlsx';
 
       <!-- Profile editor (create / edit) -->
       @if (editProfileId() !== null) {
-        <div class="card" style="padding:16px;margin-bottom:14px">
+        <div class="card" style="padding:16px;margin-bottom:14px" data-reveal="card">
           <div class="kicker" style="margin-bottom:12px">
             {{ editProfileId() === -1 ? i18n.t('hab_new_profile') : (profilesList().find(p => p.id === editProfileId())?.name ?? '') }}
           </div>
@@ -2185,6 +2209,8 @@ import * as XLSX from 'xlsx';
           </div>
         </div>
       }
+
+      </div>
       }
 
       </main>

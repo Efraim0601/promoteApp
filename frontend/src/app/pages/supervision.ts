@@ -8,6 +8,7 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { SpinnerComponent } from '../shared/spinner';
 import { NotifBellComponent } from '../shared/notif-bell';
+import { RevealDirective } from '../shared/reveal';
 
 /**
  * Supervisor daily reconciliation: print remittance (per print agent) and cash collection (per
@@ -17,24 +18,24 @@ import { NotifBellComponent } from '../shared/notif-bell';
 @Component({
   selector: 'page-supervision',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, SpinnerComponent, NotifBellComponent],
+  imports: [AppBarComponent, IconComponent, SpinnerComponent, NotifBellComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
       <notif-bell appbar-right></notif-bell>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div class="kicker" style="margin-bottom:4px"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('sup_kicker') }}</div>
+    <div class="scr-body" reveal="screen">
+      <div class="kicker" style="margin-bottom:4px" data-reveal="item"><ic name="chart" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('sup_kicker') }}</div>
 
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px" data-reveal="item">
         <h1 style="font-size:21px;margin:0;flex:1">{{ i18n.t('sup_title') }}</h1>
         <button class="icon-btn" (click)="load()" [title]="i18n.t('map_reload')" style="flex-shrink:0"><ic name="refresh" [size]="16"></ic></button>
       </div>
       <p class="muted" style="font-size:12.5px;line-height:1.5;margin:0 0 12px">{{ i18n.t('sup_sub') }}</p>
 
       <!-- Day picker + quick links to the supervisor's other views -->
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px" data-reveal="item">
         <label class="muted" style="font-size:12px;font-weight:700">{{ i18n.t('sup_day') }}</label>
         <input type="date" class="input" style="height:36px;width:auto;flex:0 0 auto" [value]="day()" [max]="today" (change)="onDay($event)" />
         <button class="btn btn-ghost" style="font-size:12px;padding:7px 11px" (click)="today_()">{{ i18n.t('sup_today') }}</button>
@@ -49,16 +50,16 @@ import { NotifBellComponent } from '../shared/notif-bell';
         <p class="err" style="text-align:center;font-weight:700">{{ i18n.t('sup_error') }}</p>
       } @else {
         <!-- ===== IMPRESSION ===== -->
-        <div class="kicker" style="margin-bottom:6px"><ic name="printer" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('sup_print_title') }}</div>
+        <div class="kicker" style="margin-bottom:6px" data-reveal="item"><ic name="printer" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('sup_print_title') }}</div>
         @if (print(); as p) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-            <div class="kpi" style="padding:10px 12px"><div class="kv" style="font-size:20px;color:var(--primary)">{{ p.totalPrinted }}</div><div class="kl">{{ i18n.t('sup_total_printed') }}</div></div>
-            <div class="kpi" style="padding:10px 12px"><div class="kv" style="font-size:20px;color:var(--af-gold)">{{ p.queue }}</div><div class="kl">{{ i18n.t('sup_queue') }}</div></div>
+            <div class="kpi" style="padding:10px 12px" data-reveal="kpi"><div class="kv" style="font-size:20px;color:var(--primary)">{{ p.totalPrinted }}</div><div class="kl">{{ i18n.t('sup_total_printed') }}</div></div>
+            <div class="kpi" style="padding:10px 12px" data-reveal="kpi"><div class="kv" style="font-size:20px;color:var(--af-gold)">{{ p.queue }}</div><div class="kl">{{ i18n.t('sup_queue') }}</div></div>
           </div>
           @if (!p.byPrinter.length) {
             <p class="muted" style="font-size:12.5px;margin-bottom:18px">{{ i18n.t('sup_empty_print') }}</p>
           } @else {
-            <div class="card" style="overflow:hidden;margin-bottom:18px">
+            <div class="card" style="overflow:hidden;margin-bottom:18px" data-reveal="item">
               <div class="sup-row sup-head">
                 <span style="flex:1">{{ i18n.t('sup_col_printer') }}</span>
                 <span class="sup-n">{{ i18n.t('sup_col_printed') }}</span>
@@ -81,16 +82,16 @@ import { NotifBellComponent } from '../shared/notif-bell';
         }
 
         <!-- ===== ENCAISSEMENT ===== -->
-        <div class="kicker" style="margin-bottom:6px"><ic name="check" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('sup_cash_title') }}</div>
+        <div class="kicker" style="margin-bottom:6px" data-reveal="item"><ic name="check" [size]="13" style="vertical-align:-2px;margin-right:4px"></ic>{{ i18n.t('sup_cash_title') }}</div>
         @if (cash(); as c) {
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-            <div class="kpi" style="padding:10px 12px"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(c.totalCollected) }}</div><div class="kl">{{ i18n.t('sup_total_collected') }}</div></div>
-            <div class="kpi" style="padding:10px 12px"><div class="kv" style="font-size:17px;color:var(--warning)">{{ i18n.money(c.pendingAmount) }}</div><div class="kl">{{ i18n.t('sup_pending_cash') }} ({{ c.pendingCount }})</div></div>
+            <div class="kpi" style="padding:10px 12px" data-reveal="kpi"><div class="kv" style="font-size:17px;color:var(--primary)">{{ i18n.money(c.totalCollected) }}</div><div class="kl">{{ i18n.t('sup_total_collected') }}</div></div>
+            <div class="kpi" style="padding:10px 12px" data-reveal="kpi"><div class="kv" style="font-size:17px;color:var(--warning)">{{ i18n.money(c.pendingAmount) }}</div><div class="kl">{{ i18n.t('sup_pending_cash') }} ({{ c.pendingCount }})</div></div>
           </div>
           @if (!c.byCashier.length) {
             <p class="muted" style="font-size:12.5px">{{ i18n.t('sup_empty_cash') }}</p>
           } @else {
-            <div class="card" style="overflow:hidden">
+            <div class="card" style="overflow:hidden" data-reveal="item">
               <div class="sup-row sup-head">
                 <span style="flex:1">{{ i18n.t('sup_col_cashier') }}</span>
                 <span class="sup-n">{{ i18n.t('sup_col_count') }}</span>

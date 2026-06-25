@@ -5,6 +5,7 @@ import { I18n } from '../core/i18n';
 import { MapPoint } from '../core/models';
 import { IconComponent } from '../shared/icon';
 import { SpinnerComponent } from '../shared/spinner';
+import { RevealDirective } from '../shared/reveal';
 
 const CLIENT_COLOR = '#D81E2C';   // brand red — subscriptions
 const STAFF_COLOR = '#2563eb';    // blue — staff
@@ -23,10 +24,10 @@ type Coord = { lat: number; lng: number };
 @Component({
   selector: 'admin-map',
   standalone: true,
-  imports: [IconComponent, SpinnerComponent],
+  imports: [IconComponent, SpinnerComponent, RevealDirective],
   template: `
-  <div style="display:flex;flex-direction:column;gap:12px">
-    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap">
+  <div style="display:flex;flex-direction:column;gap:12px" reveal="screen">
+    <div style="display:flex;align-items:center;gap:16px;flex-wrap:wrap" data-reveal="item">
       <span style="display:inline-flex;align-items:center;gap:7px;font-size:13px">
         <span style="width:12px;height:12px;border-radius:50%;background:${CLIENT_COLOR};display:inline-block"></span>
         {{ i18n.t('map_legend_clients') }} ({{ clientCount() }})

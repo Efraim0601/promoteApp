@@ -10,6 +10,7 @@ import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
 import { TileChoiceComponent, TileOption } from '../shared/tile-choice';
 import { SpinnerComponent } from '../shared/spinner';
+import { RevealDirective } from '../shared/reveal';
 import * as XLSX from 'xlsx';
 
 interface CForm {
@@ -26,32 +27,32 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
 @Component({
   selector: 'page-collecte',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, TileChoiceComponent, SpinnerComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, TileChoiceComponent, SpinnerComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar>
       <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
     </app-bar>
-    <div class="scr-body">
-      <div class="kicker">{{ i18n.t('col_kicker') }}</div>
-      <h1 style="font-size:21px;margin:2px 0 2px">{{ editingRef() ? i18n.t('col_edit_title') : i18n.t('col_new_title') }}</h1>
-      <p class="muted" style="font-size:12.5px;line-height:1.5;margin-bottom:14px">{{ i18n.t('col_sub') }}</p>
+    <div class="scr-body" reveal="screen">
+      <div class="kicker" data-reveal="item">{{ i18n.t('col_kicker') }}</div>
+      <h1 style="font-size:21px;margin:2px 0 2px" data-reveal="item">{{ editingRef() ? i18n.t('col_edit_title') : i18n.t('col_new_title') }}</h1>
+      <p class="muted" style="font-size:12.5px;line-height:1.5;margin-bottom:14px" data-reveal="item">{{ i18n.t('col_sub') }}</p>
 
       <!-- Product -->
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px">{{ i18n.t('col_product_label') }}</div>
-      <tile-choice [options]="productTiles" [value]="form().product" (valueChange)="setProduct($event)"></tile-choice>
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px" data-reveal="item">{{ i18n.t('col_product_label') }}</div>
+      <tile-choice [options]="productTiles" [value]="form().product" (valueChange)="setProduct($event)" data-reveal="card"></tile-choice>
       @if (touched() && !form().product) { <div class="err" style="margin-top:6px;font-weight:700">{{ i18n.t('required') }}</div> }
 
       @if (form().product) {
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
-          <field [label]="i18n.t('col_client_nom')" [err]="touched() && !form().clientNom.trim() ? i18n.t('required') : null">
+          <field [label]="i18n.t('col_client_nom')" [err]="touched() && !form().clientNom.trim() ? i18n.t('required') : null" data-reveal="input">
             <div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span>
               <input [value]="form().clientNom" (input)="set('clientNom', $any($event.target).value)" [placeholder]="i18n.t('col_client_nom_ph')" />
             </div>
           </field>
 
           @if (form().product === 'compte_ouvert' || form().product === 'e_first') {
-            <field [label]="i18n.t('col_cni')" [err]="touched() && !form().cniNumber.trim() ? i18n.t('required') : null">
+            <field [label]="i18n.t('col_cni')" [err]="touched() && !form().cniNumber.trim() ? i18n.t('required') : null" data-reveal="input">
               <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
                 <input [value]="form().cniNumber" (input)="set('cniNumber', $any($event.target).value)" [placeholder]="i18n.t('col_cni_ph')" />
               </div>
@@ -59,7 +60,7 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
           }
 
           @if (form().product === 'carte_bancaire') {
-            <field [label]="i18n.t('col_card_number')">
+            <field [label]="i18n.t('col_card_number')" data-reveal="input">
               <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
                 <ic name="idcard" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
                 <input #cPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form().cardPrefix"
@@ -71,7 +72,7 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
                        style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
               </div>
             </field>
-            <field [label]="i18n.t('col_card_type')" [err]="touched() && !form().cardType ? i18n.t('required') : null">
+            <field [label]="i18n.t('col_card_type')" [err]="touched() && !form().cardType ? i18n.t('required') : null" data-reveal="input">
               <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
                 <select [value]="form().cardType" (change)="set('cardType', $any($event.target).value)">
                   <option value="" disabled>{{ i18n.t('col_card_type_ph') }}</option>
@@ -81,7 +82,7 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
             </field>
           }
 
-          <field [label]="i18n.t('col_client_phone')" [err]="touched() && !form().clientPhone.trim() ? i18n.t('required') : null">
+          <field [label]="i18n.t('col_client_phone')" [err]="touched() && !form().clientPhone.trim() ? i18n.t('required') : null" data-reveal="input">
             <div class="input-prefix"><span class="pfx"><ic name="phone" [size]="17"></ic></span>
               <input inputmode="tel" [value]="form().clientPhone" (input)="set('clientPhone', $any($event.target).value)" [placeholder]="i18n.t('col_client_phone_ph')" />
             </div>
@@ -92,7 +93,7 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
       @if (msg()) { <div class="card" style="margin-top:12px;padding:10px 12px;background:color-mix(in srgb, var(--success) 14%, transparent);color:var(--success);font-size:12.5px;font-weight:700"><ic name="check" [size]="15" style="vertical-align:-2px"></ic> {{ msg() }}</div> }
       @if (err()) { <p class="err" style="margin-top:10px;text-align:center;font-weight:700">{{ err() }}</p> }
 
-      <div style="display:flex;gap:8px;margin-top:16px">
+      <div style="display:flex;gap:8px;margin-top:16px" data-reveal="button">
         <button class="btn btn-primary" (click)="submit()" [disabled]="busy()" style="flex:1;padding:12px">
           @if (busy()) { <spinner></spinner> } @else { <ic name="check" [size]="17"></ic> {{ editingRef() ? i18n.t('col_save') : i18n.t('col_submit') }} }
         </button>
@@ -100,7 +101,7 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
       </div>
 
       <!-- My collectes -->
-      <div style="display:flex;align-items:center;gap:8px;margin-top:24px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-top:24px;margin-bottom:6px" data-reveal="item">
         <div class="kicker" style="flex:1">{{ i18n.t('col_mine') }} · {{ mine().length }}</div>
         @if (mine().length) {
           <button class="btn btn-ghost" (click)="exportMine()" style="padding:4px 9px;font-size:11px"><ic name="download" [size]="13"></ic> {{ i18n.t('col_export_xl') }}</button>
@@ -111,7 +112,7 @@ const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '
       } @else if (!mine().length) {
         <p class="muted" style="font-size:12.5px">{{ i18n.t('col_empty') }}</p>
       } @else {
-        <div class="card" style="padding:2px 0;overflow:hidden">
+        <div class="card" style="padding:2px 0;overflow:hidden" data-reveal="card">
           @for (c of mine(); track c.ref) {
             <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)">
               <div style="min-width:0;flex:1">
