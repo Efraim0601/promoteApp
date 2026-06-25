@@ -7,41 +7,44 @@ html, body { margin: 0; height: 100%; }
 :root{
   --af-green:#06703A;
   --af-green-d:#044A27;
-  --af-red:#D81E2C;
+  --af-red:#C8102E;
   --af-gold:#F2B632;
+  /* Couleurs opérateurs Mobile Money (portail cible) — réutilisables partout. */
+  --op-om:#FF7900;   /* Orange Money */
+  --op-mtn:#FFCB05;  /* MTN MoMo */
 }
 
-/* ===== Institutionnel (default) — Afriland RED primary ===== */
+/* ===== Institutionnel (default) — calé sur le portail cible (rouge #C8102E, navy #1B1B2F) ===== */
 .promote-app{
-  --bg:#F2ECEC;
+  --bg:#F7F8FA;
   --bg2:#ffffff;
   --surface:#ffffff;
-  --surface-2:#FAF3F3;
-  --border:#E6DADA;
-  --text:#1E1416;
-  --muted:#766164;
-  --primary:#D81E2C;
-  --primary-600:#BD1626;
-  --primary-700:#9B0F1E;
+  --surface-2:#F3F4F6;
+  --border:#E5E7EB;
+  --text:#1B1B2F;
+  --muted:#6B7280;
+  --primary:#C8102E;
+  --primary-600:#B00D28;
+  --primary-700:#8F0A20;
   --on-primary:#ffffff;
-  --success:#0E7A45;
-  --success-700:#0A5C34;
-  --success-soft:#E4F2EA;
-  --accent:#9B0F1E;
-  --accent-soft:#FBE7E9;
-  /* Semantic status (Material): info=bleu (progression), warning=ambre (attente/action), error=accent (échec). */
-  --info:#1565C0;
-  --info-soft:#E6EEFA;
-  --warning:#8A5A00;
-  --warning-soft:#FBEFD3;
+  --success:#059669;
+  --success-700:#047857;
+  --success-soft:#ECFDF5;
+  --accent:#DC2626;
+  --accent-soft:#FEF2F2;
+  /* Semantic status: info=bleu (progression), warning=ambre (attente/action), error=accent (échec). */
+  --info:#2563EB;
+  --info-soft:#EFF6FF;
+  --warning:#D97706;
+  --warning-soft:#FFFBEB;
   --field-bg:#ffffff;
   --radius:12px;
   --radius-lg:18px;
   --radius-pill:999px;
-  --shadow:0 1px 2px rgba(40,16,20,.06), 0 2px 8px rgba(40,16,20,.05);
-  --shadow-lg:0 12px 30px rgba(40,16,20,.14);
-  --font:'Poppins', system-ui, sans-serif;
-  --font-head:'Poppins', system-ui, sans-serif;
+  --shadow:0 1px 2px rgba(27,27,47,.06), 0 2px 8px rgba(27,27,47,.05);
+  --shadow-lg:0 12px 30px rgba(27,27,47,.14);
+  --font:'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-head:'Plus Jakarta Sans', system-ui, sans-serif;
   --head-weight:700;
   --btn-weight:700;
 }
@@ -504,4 +507,43 @@ app-root{ display:block; height:100dvh; }
   /* Opened: wrap onto as many rows as needed so every item stays visible. */
   .admin-nav.open{ display:flex; flex-direction:row; flex-wrap:wrap; gap:6px; width:100%; margin-top:2px; }
   .admin-nav button{ width:auto; white-space:nowrap; padding:9px 14px; }
+}
+
+/* ============================================================================
+   Portail cible — bibliothèque d'animations (« effets de dynamisme »)
+   Keyframes repris du template Afriland Portal. Servent de socle CSS ; les
+   timelines orchestrées (cascade, élastique, confettis) sont jouées par la
+   directive [reveal] via GSAP. Ici : animations autonomes + états de repli.
+   ============================================================================ */
+@keyframes slideUp{ from{ opacity:0; transform:translateY(24px); } to{ opacity:1; transform:translateY(0); } }
+@keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
+@keyframes slideRight{ from{ opacity:0; transform:translateX(40px); } to{ opacity:1; transform:translateX(0); } }
+@keyframes slideLeft{ from{ opacity:0; transform:translateX(-40px); } to{ opacity:1; transform:translateX(0); } }
+@keyframes breathe{ 0%,100%{ opacity:.6; transform:scale(1); } 50%{ opacity:1; transform:scale(1.04); } }
+@keyframes spinRing{ to{ transform:rotate(360deg); } }
+@keyframes drawCheck{ to{ stroke-dashoffset:0; } }
+@keyframes shakeX{ 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-6px); } 75%{ transform:translateX(6px); } }
+@keyframes countPulse{ 0%{ transform:scale(1); } 50%{ transform:scale(1.15); } 100%{ transform:scale(1); } }
+@keyframes gradientShift{ 0%{ background-position:0% 50%; } 50%{ background-position:100% 50%; } 100%{ background-position:0% 50%; } }
+
+.anim-slide-up{ animation:slideUp .5s cubic-bezier(.2,.8,.3,1) both; }
+.anim-fade-in{ animation:fadeIn .4s ease both; }
+.anim-breathe{ animation:breathe 2.4s ease-in-out infinite; }
+.anim-shake{ animation:shakeX .4s ease both; }
+.anim-count-pulse{ animation:countPulse .5s ease both; }
+
+/* Dégradé animé (en-têtes héro façon portail) : place le contenu sur un dégradé qui glisse. */
+.grad-shift{
+  background-size:200% 200%;
+  animation:gradientShift 8s ease infinite;
+}
+
+/* État initial des éléments orchestrés par [reveal] : invisibles tant que GSAP n'a pas joué la
+   timeline (la directive retire cette classe au montage). Repli sans JS / reduced-motion : la
+   règle @supports + le fallback rendent le contenu visible pour ne jamais le masquer. */
+.promote-app [data-reveal]{ opacity:0; }
+.reveal-ready [data-reveal]{ opacity:1; }
+@media (prefers-reduced-motion: reduce){
+  .promote-app [data-reveal]{ opacity:1 !important; transform:none !important; }
+  .anim-breathe, .grad-shift{ animation:none; }
 }

@@ -7,6 +7,7 @@ import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { FieldComponent } from '../shared/fields';
 import { SpinnerComponent } from '../shared/spinner';
+import { RevealDirective } from '../shared/reveal';
 
 type Mode = 'staff' | 'collecteur';
 
@@ -16,12 +17,12 @@ const SHOW_COLLECTEUR_LOGIN = false;
 @Component({
   selector: 'page-login',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, SpinnerComponent],
+  imports: [AppBarComponent, IconComponent, FieldComponent, SpinnerComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar></app-bar>
-    <div class="scr-body">
-      <div style="text-align:center;margin-top:6px">
+    <div class="scr-body" reveal="screen">
+      <div style="text-align:center;margin-top:6px" data-reveal="logo">
         <span style="width:56px;height:56px;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--primary) 12%, var(--surface));color:var(--primary)">
           <ic name="lock" [size]="26"></ic>
         </span>
@@ -47,14 +48,14 @@ const SHOW_COLLECTEUR_LOGIN = false;
 
       @if (!showCollecteurLogin || mode() === 'staff') {
         @if (!forgot()) {
-        <field [label]="i18n.t('login_email')">
+        <field [label]="i18n.t('login_email')" data-reveal="input">
           <div class="input-prefix">
             <span class="pfx"><ic name="user" [size]="16"></ic></span>
             <input type="email" autocomplete="username" [placeholder]="i18n.t('login_email_ph')"
                    [value]="email()" (input)="setEmail($event)" (keydown.enter)="submit()" />
           </div>
         </field>
-        <field [label]="i18n.t('login_pw')" [err]="err() ? i18n.t(err()) : null">
+        <field [label]="i18n.t('login_pw')" [err]="err() ? i18n.t(err()) : null" data-reveal="input">
           <div class="input-prefix">
             <span class="pfx"><ic name="lock" [size]="16"></ic></span>
             <input [type]="showPw() ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••"
@@ -72,7 +73,7 @@ const SHOW_COLLECTEUR_LOGIN = false;
             {{ i18n.t('login_forgot') }}
           </button>
         </div>
-        <button class="btn btn-primary" (click)="submit()" [disabled]="busy()">
+        <button class="btn btn-primary" data-reveal="button" (click)="submit()" [disabled]="busy()">
           @if (busy()) { <spinner></spinner> } @else { {{ i18n.t('login_btn') }} <ic name="arrowR" [size]="18"></ic> }
         </button>
         } @else {

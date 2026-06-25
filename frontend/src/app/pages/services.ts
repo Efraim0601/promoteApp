@@ -4,6 +4,7 @@ import { I18n } from '../core/i18n';
 import { AppBarComponent } from '../shared/app-bar';
 import { IconComponent } from '../shared/icon';
 import { PromoteCardComponent } from '../shared/promote-card';
+import { RevealDirective } from '../shared/reveal';
 
 /**
  * Public landing for the open path: lets anyone choose between buying a Promote card (the existing
@@ -12,20 +13,20 @@ import { PromoteCardComponent } from '../shared/promote-card';
 @Component({
   selector: 'page-services',
   standalone: true,
-  imports: [AppBarComponent, IconComponent, PromoteCardComponent],
+  imports: [AppBarComponent, IconComponent, PromoteCardComponent, RevealDirective],
   template: `
   <div class="scr">
     <app-bar><span appbar-right class="badge" style="background:var(--surface-2);color:var(--muted)">{{ i18n.t('badge_self') }}</span></app-bar>
     <div class="scr-body">
-      <div style="display:flex;flex-direction:column;gap:16px">
-        <div class="kicker">{{ i18n.t('home_kicker') }}</div>
-        <promote-card></promote-card>
-        <div>
+      <div reveal="screen" style="display:flex;flex-direction:column;gap:16px">
+        <div class="kicker" data-reveal="item">{{ i18n.t('home_kicker') }}</div>
+        <promote-card data-reveal="logo"></promote-card>
+        <div data-reveal="item">
           <h1 style="font-size:23px">{{ i18n.t('services_title') }}</h1>
           <p class="muted" style="font-size:13.5px;line-height:1.55;margin-top:8px">{{ i18n.t('services_sub') }}</p>
         </div>
 
-        <button class="svc-card" (click)="buy()">
+        <button class="svc-card" data-reveal="card" (click)="buy()">
           <span class="svc-ic" style="background:var(--primary);color:#fff"><ic name="idcard" [size]="24"></ic></span>
           <span class="svc-txt">
             <span class="svc-title">{{ i18n.t('svc_buy_title') }}</span>
@@ -34,7 +35,7 @@ import { PromoteCardComponent } from '../shared/promote-card';
           <ic name="arrowR" [size]="20" style="color:var(--muted)"></ic>
         </button>
 
-        <button class="svc-card" (click)="recharge()">
+        <button class="svc-card" data-reveal="card" (click)="recharge()">
           <span class="svc-ic" style="background:var(--af-gold);color:#5a4200"><ic name="phone" [size]="24"></ic></span>
           <span class="svc-txt">
             <span class="svc-title">{{ i18n.t('svc_recharge_title') }}</span>
@@ -44,7 +45,7 @@ import { PromoteCardComponent } from '../shared/promote-card';
         </button>
 
         <!-- Accès discret à l'espace collaborateur (connexion staff). -->
-        <button class="staff-link" (click)="login()">
+        <button class="staff-link" data-reveal="item" (click)="login()">
           <ic name="lock" [size]="14" [sw]="2"></ic> {{ i18n.t('staff_login_link') }}
         </button>
       </div>
