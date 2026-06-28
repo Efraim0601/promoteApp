@@ -6,11 +6,13 @@ import com.afriland.promote.repo.LoginAuditRepository;
 import com.afriland.promote.web.dto.Dtos.ActionAuditDto;
 import com.afriland.promote.web.dto.Dtos.LoginAuditDto;
 import org.springframework.data.domain.PageRequest;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /** Admin-only audit trail of login attempts and application actions (enforced in SecurityConfig). */
+@Tag(name = "Audit", description = "Journaux de connexion et actions")
 @RestController
 @RequestMapping("/api/audit")
 public class AuditController {

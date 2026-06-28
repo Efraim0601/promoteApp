@@ -1,5 +1,5 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
-import { Subscription } from '../core/models';
+import { SubscriptionDto } from '../core/models';
 
 /** Payment methods, ported from components.jsx PAY_METHODS. */
 export interface PayMethod { id: string; name: string; short: string; bg: string; fg: string; momo: boolean; logo?: string; }
@@ -100,12 +100,12 @@ export const maskPan = (v: string): string => {
 export const DELIVERY_MODES = ['promote', 'agence'];
 
 /** Overall record status for badges — ports components.jsx recordStatus(). */
-export function recordStatus(r: Subscription): string {
+export function recordStatus(r: SubscriptionDto): string {
   // A failed payment must never be hidden by a (mistaken) print — surface the failure first.
   // Un délai dépassé (prompt USSD jamais validé, sans débit) est distingué d'un vrai rejet :
   // statut « expired » → libellé « Expiré » au lieu de l'alarmant « Échouée ». Reste un payStatus
   // 'failed' côté données (filtres/stats inchangés) — seul le badge change.
-  if (r.payStatus === 'failed') return r.failureCategory === 'TIMEOUT' ? 'expired' : 'failed';
+  if (r.payStatus === 'failed') return r['failureCategory'] === 'TIMEOUT' ? 'expired' : 'failed';
   if (r.printed) return 'printed';
   if (r.payStatus === 'cash') return 'cash';
   if (r.payStatus === 'sara_pending') return 'sara_pending';

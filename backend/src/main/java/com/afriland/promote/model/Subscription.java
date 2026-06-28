@@ -71,6 +71,13 @@ public class Subscription implements Payable {
      *  (config) et le motif de paiement envoyé à l'agrégateur. Défaut : bancaire. */
     private String cardType;        // bancaire | prepaid
 
+    /** Product selected in the public/product funnel. Defaults to the built-in Promote card for
+     *  legacy rows and callers that predate the catalog-driven subscription step. */
+    @Column(length = 60)
+    private String productCode;
+    @Column(length = 120)
+    private String productLabel;
+
     /** Chosen pickup branch when delivery == agence. The name is snapshotted so it survives the
      *  agency being renamed or removed later; the id links back to the {@code Agency} row. */
     private String pickupAgencyId;
@@ -193,8 +200,9 @@ public class Subscription implements Payable {
     @Override
     @Transient
     public String getPaymentLabel() {
-        return "prepaid".equals(cardType)
-                ? "Carte prépayée Promote " + getRef()
-                : "Carte bancaire " + getRef();
+        String label = productLabel != null && !productLabel.isBlank()
+                ? productLabel
+                : ("prepaid".equals(cardType) ? "Carte prépayée Promote" : "Carte bancaire");
+        return label + " " + getRef();
     }
 }

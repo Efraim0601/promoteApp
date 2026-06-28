@@ -1,549 +1,270 @@
-/* Promote subscription — theme tokens + base (ported from the validated prototype).
-   Afriland brand: red primary. Institutional theme is the default. */
+/* ============================================================
+   Afriland Portal — Design system foundation
+   Recréé depuis le composant Claude Design (Afriland Portal.dc.html).
+   Palette: rouge #C8102E, navy #1B1B2F, surface #F7F8FA, Plus Jakarta Sans.
+   ============================================================ */
 
-html, body { margin: 0; height: 100%; }
+:root {
+  /* Brand */
+  --primary: #C8102E;
+  --primary-700: #A50D23;
+  --primary-900: #8B0000;
+  --navy: #1B1B2F;
+  --text: #1B1B2F;
+  --muted: #6B7280;
+  --muted-2: #9CA3AF;
+  --label: #374151;
+  --bg: #F7F8FA;
+  --surface: #FFFFFF;
+  --surface-2: #FAFAFA;
+  --surface-3: #F3F4F6;
+  --border: #E5E7EB;
+  --border-2: #D1D5DB;
 
-/* ---- constant brand (used by the card visual) ---- */
-:root{
-  --af-green:#06703A;
-  --af-green-d:#044A27;
-  --af-red:#C8102E;
-  --af-gold:#F2B632;
-  /* Couleurs opérateurs Mobile Money (portail cible) — réutilisables partout. */
-  --op-om:#FF7900;   /* Orange Money */
-  --op-mtn:#FFCB05;  /* MTN MoMo */
+  /* Semantic */
+  --success: #059669;
+  --success-soft: #ECFDF5;
+  --danger: #DC2626;
+  --danger-soft: #FEF2F2;
+  --danger-border: #FECACA;
+  --warning: #D97706;
+  --warning-soft: #FFFBEB;
+  --info: #2563EB;
+  --info-soft: #EFF6FF;
+  --accent: #C8102E;
+  --field-bg: #FAFAFA;
+
+  /* Operators (Mobile Money) */
+  --op-om: #FF7900;
+  --op-mtn: #FFCB05;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+  --radius-pill: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 4px rgba(0, 0, 0, .06);
+  --shadow: 0 4px 24px rgba(0, 0, 0, .06);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, .12);
+
+  --font: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* Demo/lang top bar height */
+  --topbar-h: 38px;
 }
 
-/* ===== Institutionnel (default) — calé sur le portail cible (rouge #C8102E, navy #1B1B2F) ===== */
-.promote-app{
-  --bg:#F7F8FA;
-  --bg2:#ffffff;
-  --surface:#ffffff;
-  --surface-2:#F3F4F6;
-  --border:#E5E7EB;
-  --text:#1B1B2F;
-  --muted:#6B7280;
-  --primary:#C8102E;
-  --primary-600:#B00D28;
-  --primary-700:#8F0A20;
-  --on-primary:#ffffff;
-  --success:#059669;
-  --success-700:#047857;
-  --success-soft:#ECFDF5;
-  --accent:#DC2626;
-  --accent-soft:#FEF2F2;
-  /* Semantic status: info=bleu (progression), warning=ambre (attente/action), error=accent (échec). */
-  --info:#2563EB;
-  --info-soft:#EFF6FF;
-  --warning:#D97706;
-  --warning-soft:#FFFBEB;
-  --field-bg:#ffffff;
-  --radius:12px;
-  --radius-lg:18px;
-  --radius-pill:999px;
-  --shadow:0 1px 2px rgba(27,27,47,.06), 0 2px 8px rgba(27,27,47,.05);
-  --shadow-lg:0 12px 30px rgba(27,27,47,.14);
-  --font:'Plus Jakarta Sans', system-ui, sans-serif;
-  --font-head:'Plus Jakarta Sans', system-ui, sans-serif;
-  --head-weight:700;
-  --btn-weight:700;
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* ===== Fintech moderne (dark) — RED primary ===== */
-.promote-app[data-theme="fintech"]{
-  --bg:#120A0B;
-  --bg2:#1C1011;
-  --surface:#231618;
-  --surface-2:#2E1C1E;
-  --border:#3A2528;
-  --text:#F6EAEB;
-  --muted:#C09B9F;
-  --primary:#FF4D5E;
-  --primary-600:#F23446;
-  --primary-700:#D81E2C;
-  --on-primary:#1A0608;
-  --success:#2BD37A;
-  --success-700:#19A861;
-  --success-soft:#13231A;
-  --accent:#FF8A5A;
-  --accent-soft:#2B1616;
-  --info:#5FA8FF;
-  --info-soft:#11202E;
-  --warning:#F2B632;
-  --warning-soft:#2A2010;
-  --field-bg:#1B0F11;
-  --radius:16px;
-  --radius-lg:24px;
-  --radius-pill:999px;
-  --shadow:0 1px 2px rgba(0,0,0,.45);
-  --shadow-lg:0 18px 50px rgba(0,0,0,.55), 0 0 0 1px rgba(255,77,94,.1);
-  --font:'Poppins', system-ui, sans-serif;
-  --font-head:'Poppins', system-ui, sans-serif;
-  --head-weight:600;
-  --btn-weight:600;
+input, select, textarea, button { font-family: inherit; }
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+  border-color: var(--primary) !important;
 }
 
-/* ===== Chaleureux (warm/cream) — RED primary ===== */
-.promote-app[data-theme="warm"]{
-  --bg:#F6EAD9;
-  --bg2:#FFFDF8;
-  --surface:#FFFDF8;
-  --surface-2:#FBEEE4;
-  --border:#EAD9C6;
-  --text:#2A1A18;
-  --muted:#8A6A5E;
-  --primary:#D8202A;
-  --primary-600:#BC1722;
-  --primary-700:#9C111B;
-  --on-primary:#ffffff;
-  --success:#0E7A45;
-  --success-700:#0A5C34;
-  --success-soft:#E7F2EB;
-  --accent:#9C111B;
-  --accent-soft:#FBE3DC;
-  --info:#1565C0;
-  --info-soft:#E9EFF9;
-  --warning:#8A5A00;
-  --warning-soft:#F8EAD0;
-  --field-bg:#ffffff;
-  --radius:18px;
-  --radius-lg:26px;
-  --radius-pill:999px;
-  --shadow:0 2px 6px rgba(80,30,20,.09);
-  --shadow-lg:0 16px 40px rgba(80,30,20,.18);
-  --font:'Poppins', system-ui, sans-serif;
-  --font-head:'Poppins', system-ui, sans-serif;
-  --head-weight:700;
-  --btn-weight:600;
+::placeholder { color: var(--muted-2); }
+
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+
+a { color: inherit; text-decoration: none; }
+
+/* ---- keyframes (du design) ---- */
+@keyframes slideUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideRight { from { opacity: 0; transform: translateX(40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideLeft { from { opacity: 0; transform: translateX(-40px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.06); } }
+@keyframes breathe { 0%, 100% { opacity: .6; transform: scale(1); } 50% { opacity: 1; transform: scale(1.04); } }
+@keyframes spinRing { to { transform: rotate(360deg); } }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+@keyframes shakeX { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-6px); } 75% { transform: translateX(6px); } }
+@keyframes countPulse { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
+@keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+
+/* ============================================================
+   Layout primitives — cadre mobile (preview 390×844)
+   ============================================================ */
+
+.app-shell {
+  padding-top: var(--topbar-h);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
-/* ---------- base ---------- */
-*{ box-sizing:border-box; }
-.promote-app{
-  font-family:var(--font);
-  color:var(--text);
-  background:var(--bg);
-  height:100%;
-  min-height:100%;
-  display:flex;
-  flex-direction:column;
-  -webkit-font-smoothing:antialiased;
-}
-.promote-app h1,.promote-app h2,.promote-app h3{ font-family:var(--font-head); font-weight:var(--head-weight); margin:0; letter-spacing:-0.01em; }
-.promote-app p{ margin:0; }
-
-/* The router renders the routed page as a host element (<page-admin>, …) between
-   .promote-app and .scr. Make that host fill the shell and be a flex column so the
-   flex/overflow chain reaches .scr-body — otherwise the page grows past 100dvh, the
-   document itself scrolls, and the background only paints the first viewport. */
-.promote-app > *:not(router-outlet){
-  flex:1;
-  min-height:0;
-  display:flex;
-  flex-direction:column;
+.screen {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
-/* scrollable screen body */
-.scr{
-  flex:1;
-  min-height:0;
-  display:flex;
-  flex-direction:column;
-  position:relative;
-}
-.scr-body{
-  flex:1;
-  min-height:0;
-  overflow-y:auto;
-  overflow-x:hidden;
-  padding:20px;
-  display:flex;
-  flex-direction:column;
-  gap:16px;
-}
-.scr-body > *{ flex-shrink:0; }
-.scr-foot{
-  padding:14px 20px calc(14px + env(safe-area-inset-bottom));
-  border-top:1px solid var(--border);
-  background:var(--bg2);
-  display:flex;
-  flex-direction:column;
-  gap:10px;
-}
+.screen-pad { padding: 24px 16px; }
 
-/* ---------- brand header ---------- */
-.appbar{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  padding:14px 18px;
-  background:var(--bg2);
-  border-bottom:1px solid var(--border);
-}
-.appbar .brand{ display:flex; align-items:center; gap:11px; flex:1; min-width:0; }
-.appbar .brand > div{ min-width:0; }
-.appbar .brand-logo{ height:26px; width:auto; display:block; flex-shrink:0; }
-.appbar .brand-sep{ width:1px; height:22px; background:var(--border); flex-shrink:0; }
-.appbar .brand-name{ font-family:var(--font-head); font-weight:var(--head-weight); font-size:15px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.appbar .brand-sub{ font-size:11.5px; font-weight:700; color:var(--muted); letter-spacing:.01em; line-height:1.2;
-  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
-.promote-app[data-theme="fintech"] .appbar .brand-logo{ background:#fff; padding:4px 7px; border-radius:8px; height:24px; box-sizing:content-box; }
-.icon-btn{
-  appearance:none; border:1px solid var(--border); background:var(--surface);
-  color:var(--text); height:34px; min-width:34px; padding:0 10px;
-  border-radius:var(--radius-pill); font-size:12.5px; font-weight:700;
-  display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer;
-  font-family:var(--font);
-}
-.icon-btn:active{ transform:scale(.97); }
-.back-link{
-  appearance:none; background:none; border:none; color:var(--muted);
-  font-family:var(--font); font-size:13px; font-weight:600; cursor:pointer;
-  display:inline-flex; align-items:center; gap:6px; padding:0;
-}
+.fade-in { animation: fadeIn .4s ease; }
+.slide-up { animation: slideUp .5s ease; }
 
-/* ---------- buttons ---------- */
-.btn{
-  appearance:none; cursor:pointer; width:100%;
-  border:none; border-radius:var(--radius);
-  padding:15px 18px; font-family:var(--font); font-size:15.5px; font-weight:var(--btn-weight);
-  display:inline-flex; align-items:center; justify-content:center; gap:9px;
-  transition:transform .08s ease, filter .15s ease, background .15s ease;
-}
-.btn:active{ transform:translateY(1px) scale(.995); }
-.btn-primary{ background:var(--primary); color:var(--on-primary); box-shadow:var(--shadow); }
-.btn-primary:hover{ background:var(--primary-600); }
-.btn-primary:disabled{ opacity:.5; cursor:not-allowed; }
-.btn-ghost{ background:var(--surface-2); color:var(--text); }
-.btn-danger-soft{ background:var(--accent-soft); color:var(--accent); }
-.btn-outline{ background:transparent; border:1.5px solid var(--border); color:var(--text); }
+/* ============================================================
+   Composants de base réutilisables (styles inline du design)
+   ============================================================ */
 
-/* ---------- cards & fields ---------- */
-.card{
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:var(--radius-lg); box-shadow:var(--shadow);
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: none;
+  border-radius: var(--radius);
+  font-weight: 700;
+  cursor: pointer;
+  transition: all .2s;
+  font-family: inherit;
 }
-/* Each labelled field eases in — gives the wizard a lively, dynamic feel on step changes. */
-@keyframes fieldIn{ from{ opacity:0; transform:translateY(7px); } to{ opacity:1; transform:translateY(0); } }
-.field{ animation:fieldIn .28s cubic-bezier(.2,.7,.3,1) both; }
-.field label{ display:block; font-size:12.5px; font-weight:700; margin-bottom:6px; color:var(--text); transition:color .15s ease; }
-.field:focus-within label{ color:var(--primary); }
-.field .hint{ font-size:11.5px; color:var(--muted); margin-top:6px; line-height:1.35; }
-.field .err{ font-size:11.5px; color:var(--accent); margin-top:6px; font-weight:600; animation:fieldIn .2s ease both; }
-/* A field in error gets an error-coloured border + label (Material): the red reads as "à corriger". */
-.field:has(.err) label{ color:var(--accent); }
-.field:has(.err) .input, .field:has(.err) .input-prefix{ border-color:var(--accent); }
-.field:has(.err) .input:focus, .field:has(.err) .input-prefix:focus-within{ box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent); }
-.input{
-  width:100%; font-family:var(--font); font-size:15px; color:var(--text);
-  background:var(--field-bg); border:1.5px solid var(--border); border-radius:var(--radius);
-  padding:13px 14px; outline:none; transition:border-color .18s ease, box-shadow .18s ease, transform .12s ease;
-}
-.input::placeholder{ color:var(--muted); opacity:.7; }
-.input:focus{ border-color:var(--primary); box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
-/* Native date picker: align with the app's input look + show the calendar affordance in the brand colour. */
-.input[type="date"]{ min-height:50px; cursor:pointer; }
-.input[type="date"]::-webkit-calendar-picker-indicator{ cursor:pointer; opacity:.65; transition:opacity .15s ease; }
-.input[type="date"]:hover::-webkit-calendar-picker-indicator{ opacity:1; }
-.input-prefix{ display:flex; align-items:stretch; border:1.5px solid var(--border); border-radius:var(--radius); overflow:hidden; background:var(--field-bg); }
-.input-prefix:focus-within{ border-color:var(--primary); box-shadow:0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
-.input-prefix .pfx{ display:flex; align-items:center; gap:6px; padding:0 12px; background:var(--surface-2); font-size:14px; font-weight:700; color:var(--text); border-right:1.5px solid var(--border); }
-.input-prefix .phone-cc{ display:inline-flex; align-items:center; gap:5px; white-space:nowrap; border:none; border-right:1.5px solid var(--border); background:var(--surface-2); color:var(--text); font-weight:700; font-size:14px; padding:0 10px; cursor:pointer; outline:none; }
-/* Custom country dropdown: name in the list, dial code in the field. */
-.cc-menu{ position:absolute; top:calc(100% + 4px); left:0; z-index:50; width:300px; max-width:90vw; background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow-lg); overflow:hidden; }
-.cc-search{ width:100%; box-sizing:border-box; border:none; border-bottom:1.5px solid var(--border); padding:11px 13px; outline:none; font-family:var(--font); font-size:14px; background:var(--field-bg); color:var(--text); }
-.cc-list{ max-height:264px; overflow-y:auto; }
-.cc-list button{ display:flex; align-items:center; gap:9px; width:100%; text-align:left; border:none; background:transparent; padding:9px 13px; cursor:pointer; font-size:13.5px; color:var(--text); }
-.cc-list button:hover{ background:var(--surface-2); }
-.cc-list button.cc-active{ background:color-mix(in srgb, var(--primary) 12%, transparent); font-weight:700; }
-.cc-list button .cc-dial{ margin-left:auto; color:var(--muted); font-weight:700; flex-shrink:0; }
-.input-prefix input{ flex:1; min-width:0; border:none; background:transparent; outline:none; font-family:var(--font); font-size:15px; padding:13px 12px; color:var(--text); letter-spacing:.02em; }
-.input-prefix select{ flex:1; min-width:0; border:none; background:transparent; outline:none; font-family:var(--font); font-size:15px; padding:13px 12px; color:var(--text); cursor:pointer; }
+.btn:active { transform: scale(.98); }
 
-/* Admin transactions table — detailed, paginated, with the client photo. */
-.tx-table{ width:100%; border-collapse:collapse; font-size:12.5px; table-layout:fixed; }
-.tx-table thead th{ position:sticky; top:0; z-index:1; background:var(--surface); text-align:left; white-space:nowrap;
-  font-size:10.5px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); font-weight:700;
-  padding:9px 10px; border-bottom:1.5px solid var(--border); }
-.tx-table thead th.num{ text-align:right; }
-.tx-table tbody td{ padding:8px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
-.tx-table tbody td.num{ text-align:right; font-weight:800; white-space:nowrap; }
-.tx-table tbody td.nowrap{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-/* Cells whose content has no spaces (CNI) — break within the column instead of overflowing. */
-.tx-table tbody td.brk{ overflow-wrap:anywhere; }
-.tx-table tr.tx-tr{ cursor:pointer; transition:background .12s ease; }
-.tx-table tr.tx-tr:hover{ background:var(--surface-2); }
-.tx-table tr.tx-expand td{ border-bottom:1px solid var(--border); }
-.tx-table .cell-name{ font-weight:700; overflow-wrap:anywhere; line-height:1.25; }
-.tx-table .cell-sub{ color:var(--muted); font-size:10.5px; margin-top:1px; overflow-wrap:anywhere; }
-.tx-pager{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:10px 6px 4px; flex-wrap:wrap; }
-/* Narrow screens: the table reflows into stacked cards so every field stays readable at any
-   size — one labelled line per value (data-label), no horizontal scrolling, no cramped columns. */
-@media (max-width:760px){
-  .tx-table{ table-layout:auto; }
-  .tx-table thead{ display:none; }
-  .tx-table tbody, .tx-table tr.tx-tr, .tx-table tr.tx-tr td{ display:block; }
-  .tx-table tr.tx-tr{
-    display:grid; grid-template-columns:38px 1fr; column-gap:10px; row-gap:6px; align-items:center;
-    padding:11px 12px; margin:0 0 10px; border:1px solid var(--border); border-radius:14px; background:var(--surface);
-  }
-  .tx-table tr.tx-tr td{ border:0; padding:0; }
-  .tx-table tr.tx-tr td:nth-child(2){ font-weight:700; min-width:0; }            /* client name + ref */
-  .tx-table tr.tx-tr td:nth-child(n+3){
-    grid-column:1 / -1; display:flex; align-items:center; justify-content:space-between; gap:12px;
-    border-top:1px dashed var(--border); padding-top:6px; white-space:normal; overflow:visible; text-overflow:clip;
-  }
-  .tx-table tr.tx-tr td:nth-child(n+3)::before{
-    content:attr(data-label); flex-shrink:0;
-    font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted);
-  }
-  .tx-table tr.tx-tr td.num{ text-align:right; }
-  .tx-table tr.tx-expand, .tx-table tr.tx-expand td{ display:block; }
-  .tx-table tr.tx-expand td{ padding:0 0 10px; }
+.btn-primary {
+  background: var(--primary);
+  color: #fff;
+  padding: 14px;
+  font-size: 15px;
+  width: 100%;
+}
+.btn-primary:hover { background: var(--primary-700); }
+.btn-primary:disabled { opacity: .55; cursor: not-allowed; }
+
+.btn-ghost {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-ghost:hover { color: var(--primary); }
+
+.btn-soft {
+  background: var(--surface-3);
+  color: var(--label);
+  padding: 12px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+}
+.btn-soft:hover { background: var(--border); }
+
+.card {
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
 }
 
-.kicker{ font-size:11.5px; font-weight:800; letter-spacing:.14em; text-transform:uppercase; color:var(--primary); }
-.muted{ color:var(--muted); }
-
-/* progress dots */
-.steps{ display:flex; align-items:center; gap:6px; }
-.steps .dot{ height:5px; border-radius:3px; background:var(--border); flex:1; transition:background .2s ease; }
-.steps .dot.on{ background:var(--primary); }
-.steps .dot.done{ background:var(--primary-700); }
-
-/* operator picker */
-.op-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
-.op{
-  border:1.5px solid var(--border); background:var(--field-bg); border-radius:var(--radius); color:var(--text);
-  padding:12px; display:flex; align-items:center; gap:10px; cursor:pointer; transition:border-color .15s, background .15s;
-  text-align:left;
-}
-.op .op-logo{ width:34px; height:34px; border-radius:9px; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:11px; flex-shrink:0; }
-.op .op-name{ font-size:13.5px; font-weight:700; line-height:1.1; }
-.op .op-tag{ font-size:11px; color:var(--muted); }
-.op.sel{ border-color:var(--primary); background:color-mix(in srgb, var(--primary) 8%, var(--field-bg)); }
-.op .op-check{ margin-left:auto; color:var(--primary); opacity:0; transition:opacity .15s; }
-.op.sel .op-check{ opacity:1; }
-.op-logo{ display:flex; align-items:center; justify-content:center; font-weight:800; }
-
-/* generic option tiles (payment / delivery) */
-.tile{
-  display:flex; align-items:center; gap:13px; width:100%; cursor:pointer; color:var(--text);
-  background:var(--field-bg); border:1.5px solid var(--border); border-radius:var(--radius);
-  padding:14px; transition:border-color .15s, background .15s; font-family:var(--font);
-}
-.tile-ic{ width:42px; height:42px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:var(--surface-2); color:var(--primary); font-weight:800; font-size:14px; }
-.tile-title{ display:block; font-size:14.5px; font-weight:700; line-height:1.15; }
-.tile-desc{ display:block; font-size:11.5px; color:var(--muted); margin-top:2px; line-height:1.35; }
-.tile-meta{ font-size:12.5px; font-weight:800; color:var(--text); white-space:nowrap; }
-.tile-check{ width:22px; height:22px; border-radius:50%; flex-shrink:0; display:flex; align-items:center; justify-content:center; border:1.5px solid var(--border); color:transparent; transition:all .15s; }
-.tile.sel{ border-color:var(--primary); background:color-mix(in srgb, var(--primary) 8%, var(--field-bg)); }
-.tile.sel .tile-check{ background:var(--primary); border-color:var(--primary); color:var(--on-primary); }
-
-/* summary rows */
-.srow{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:13px 0; border-bottom:1px solid var(--border); }
-.srow:last-child{ border-bottom:none; }
-.srow .lbl{ font-size:13px; color:var(--muted); }
-.srow .val{ font-size:14px; font-weight:700; text-align:right; }
-.srow.total .lbl{ color:var(--text); font-weight:700; font-size:14px; }
-.srow.total .val{ font-size:18px; color:var(--primary); }
-
-/* status badge */
-.badge{ display:inline-flex; align-items:center; gap:6px; font-size:11.5px; font-weight:700; padding:4px 9px; border-radius:var(--radius-pill); }
-.badge .bdot{ width:7px; height:7px; border-radius:50%; }
-.badge.pending{ background:var(--warning-soft); color:var(--warning); }       /* ambre — en attente / action requise */
-.badge.success{ background:var(--success-soft); color:var(--success-700); }   /* vert — terminé */
-.badge.failed{ background:var(--accent-soft); color:var(--accent); }           /* rouge — réservé aux échecs */
-.badge.expired{ background:var(--surface-2); color:var(--muted); }             /* gris neutre — délai dépassé, sans débit, à reprendre */
-.badge.info{ background:var(--info-soft); color:var(--info); }                 /* bleu — payé, étape suivante (imprimer / créditer) */
-.promote-app[data-theme="fintech"] .badge.pending{ color:var(--af-gold); }
-.promote-app[data-theme="fintech"] .badge.success{ color:var(--success); }
-
-/* big choice cards (home) */
-.choice{
-  display:flex; gap:14px; align-items:center; text-align:left; width:100%; cursor:pointer; color:var(--text);
-  background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-lg);
-  padding:18px; transition:border-color .15s, transform .08s, box-shadow .2s; box-shadow:var(--shadow);
-}
-.choice:hover{ border-color:var(--primary); box-shadow:var(--shadow-lg); }
-.choice:active{ transform:translateY(1px); }
-.choice .ci{ width:50px; height:50px; border-radius:14px; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.choice .ci.green{ background:var(--success-soft); color:var(--success); }
-.choice .ci.red{ background:var(--accent-soft); color:var(--accent); }
-.choice .ctitle{ font-size:15.5px; font-weight:800; display:flex; align-items:center; gap:8px; }
-.choice .cdesc{ font-size:12.5px; color:var(--muted); margin-top:3px; line-height:1.4; }
-.choice .pill{ font-size:9.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:var(--surface-2); color:var(--muted); border:1px solid var(--border); }
-.choice .arrow{ margin-left:auto; color:var(--muted); align-self:center; }
-
-/* spinner */
-.spinner{ width:22px; height:22px; border-radius:50%; border:2.5px solid color-mix(in srgb, var(--on-primary) 40%, transparent); border-top-color:var(--on-primary); animation:spin .8s linear infinite; }
-.ring{ width:96px; height:96px; }
-/* centred section loader (tables, lists, forms awaiting data) */
-.load-center{ display:flex; align-items:center; justify-content:center; gap:9px; padding:26px 14px; color:var(--muted); font-size:13px; }
-@keyframes spin{ to{ transform:rotate(360deg); } }
-@keyframes pulse{ 0%,100%{ opacity:1; } 50%{ opacity:.45; } }
-@keyframes ripple{ 0%{ transform:scale(.6); opacity:.55; } 100%{ transform:scale(1.7); opacity:0; } }
-@keyframes pop{ 0%{ transform:scale(.6); } 60%{ transform:scale(1.08); } 100%{ transform:scale(1); } }
-.pop{ animation:pop .4s cubic-bezier(.2,.8,.3,1.2) both; }
-
-/* admin lists */
-.kpi{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:13px 14px; box-shadow:var(--shadow); }
-.kpi .kv{ font-size:21px; font-weight:800; font-family:var(--font-head); letter-spacing:-.02em; }
-.kpi .kl{ font-size:11px; color:var(--muted); margin-top:2px; }
-
-/* KPI value slide-in animation (today's numbers) */
-@keyframes kvPop{ 0%{ opacity:0; transform:translateY(6px) scale(.92); } 70%{ transform:translateY(-2px) scale(1.04); } 100%{ opacity:1; transform:none; } }
-.kv-anim{ animation:kvPop .45s cubic-bezier(.2,.8,.3,1.1) both; }
-
-/* Formatted amount display (large number + unit badge) */
-.amount-block{ display:flex; align-items:baseline; gap:5px; flex-wrap:wrap; }
-.amount-main{ font-size:1em; font-weight:900; font-variant-numeric:tabular-nums; }
-.amount-unit{ font-size:.52em; font-weight:700; opacity:.7; letter-spacing:.03em; }
-@keyframes amountGlow{ 0%,100%{ text-shadow:none; } 50%{ text-shadow:0 0 14px currentColor; } }
-.amount-anim{ animation:kvPop .45s cubic-bezier(.2,.8,.3,1.1) both, amountGlow 2.4s ease-in-out 0.5s 2; }
-
-/* live auto-refresh indicator (small pulsing dot) */
-.live-dot{ width:7px; height:7px; border-radius:50%; background:var(--success); display:inline-block; animation:pulse 1.6s ease-in-out infinite; }
-
-/* ---------- Offre Promote: animated subscription offer card ---------- */
-@keyframes offerIn{ from{ opacity:0; transform:translateY(12px) scale(.97); } to{ opacity:1; transform:translateY(0) scale(1); } }
-@keyframes offerGlow{ 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--primary) 0%, transparent); } 50%{ box-shadow:0 0 18px 1px color-mix(in srgb, var(--primary) 36%, transparent); } }
-.offer-card{ animation:offerIn .55s cubic-bezier(.2,.8,.3,1.1) both, offerGlow 3.4s ease-in-out .55s infinite; }
-/* gold sweep across the gradient header */
-@keyframes offerSweep{ 0%{ transform:translateX(-120%) skewX(-18deg); } 55%,100%{ transform:translateX(320%) skewX(-18deg); } }
-.offer-head{ position:relative; overflow:hidden; }
-.offer-head::after{ content:''; position:absolute; inset:0; width:38%; pointer-events:none; background:linear-gradient(90deg, transparent, color-mix(in srgb, #fff 55%, transparent), transparent); animation:offerSweep 3.6s ease-in-out 1s infinite; }
-/* award badge gently bobbing */
-@keyframes badgeBob{ 0%,100%{ transform:rotate(0) scale(1); } 50%{ transform:rotate(-9deg) scale(1.14); } }
-.offer-badge{ display:inline-flex; transform-origin:center; animation:badgeBob 2.4s ease-in-out infinite; }
-/* shimmering "Gratuit" label */
-@keyframes offerShine{ 0%{ background-position:-160% 0; } 60%,100%{ background-position:260% 0; } }
-.offer-free{ background:linear-gradient(100deg, var(--success) 0%, var(--success) 40%, color-mix(in srgb, var(--success) 35%, #fff) 50%, var(--success) 60%, var(--success) 100%); background-size:260% 100%; -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent; animation:offerShine 2.8s ease-in-out 1s infinite; }
-@media (prefers-reduced-motion: reduce){
-  .offer-card{ animation:offerIn .4s ease both; }
-  .offer-head::after,.offer-badge,.offer-free{ animation:none; }
-  .offer-free{ -webkit-text-fill-color:var(--success); }
-}
-
-/* ---------- responsive full-bleed web shell (no phone frame) ---------- */
-/* The app always fills the whole browser window, at every screen size. */
-app-root{ display:block; height:100dvh; }
-.app-shell{
-  height:100dvh;
-  overflow:hidden;
-  background:var(--bg);
-}
-.app-shell > .promote-app{
-  width:100%;
-  height:100dvh;
-}
-
-/* Larger screens: a real full-width web layout — full-width header & action bar,
-   content centred in a comfortable reading column (no phone-shaped card). */
-@media (min-width:760px){
-  .appbar{
-    padding-left:calc((100% - 720px) / 2);
-    padding-right:calc((100% - 720px) / 2);
-  }
-  .scr-body{ align-items:center; }
-  .scr-body > *{ width:100%; max-width:720px; }
-  .scr-foot{ align-items:center; }
-  .scr-foot > *{ width:100%; max-width:720px; }
-  /* The admin console spans full width (sidebar + content), not the 720px reading column. */
-  app-bar.appbar-wide .appbar{ padding-left:18px; padding-right:18px; }
-}
-
-/* ---------- admin console: sidebar layout ---------- */
-.admin-layout{ flex:1; min-height:0; display:flex; }
-.admin-side{
-  width:236px; flex-shrink:0; border-right:1px solid var(--border); background:var(--bg2);
-  display:flex; flex-direction:column; gap:14px; padding:16px 12px; overflow-y:auto;
-}
-.admin-userbox{ display:flex; align-items:center; gap:11px; padding:4px 6px; min-width:0; }
-.admin-nav{ display:flex; flex-direction:column; gap:4px; }
-.admin-nav button{
-  display:flex; align-items:center; gap:11px; width:100%; text-align:left;
-  padding:11px 13px; border:none; background:transparent; border-radius:12px;
-  color:var(--text); font-size:13.5px; font-weight:700; cursor:pointer; transition:background .15s;
-}
-.admin-nav button:hover{ background:var(--surface-2); }
-.admin-nav button.active{ background:var(--accent-soft); color:var(--accent); }
-.admin-nav button ic{ flex-shrink:0; }
-/* The collapse toggle is mobile-only — hidden on the desktop sidebar layout. */
-.admin-nav-toggle{ display:none; }
-.admin-spacer{ flex:1; }
-.admin-main{ flex:1; min-height:0; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:16px; }
-.admin-main > *{ width:100%; max-width:760px; margin-inline:auto; }
-.admin-main > *{ flex-shrink:0; }
-
-@keyframes shimmer {
-  from { background-position: -600px 0; }
-  to   { background-position:  600px 0; }
-}
-.skel {
+.field { margin-bottom: 18px; }
+.field-label {
   display: block;
-  border-radius: 4px;
-  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
-  background-size: 1200px 100%;
-  animation: shimmer 1.5s infinite linear;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--label);
+  margin-bottom: 6px;
+}
+.input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 15px;
+  background: var(--surface-2);
+  transition: all .2s;
 }
 
-@media (max-width:759px){
-  .admin-layout{ flex-direction:column; }
-  .admin-side{
-    width:auto; flex-direction:row; flex-wrap:wrap; align-items:center; gap:6px; padding:8px 12px;
-    border-right:none; border-bottom:1px solid var(--border);
-  }
-  .admin-userbox, .admin-spacer, .admin-logout{ display:none; }
-  /* Compact bar: just a toggle showing the current section. The full nav stays collapsed
-     until tapped, so it no longer fills the top of the screen. */
-  .admin-nav-toggle{
-    display:flex; align-items:center; gap:9px; width:100%;
-    padding:10px 13px; border:1px solid var(--border); background:var(--surface);
-    border-radius:12px; color:var(--text); font-size:14px; font-weight:800; cursor:pointer;
-  }
-  .admin-nav-toggle ic{ flex-shrink:0; color:var(--accent); }
-  .admin-nav{ display:none; }
-  /* Opened: wrap onto as many rows as needed so every item stays visible. */
-  .admin-nav.open{ display:flex; flex-direction:row; flex-wrap:wrap; gap:6px; width:100%; margin-top:2px; }
-  .admin-nav button{ width:auto; white-space:nowrap; padding:9px 14px; }
+.alert-error {
+  padding: 10px 12px;
+  background: var(--danger-soft);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-sm);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+}
+.alert-error.shake { animation: shakeX .4s ease; }
+
+.alert-success {
+  padding: 8px 12px;
+  background: var(--success-soft);
+  border-radius: var(--radius-sm);
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 600;
 }
 
-/* ============================================================================
-   Portail cible — bibliothèque d'animations (« effets de dynamisme »)
-   Keyframes repris du template Afriland Portal. Servent de socle CSS ; les
-   timelines orchestrées (cascade, élastique, confettis) sont jouées par la
-   directive [reveal] via GSAP. Ici : animations autonomes + états de repli.
-   ============================================================================ */
-@keyframes slideUp{ from{ opacity:0; transform:translateY(24px); } to{ opacity:1; transform:translateY(0); } }
-@keyframes fadeIn{ from{ opacity:0; } to{ opacity:1; } }
-@keyframes slideRight{ from{ opacity:0; transform:translateX(40px); } to{ opacity:1; transform:translateX(0); } }
-@keyframes slideLeft{ from{ opacity:0; transform:translateX(-40px); } to{ opacity:1; transform:translateX(0); } }
-@keyframes breathe{ 0%,100%{ opacity:.6; transform:scale(1); } 50%{ opacity:1; transform:scale(1.04); } }
-@keyframes spinRing{ to{ transform:rotate(360deg); } }
-@keyframes drawCheck{ to{ stroke-dashoffset:0; } }
-@keyframes shakeX{ 0%,100%{ transform:translateX(0); } 25%{ transform:translateX(-6px); } 75%{ transform:translateX(6px); } }
-@keyframes countPulse{ 0%{ transform:scale(1); } 50%{ transform:scale(1.15); } 100%{ transform:scale(1); } }
-@keyframes gradientShift{ 0%{ background-position:0% 50%; } 50%{ background-position:100% 50%; } 100%{ background-position:0% 50%; } }
-
-.anim-slide-up{ animation:slideUp .5s cubic-bezier(.2,.8,.3,1) both; }
-.anim-fade-in{ animation:fadeIn .4s ease both; }
-.anim-breathe{ animation:breathe 2.4s ease-in-out infinite; }
-.anim-shake{ animation:shakeX .4s ease both; }
-.anim-count-pulse{ animation:countPulse .5s ease both; }
-
-/* Dégradé animé (en-têtes héro façon portail) : place le contenu sur un dégradé qui glisse. */
-.grad-shift{
-  background-size:200% 200%;
-  animation:gradientShift 8s ease infinite;
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: var(--primary);
+  color: #fff;
 }
 
-/* État initial des éléments orchestrés par [reveal] : invisibles tant que GSAP n'a pas joué la
-   timeline (la directive retire cette classe au montage). Repli sans JS / reduced-motion : la
-   règle @supports + le fallback rendent le contenu visible pour ne jamais le masquer. */
-.promote-app [data-reveal]{ opacity:0; }
-.reveal-ready [data-reveal]{ opacity:1; }
-@media (prefers-reduced-motion: reduce){
-  .promote-app [data-reveal]{ opacity:1 !important; transform:none !important; }
-  .anim-breathe, .grad-shift{ animation:none; }
+.muted { color: var(--muted); }
+.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ---- form fields (phone-field, field wrapper) ---- */
+@keyframes fieldIn { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+.field { animation: fieldIn .28s cubic-bezier(.2,.7,.3,1) both; margin-bottom: 18px; }
+.field label { display: block; font-size: 12.5px; font-weight: 700; margin-bottom: 6px; color: var(--text); transition: color .15s ease; }
+.field:focus-within label { color: var(--primary); }
+.field .hint { font-size: 11.5px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+.field .err { font-size: 11.5px; color: var(--accent); margin-top: 6px; font-weight: 600; animation: fieldIn .2s ease both; }
+.field:has(.err) label { color: var(--accent); }
+.field:has(.err) .input-prefix { border-color: var(--accent); }
+.input-prefix {
+  display: flex; align-items: stretch;
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  overflow: hidden; background: var(--field-bg);
+}
+.input-prefix:focus-within { border-color: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent); }
+.input-prefix .phone-cc {
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  border: none; border-right: 1.5px solid var(--border); background: var(--surface-2);
+  color: var(--text); font-weight: 700; font-size: 14px; padding: 0 10px; cursor: pointer; outline: none;
+}
+.cc-menu {
+  position: absolute; top: calc(100% + 4px); left: 0; z-index: 50;
+  width: 300px; max-width: 90vw; background: var(--surface);
+  border: 1.5px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow-lg); overflow: hidden;
+}
+.cc-search {
+  width: 100%; box-sizing: border-box; border: none; border-bottom: 1.5px solid var(--border);
+  padding: 11px 13px; outline: none; font-family: var(--font); font-size: 14px;
+  background: var(--field-bg); color: var(--text);
+}
+.cc-list { max-height: 264px; overflow-y: auto; }
+.cc-list button {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  border: none; background: transparent; padding: 9px 13px; cursor: pointer;
+  font-size: 13.5px; color: var(--text);
+}
+.cc-list button:hover { background: var(--surface-2); }
+.cc-list button.cc-active { background: color-mix(in srgb, var(--primary) 12%, transparent); font-weight: 700; }
+.cc-list button .cc-dial { margin-left: auto; color: var(--muted); font-weight: 700; flex-shrink: 0; }
+.input-prefix input {
+  flex: 1; min-width: 0; border: none; background: transparent; outline: none;
+  font-family: var(--font); font-size: 15px; padding: 13px 12px; color: var(--text); letter-spacing: .02em;
 }

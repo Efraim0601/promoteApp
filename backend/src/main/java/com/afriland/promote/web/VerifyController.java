@@ -18,6 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
  * late or our local timeout fired first). Authenticated staff only (falls under the global
  * {@code anyRequest().authenticated()} rule in SecurityConfig).
  */
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@Tag(name = "Réconciliation", description = "Vérification statut commande agrégateur")
 @RestController
 @RequestMapping("/api/verify")
 public class VerifyController {

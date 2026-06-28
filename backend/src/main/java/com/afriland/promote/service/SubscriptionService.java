@@ -51,6 +51,7 @@ public class SubscriptionService {
     private final ReferenceSequence refs;     // PRM-#### sequence (subscriptions only)
     private final ApplicationEventPublisher events;
     private final CommissionService commissions;
+    private final ProductService products;
 
     /** When true, the gateway push runs off the request thread (PaymentDispatcher); see application.yml. */
     @Value("${app.payment.async:false}")
@@ -68,7 +69,7 @@ public class SubscriptionService {
                                ImageStorage storage, SaraReceiptExtractor receiptExtractor,
                                ReferenceSequence refs, ApplicationEventPublisher events,
                                CommissionService commissions, PlatformTransactionManager txManager,
-                               LiveStatusThrottle statusThrottle) {
+                               LiveStatusThrottle statusThrottle, ProductService products) {
         this.subs = subs;
         this.configs = configs;
         this.users = users;
@@ -79,6 +80,7 @@ public class SubscriptionService {
         this.refs = refs;
         this.events = events;
         this.commissions = commissions;
+        this.products = products;
         this.tx = new TransactionTemplate(txManager);
         this.statusThrottle = statusThrottle;
     }
@@ -155,6 +157,46 @@ public class SubscriptionService {
         return "prepaid".equals(cardType) ? cfg.rechargeInitialeOr() : cfg.rechargeInitialeBancaireOr();
     }
 
+    private Product resolveSubscriptionProduct(String code) {
+        String requested = (code == null || code.isBlank()) ? ProductService.CARD_CODE : code.trim();
+        Product p = products.byCode(requested);
+        if (p == null || p.getKind() != Product.Kind.CARD || !p.isActive()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "product_unavailable");
+        }
+        return p;
+    }
+
+    private CardConfig configForProduct(Product product) {
+        CardConfig base = config();
+        CardConfig cfg = CardConfig.builder()
+                .id(base.getId())
+                .price(product.getBasePrice())
+                .fees(base.getFees())
+                .transport(base.getTransport())
+                .rechargeMin(base.getRechargeMin())
+                .rechargeMax(base.getRechargeMax())
+                .rechargeInitiale(base.getRechargeInitiale())
+                .passPremium(base.getPassPremium())
+                .rechargeInitialeBancaire(base.getRechargeInitialeBancaire())
+                .passPremiumBancaire(base.getPassPremiumBancaire())
+                .build();
+        for (ProductComponent c : products.componentsOf(product.getId())) {
+            int v = c.getAmount();
+            switch (c.getCkey()) {
+                case "fees" -> cfg.setFees(v);
+                case "transport" -> cfg.setTransport(v);
+                case "rechargeInitiale" -> cfg.setRechargeInitiale(v);
+                case "passPremium" -> cfg.setPassPremium(v);
+                case "rechargeInitialeBancaire" -> cfg.setRechargeInitialeBancaire(v);
+                case "passPremiumBancaire" -> cfg.setPassPremiumBancaire(v);
+                case "rechargeMin" -> cfg.setRechargeMin(v);
+                case "rechargeMax" -> cfg.setRechargeMax(v);
+                default -> { /* ignore unknown product component keys */ }
+            }
+        }
+        return cfg;
+    }
+
     /** Resolve a referrer (sales agent) by phone — ports app.jsx:findAgentByPhone. */
     public AppUser resolveAgentByPhone(String phone) {
         if (phone == null) return null;
@@ -177,7 +219,8 @@ public class SubscriptionService {
 
     @Transactional
     public Subscription create(CreateSubscriptionRequest req, String channel, String agentId) {
-        CardConfig cfg = config();
+        Product product = resolveSubscriptionProduct(req.productCode());
+        CardConfig cfg = configForProduct(product);
         String delivery = (req.delivery() == null || req.delivery().isBlank()) ? "promote" : req.delivery();
         // Type de carte : bancaire (défaut) ou prepaid — détermine les montants et le motif de paiement.
         String cardType = "prepaid".equals(req.cardType()) ? "prepaid" : "bancaire";
@@ -272,6 +315,8 @@ public class SubscriptionService {
                 .payPhone(payPhone)
                 .delivery(delivery)
                 .cardType(cardType)
+                .productCode(product.getCode())
+                .productLabel(product.getLabel())
                 .pickupAgencyId(pickupAgencyId)
                 .pickupAgencyName(pickupAgencyName)
                 .amount(amount)

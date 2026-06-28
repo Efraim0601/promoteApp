@@ -7,6 +7,7 @@ import com.afriland.promote.web.dto.Dtos.TeamMemberDto;
 import com.afriland.promote.web.dto.Dtos.TeamMessageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Comparator;
@@ -19,6 +20,7 @@ import java.util.Set;
  * chef d'équipe can never message outside their team. Gated to the management chain in
  * {@link com.afriland.promote.config.SecurityConfig}.
  */
+@Tag(name = "Équipes", description = "Organigramme et messagerie interne")
 @RestController
 @RequestMapping("/api/team")
 public class TeamController {

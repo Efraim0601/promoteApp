@@ -154,6 +154,23 @@ server:
     max-http-form-post-size: 8MB
     max-swallow-size: 8MB
 
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    tags-sorter: alpha
+    operations-sorter: method
+    display-request-duration: true
+    persist-authorization: true
+    try-it-out-enabled: true
+    filter: true
+    doc-expansion: none
+  show-actuator: false
+  packages-to-scan: com.afriland.promote.web
+
 logging:
   level:
     org.springframework.security: INFO

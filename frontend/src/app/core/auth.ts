@@ -2,135 +2,99 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { tap } from 'rxjs';
 import { Api } from './api';
-import { Geo } from './geo';
-import { ALL_ROLES, Permission, Role, User } from './models';
+import { Role, User } from './models';
 
-const TOKEN_KEY = 'promote.token';
-const USER_KEY = 'promote.user';
+const TOKEN_KEY = 'afp_token';
 
-/** Authentication + session state (JWT stored in localStorage). */
+interface JwtClaims {
+  sub?: string;
+  email?: string;
+  role?: string;
+  roles?: string; // CSV
+  permissions?: string; // CSV
+  exp?: number;
+}
+
+function decodeJwt(token: string): JwtClaims | null {
+  try {
+    const payload = token.split('.')[1];
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decodeURIComponent(escape(json)));
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Auth state. Roles & permissions are the single source of truth from the JWT
+ * (shared contract with the backend) — never the stored user object — which
+ * avoids stale-token 403s after a role change.
+ */
 @Injectable({ providedIn: 'root' })
 export class Auth {
   private api = inject(Api);
-  private geo = inject(Geo);
   private router = inject(Router);
 
-  readonly user = signal<User | null>(this.restoreUser());
-  readonly isStaff = computed(() => this.user() !== null);
+  private _token = signal<string | null>(localStorage.getItem(TOKEN_KEY));
+  readonly user = signal<User | null>(null);
 
-  private restoreUser(): User | null {
-    try { const s = localStorage.getItem(USER_KEY); return s ? JSON.parse(s) : null; }
-    catch { return null; }
+  readonly claims = computed<JwtClaims | null>(() => {
+    const t = this._token();
+    return t ? decodeJwt(t) : null;
+  });
+
+  readonly isLoggedIn = computed(() => {
+    const c = this.claims();
+    if (!c) return false;
+    if (c.exp && c.exp * 1000 < Date.now()) return false;
+    return true;
+  });
+
+  readonly roles = computed<Role[]>(() => {
+    const c = this.claims();
+    const csv = c?.roles || c?.role || '';
+    return csv.split(',').map((r) => r.trim()).filter(Boolean) as Role[];
+  });
+
+  readonly permissions = computed<string[]>(() => {
+    const c = this.claims();
+    return (c?.permissions || '').split(',').map((p) => p.trim()).filter(Boolean);
+  });
+
+  token(): string | null {
+    return this._token();
   }
 
-  get token(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+  hasRole(...r: Role[]): boolean {
+    const mine = this.roles();
+    return r.some((x) => mine.includes(x));
+  }
+  hasPermission(p: string): boolean {
+    return this.permissions().includes(p);
   }
 
   login(email: string, password: string) {
-    return this.api.login(email, password).pipe(tap((res) => this.establish(res)));
+    return this.api.login(email, password).pipe(
+      tap((res) => {
+        this.setToken(res.token);
+        if (res.user) this.user.set(res.user);
+      }),
+    );
   }
 
-  /** Simplified collecteur sign-in (phone number + 4-digit PIN). */
-  loginByPhone(phone: string, pin: string) {
-    return this.api.loginByPhone(phone, pin).pipe(tap((res) => this.establish(res)));
+  refreshMe() {
+    return this.api.me().pipe(tap((u) => this.user.set(u)));
   }
 
-  /** Persist a freshly authenticated session and capture the GPS fix (best-effort). */
-  private establish(res: { token: string; user: User }): void {
-    localStorage.setItem(TOKEN_KEY, res.token);
-    localStorage.setItem(USER_KEY, JSON.stringify(res.user));
-    this.user.set(res.user);
-    this.reportLocation();
+  setToken(token: string) {
+    localStorage.setItem(TOKEN_KEY, token);
+    this._token.set(token);
   }
 
-  /** Best-effort: capture the browser's GPS fix and store it as the user's last-known location
-   *  (powers the admin map). Silently does nothing if the permission is denied or unavailable. */
-  private reportLocation(): void {
-    this.geo.current().then((fix) => {
-      if (!fix) return;
-      this.api.reportLocation(fix.lat, fix.lng, fix.accuracy).subscribe({ error: () => {} });
-    });
-  }
-
-  logout(): void {
+  logout() {
     localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    this._token.set(null);
     this.user.set(null);
     this.router.navigateByUrl('/login');
-  }
-
-  /** End an expired/invalid session (triggered by a 401) and return to login with a notice.
-   *  No-op if already signed out, so parallel failing requests don't stack redundant redirects. */
-  expireSession(): void {
-    if (!this.token && !this.user()) return;
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
-    this.user.set(null);
-    this.router.navigate(['/login'], { queryParams: { expired: 1 } });
-  }
-
-  /** Decode the JWT payload (claims) — the SAME token the backend authorises against. Returns null
-   *  when there is no token or it can't be parsed. UTF-8 safe (names with accents). */
-  private tokenClaims(): { role?: string; roles?: string; permissions?: string } | null {
-    const seg = this.token?.split('.')[1];
-    if (!seg) return null;
-    try {
-      const b64 = seg.replace(/-/g, '+').replace(/_/g, '/');
-      const pad = b64.length % 4 ? b64 + '='.repeat(4 - (b64.length % 4)) : b64;
-      const bytes = Uint8Array.from(atob(pad), (c) => c.charCodeAt(0));
-      return JSON.parse(new TextDecoder().decode(bytes));
-    } catch { return null; }
-  }
-
-  /** Effective roles of the current session, read FROM THE JWT — the single source of truth shared
-   *  with the backend. This guarantees the route guards and the API can never disagree (a stale
-   *  token simply carries stale roles for BOTH sides, instead of the guard trusting a separately
-   *  stored user object). Falls back to the legacy single `role` claim on very old tokens. */
-  roles(): Role[] {
-    const c = this.tokenClaims();
-    const csv = (c?.roles && c.roles.length ? c.roles : c?.role) ?? '';
-    return csv.split(',').map((s) => s.trim()).filter(Boolean) as Role[];
-  }
-  hasRole(...roles: Role[]): boolean {
-    const mine = this.roles();
-    return roles.some((r) => mine.includes(r));
-  }
-
-  /** Effective permissions, also read from the JWT for the same single-source-of-truth reason. */
-  permissions(): Permission[] {
-    const csv = this.tokenClaims()?.permissions ?? '';
-    return csv.split(',').map((s) => s.trim()).filter(Boolean) as Permission[];
-  }
-
-  /** ADMIN bypasses all permission checks for backward compatibility with pre-profile sessions. */
-  hasPermission(...perms: Permission[]): boolean {
-    if (this.hasRole('ADMIN')) return true;
-    const mine = this.permissions();
-    return perms.some((p) => mine.includes(p));
-  }
-
-  /** True until the user has set their own password (forces the change-password screen). */
-  get mustChangePassword(): boolean {
-    return !!this.user()?.mustChangePassword;
-  }
-
-  /** Persist an updated user (e.g. after a password change clears mustChangePassword). */
-  setUser(u: User): void {
-    localStorage.setItem(USER_KEY, JSON.stringify(u));
-    this.user.set(u);
-  }
-
-  /** Landing route for a freshly authenticated user. For a multi-role account, the highest-priority
-   *  role wins (ADMIN → Superviseur → Agent → Cashier → Print → Collecteur). */
-  landingPath(role?: Role): string {
-    const home: Record<Role, string> = {
-      ADMIN: '/admin', MANAGER: '/manager', SUPERVISEUR: '/supervision', CHEF_EQUIPE: '/team-stats',
-      AGENT: '/agent', CASHIER: '/cashier', PRINT_AGENT: '/print', COLLECTEUR: '/collecte',
-    };
-    if (role) return home[role] ?? '/login';
-    const mine = this.roles();
-    for (const r of ALL_ROLES) if (mine.includes(r)) return home[r];
-    return '/login';
   }
 }

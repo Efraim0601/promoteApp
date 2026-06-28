@@ -10,10 +10,12 @@ import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Souscriptions", description = "Parcours KYC, paiement et suivi des souscriptions carte")
 @RestController
 @RequestMapping("/api/subscriptions")
 public class SubscriptionController {

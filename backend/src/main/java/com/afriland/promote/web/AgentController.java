@@ -5,10 +5,12 @@ import com.afriland.promote.model.Role;
 import com.afriland.promote.repo.AppUserRepository;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.web.dto.Dtos.AgentDto;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Agents", description = "Résolution parrain et liste agents")
 @RestController
 @RequestMapping("/api/agents")
 public class AgentController {

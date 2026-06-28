@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import java.util.List;
  * Collectes (bank-product sales capture). Collecteurs create + manage their own; admins see/manage
  * everything (per-route roles enforced in SecurityConfig; ownership re-checked here for edit/delete).
  */
+@Tag(name = "Collectes", description = "Ventes produits bancaires terrain")
 @RestController
 @RequestMapping("/api/collectes")
 public class CollecteController {

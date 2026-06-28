@@ -5,6 +5,7 @@ import com.afriland.promote.service.ActionAuditService;
 import com.afriland.promote.service.CommissionService;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -15,6 +16,7 @@ import java.util.List;
  * MANAGER/ADMIN-only (gated in {@link com.afriland.promote.config.SecurityConfig}); the {@code /mine}
  * endpoint lets any authenticated seller read their own commissions.
  */
+@Tag(name = "Commissions", description = "Règles et ledger des commissions")
 @RestController
 @RequestMapping("/api/commissions")
 public class CommissionController {

@@ -9,11 +9,13 @@ import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 /** Prepaid-card recharge (top-up) endpoints — public create + staff validation. */
+@Tag(name = "Recharges", description = "Recharge de carte prépayée")
 @RestController
 @RequestMapping("/api/recharges")
 public class RechargeController {

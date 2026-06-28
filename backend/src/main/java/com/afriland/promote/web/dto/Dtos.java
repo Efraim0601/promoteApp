@@ -184,13 +184,21 @@ public final class Dtos {
 
     public record ProductDto(Long id, String code, String label, String description, String groupCode,
                              String kind, int basePrice, int effectivePrice, boolean builtin,
-                             boolean active, List<ProductComponentDto> components,
+                             boolean active, String imageKey, List<ProductComponentDto> components,
                              List<PromotionDto> promotions) {}
 
     /** Create/update a product. {@code components} only meaningful for the CARD product. */
     public record ProductRequest(String code, String label, String description, String groupCode,
-                                 String kind, int basePrice, boolean active,
+                                 String kind, int basePrice, boolean active, String imageKey,
                                  List<ProductComponentDto> components) {}
+
+    /** Product category for catalog grouping and subscription funnel filters. */
+    public record ProductCategoryDto(Long id, String code, String label, String description,
+                                     int sortOrder, boolean subscriptionVisible, boolean active,
+                                     boolean builtin, long productCount) {}
+
+    public record ProductCategoryRequest(String code, String label, String description,
+                                         int sortOrder, boolean subscriptionVisible, boolean active) {}
 
     /** Create/update a promotion (dates ISO yyyy-MM-dd, nullable). */
     public record PromotionRequest(String label, String type, int value,
@@ -264,6 +272,7 @@ public final class Dtos {
             Double geoAccuracy,          // accuracy radius in metres (optional)
             String pickupAgencyId,       // chosen pickup branch id when delivery == agence (optional)
             String cardType,             // bancaire | prepaid (defaults to bancaire server-side)
+            String productCode,          // catalog product selected in the first funnel step
             String naissance,            // date de naissance dd/MM/yyyy — anti-duplicate identity key
             String cniOcrNom,            // surname read off the CNI by OCR (optional) — identity match
             String cniOcrPrenom) {       // given name read off the CNI by OCR (optional)
@@ -275,7 +284,7 @@ public final class Dtos {
                 String cniRectoKey, String cniVersoKey, String saraReceiptKey, String saraRef, String referrerPhone) {
             this(prenom, nom, sexe, docType, cni, niu, cniExp, phone, email, quartier, region, ville, pay,
                     payPhone, delivery, selfie, selfieKey, cniRectoKey, cniVersoKey, saraReceiptKey, saraRef,
-                    referrerPhone, null, null, null, null, null, null, null, null);
+                    referrerPhone, null, null, null, null, null, null, null, null, null);
         }
 
         /** Backward-compatible constructor (geolocation, no birth date / OCR identity) — keeps callers valid. */
@@ -286,7 +295,20 @@ public final class Dtos {
                 Double latitude, Double longitude, Double geoAccuracy, String pickupAgencyId, String cardType) {
             this(prenom, nom, sexe, docType, cni, niu, cniExp, phone, email, quartier, region, ville, pay,
                     payPhone, delivery, selfie, selfieKey, cniRectoKey, cniVersoKey, saraReceiptKey, saraRef,
-                    referrerPhone, latitude, longitude, geoAccuracy, pickupAgencyId, cardType, null, null, null);
+                    referrerPhone, latitude, longitude, geoAccuracy, pickupAgencyId, cardType, null, null, null, null);
+        }
+
+        /** Backward-compatible constructor (geolocation + birth/OCR, no productCode). */
+        public CreateSubscriptionRequest(String prenom, String nom, String sexe, String docType, String cni,
+                String niu, String cniExp, String phone, String email, String quartier, String region,
+                String ville, String pay, String payPhone, String delivery, boolean selfie, String selfieKey,
+                String cniRectoKey, String cniVersoKey, String saraReceiptKey, String saraRef, String referrerPhone,
+                Double latitude, Double longitude, Double geoAccuracy, String pickupAgencyId, String cardType,
+                String naissance, String cniOcrNom, String cniOcrPrenom) {
+            this(prenom, nom, sexe, docType, cni, niu, cniExp, phone, email, quartier, region, ville, pay,
+                    payPhone, delivery, selfie, selfieKey, cniRectoKey, cniVersoKey, saraReceiptKey, saraRef,
+                    referrerPhone, latitude, longitude, geoAccuracy, pickupAgencyId, cardType, null,
+                    naissance, cniOcrNom, cniOcrPrenom);
         }
     }
 
@@ -295,7 +317,7 @@ public final class Dtos {
             String docType, String cni, String niu, String cniExp, String phone, String quartier, String region, String ville,
             String pay, String payPhone, String delivery, String pickupAgencyName, int amount, int transport,
             Integer rechargeAmount, Integer cardSaleAmount,
-            String cardType,
+            String cardType, String productCode, String productLabel,
             String channel, String agentId, String referrerName, String referrerPhone,
             String payStatus, boolean printed, boolean selfieVerified,
             boolean hasSelfie, boolean hasCniRecto, boolean hasCniVerso, boolean hasSaraReceipt,
@@ -315,7 +337,7 @@ public final class Dtos {
                     s.getDocType(), s.getCni(), s.getNiu(), s.getCniExp(), s.getPhone(), s.getQuartier(), s.getRegion(), s.getVille(),
                     s.getPay(), s.getPayPhone(), s.getDelivery(), s.getPickupAgencyName(), s.getAmount(), s.getTransport(),
                     rechargePart, cardSalePart,
-                    s.getCardType(),
+                    s.getCardType(), s.getProductCode(), s.getProductLabel(),
                     s.getChannel(), s.getAgentId(), s.getReferrerName(), s.getReferrerPhone(),
                     s.getPayStatus().name(), s.isPrinted(), s.isSelfieVerified(),
                     s.getSelfieKey() != null, s.getCniRectoKey() != null, s.getCniVersoKey() != null,

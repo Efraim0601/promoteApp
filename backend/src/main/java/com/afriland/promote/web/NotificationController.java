@@ -5,11 +5,13 @@ import com.afriland.promote.service.NotificationService;
 import com.afriland.promote.web.dto.Dtos.NotificationDto;
 import com.afriland.promote.web.dto.Dtos.SendNotificationRequest;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
 
+@Tag(name = "Notifications", description = "Alertes in-app staff")
 @RestController
 @RequestMapping("/api/notifications")
 public class NotificationController {

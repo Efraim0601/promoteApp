@@ -25,6 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@Tag(name = "Statistiques", description = "Tableaux de bord par rôle")
 @RestController
 @RequestMapping("/api/stats")
 public class StatsController {

@@ -46,7 +46,8 @@ public class CommissionService {
         if (s == null || s.getPayStatus() != PayStatus.paid) return;
         String beneficiaryId = s.getAgentId();
         if (isBlank(beneficiaryId)) return;   // unattributed self sale → no commission
-        record(CommissionEntry.SaleType.SUBSCRIPTION, s.getRef(), ProductService.CARD_CODE,
+        String productCode = isBlank(s.getProductCode()) ? ProductService.CARD_CODE : s.getProductCode();
+        record(CommissionEntry.SaleType.SUBSCRIPTION, s.getRef(), productCode,
                 beneficiaryId, s.getAmount());
     }
 

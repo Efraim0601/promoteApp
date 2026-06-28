@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.ArrayList;
@@ -23,6 +24,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /** Admin-only staff account management (create + list). Enforced ADMIN in SecurityConfig. */
+@Tag(name = "Utilisateurs", description = "Gestion des comptes staff")
 @RestController
 @RequestMapping("/api/users")
 public class UserController {

@@ -15,6 +15,7 @@ import com.afriland.promote.web.dto.Dtos.ReceiptUploadResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -28,6 +29,7 @@ import java.util.regex.Pattern;
  * exists). Accepts the client photo and the ID-card front/back; stores each in
  * object storage and returns its key.
  */
+@Tag(name = "KYC & documents", description = "Upload selfie, CNI, reçu SARA et OCR")
 @RestController
 @RequestMapping("/api/kyc")
 public class KycController {

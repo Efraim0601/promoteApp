@@ -45,6 +45,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/config").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/agencies").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/agents/resolve").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/product-categories/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/subscriptions/self").permitAll()
                 .requestMatchers(HttpMethod.PATCH, "/api/subscriptions/*/pay").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions/*/status").permitAll()
@@ -61,6 +63,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.POST, "/api/payment/reconcile").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/payment/reconcile/stream").hasRole("ADMIN")
                 .requestMatchers("/actuator/health", "/h2-console/**").permitAll()
+                // OpenAPI / Swagger UI (documentation interactive)
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                 // Validation errors on public endpoints re-dispatch to /error — permit it so the real
                 // 4xx status reaches the client instead of being masked as 403 for anonymous callers.
                 .requestMatchers("/error").permitAll()
@@ -68,9 +72,9 @@ public class SecurityConfig {
                 // ---- profile / habilitation management (admin only) ----
                 .requestMatchers("/api/profiles/**").hasRole("ADMIN")
 
-                // ---- catalog: read = any authenticated staff; write = manager/admin ----
-                .requestMatchers(HttpMethod.GET, "/api/products/**").authenticated()
+                // ---- catalog: public read for the client funnel; write = manager/admin ----
                 .requestMatchers("/api/products/**").hasAnyRole("ADMIN", "MANAGER")
+                .requestMatchers("/api/product-categories/**").hasAnyRole("ADMIN", "MANAGER")
 
                 // ---- commissions: own ledger = any staff; rules + global ledger = manager/admin ----
                 .requestMatchers(HttpMethod.GET, "/api/commissions/mine").authenticated()

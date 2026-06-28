@@ -37,10 +37,8 @@ function buildCountries(lang: string): CountryOption[] {
 }
 
 /**
- * International phone input: a country selector (flag + dial code) plus the national number.
- * Emits the full E.164 string (e.g. "+237699000000"); validity per country is enforced by the
- * parent via libphonenumber-js. Parses an incoming E.164 value back into country + national so
- * drafts round-trip. Defaults to Cameroon.
+ * International phone input: country selector (flag + dial code) + national number.
+ * Emits the full E.164 string (e.g. "+237699000000"). Defaults to Cameroon.
  */
 @Component({
   selector: 'phone-field',
@@ -50,14 +48,12 @@ function buildCountries(lang: string): CountryOption[] {
     <field [label]="label" [hint]="hint" [err]="err">
       <div style="position:relative">
         <div class="input-prefix">
-          <!-- Collapsed: flag + dial code only. A native <select> can't show the name in the list yet the
-               code in the field, and its selected option is unreliable with @for — hence a custom menu. -->
-          <button type="button" class="phone-cc" (click)="toggleOpen($event)" [attr.aria-expanded]="open" aria-label="Indicatif pays">
+          <button type="button" class="phone-cc" (click)="toggleOpen($event)" [attr.aria-expanded]="open" [attr.aria-label]="i18n.t('cc_label')">
             <span style="font-size:15px;line-height:1">{{ selectedFlag }}</span>
             <span>+{{ dial }}</span>
             <span style="opacity:.55;font-size:11px">▾</span>
           </button>
-          <input inputmode="tel" maxlength="18" [placeholder]="placeholder" [value]="national" (input)="onInput($event)" />
+          <input inputmode="tel" [attr.maxlength]="maxLen" [placeholder]="placeholder" [value]="national" (input)="onInput($event)" />
         </div>
         @if (open) {
           <div class="cc-menu" (click)="$event.stopPropagation()">
@@ -87,7 +83,7 @@ export class PhoneFieldComponent implements OnChanges {
   @Output() valueChange = new EventEmitter<string>();
 
   countries = buildCountries(this.i18n.lang());
-  country: CountryCode = 'CM';   // default: Cameroon
+  country: CountryCode = 'CM';
   national = '';
   open = false;
   filter = '';
@@ -96,6 +92,8 @@ export class PhoneFieldComponent implements OnChanges {
   get dial() { return getCountryCallingCode(this.country); }
   get selectedFlag() { return flagEmoji(this.country); }
   get placeholder() { return this.country === 'CM' ? '6 99 00 00 00' : '000 000 000'; }
+  /** National number length cap (E.164 max 15 digits minus country code). */
+  get maxLen() { return Math.max(6, 15 - this.dial.length); }
   get filteredCountries(): CountryOption[] {
     const q = this.filter.trim().toLowerCase();
     if (!q) return this.countries;
@@ -105,7 +103,6 @@ export class PhoneFieldComponent implements OnChanges {
 
   ngOnChanges(ch: SimpleChanges) {
     if (ch['defaultCountry'] && !this.value) this.country = this.defaultCountry;
-    // Only re-parse external value changes, never our own emissions (avoids clobbering typing).
     if (ch['value'] && this.value !== this.lastEmitted) this.parse(this.value);
   }
 
@@ -113,18 +110,17 @@ export class PhoneFieldComponent implements OnChanges {
     if (!v) { this.national = ''; return; }
     const p = parsePhoneNumberFromString(v);
     if (p) { if (p.country) this.country = p.country; this.national = p.nationalNumber as string; }
-    else { this.national = v.replace(/\D/g, ''); }  // legacy national-only drafts
+    else { this.national = v.replace(/\D/g, ''); }
   }
 
   toggleOpen(e: Event) { e.stopPropagation(); this.open = !this.open; this.filter = ''; }
   choose(iso: string) { this.country = iso as CountryCode; this.open = false; this.filter = ''; this.emit(); }
 
-  /** Close the menu on any click outside it (the toggle/menu stop propagation). */
   @HostListener('document:click')
   closeMenu() { this.open = false; }
 
   onInput(e: Event) {
-    this.national = (e.target as HTMLInputElement).value.replace(/\D/g, '');
+    this.national = (e.target as HTMLInputElement).value.replace(/\D/g, '').slice(0, this.maxLen);
     this.emit();
   }
 
@@ -133,73 +129,5 @@ export class PhoneFieldComponent implements OnChanges {
     this.lastEmitted = v;
     this.value = v;
     this.valueChange.emit(v);
-  }
-}
-
-/** ID-card (CNI) number input. */
-@Component({
-  selector: 'cni-field',
-  standalone: true,
-  imports: [FieldComponent, IconComponent],
-  template: `
-    <field [label]="label" [hint]="hint" [err]="err">
-      <div class="input-prefix">
-        <span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-        <input inputmode="text" autocapitalize="characters" placeholder="1A2B3C4D" style="text-transform:uppercase"
-               [value]="value" (input)="onInput($event)" />
-      </div>
-    </field>`,
-})
-export class CniFieldComponent {
-  @Input() label = '';
-  @Input() hint = '';
-  @Input() err: string | null = null;
-  @Input() value = '';
-  @Output() valueChange = new EventEmitter<string>();
-  onInput(e: Event) {
-    // CNI: alphanumeric (letters + digits), upper-cased.
-    const v = (e.target as HTMLInputElement).value.replace(/[^0-9A-Za-z]/g, '').toUpperCase().slice(0, 20);
-    this.value = v;
-    this.valueChange.emit(v);
-  }
-}
-
-/**
- * Expiry date input — a native date picker for a friendly calendar UX, while keeping the existing
- * {@code ddmmyyyy} digit contract used by the form (validation, payload, drafts) unchanged.
- */
-@Component({
-  selector: 'expiry-field',
-  standalone: true,
-  imports: [FieldComponent, IconComponent],
-  template: `
-    <field [label]="label" [err]="err">
-      <div class="input-prefix">
-        <span class="pfx"><ic name="calendar" [size]="17"></ic></span>
-        <input type="date" [value]="isoValue" [min]="minIso" (change)="onChange($event)" />
-      </div>
-    </field>`,
-})
-export class ExpiryFieldComponent {
-  @Input() label = '';
-  @Input() err: string | null = null;
-  @Input() value = ''; // ddmmyyyy digits
-  @Output() valueChange = new EventEmitter<string>();
-
-  /** Earliest selectable day = today (an ID-card expiry must be in the future). */
-  get minIso(): string { return new Date().toISOString().slice(0, 10); }
-
-  /** ddmmyyyy → yyyy-mm-dd for the native date input. */
-  get isoValue(): string {
-    const s = (this.value || '').replace(/\D/g, '');
-    if (s.length !== 8) return '';
-    return `${s.slice(4, 8)}-${s.slice(2, 4)}-${s.slice(0, 2)}`;
-  }
-  onChange(e: Event) {
-    const iso = (e.target as HTMLInputElement).value; // yyyy-mm-dd (or '' when cleared)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) { this.value = ''; this.valueChange.emit(''); return; }
-    const [yyyy, mm, dd] = iso.split('-');
-    this.value = `${dd}${mm}${yyyy}`;
-    this.valueChange.emit(this.value);
   }
 }

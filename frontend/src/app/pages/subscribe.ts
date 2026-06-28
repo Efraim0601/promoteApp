@@ -1,714 +1,818 @@
-import { Component, ElementRef, OnDestroy, OnInit, ViewChild, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
-import { I18n } from '../core/i18n';
-import { Api } from '../core/api';
-import { ConfigStore } from '../core/config-store';
-import { Auth } from '../core/auth';
-import { Geo, GeoFix } from '../core/geo';
-import { Agency, Agent, CardConfig, Subscription } from '../core/models';
+import { Component, computed, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { isValidPhoneNumber, parsePhoneNumberFromString } from 'libphonenumber-js';
-import { PAY_METHODS, payById, matchesOperator, formatPhone } from '../shared/constants';
-import { AppBarComponent } from '../shared/app-bar';
-import { IconComponent } from '../shared/icon';
-import { FieldComponent, PhoneFieldComponent, CniFieldComponent, ExpiryFieldComponent } from '../shared/fields';
-import { StepsComponent } from '../shared/steps';
-import { StatusBadgeComponent } from '../shared/status-badge';
-import { AvatarComponent } from '../shared/avatar';
+import { Api } from '../core/api';
+import { I18n } from '../core/i18n';
+import { AgencyDto, ConfigDto, CreateSubscriptionRequest, ProductDto } from '../core/models';
+import { formatPhone, matchesOperator } from '../shared/constants';
+import { PhoneFieldComponent } from '../shared/fields';
 import { PhotoCaptureComponent } from '../shared/photo-capture';
-import { ReceiptService } from '../shared/receipt';
-import { ReceiptUploadComponent } from '../shared/receipt-upload';
-import { TileChoiceComponent, TileOption } from '../shared/tile-choice';
-import { SpinnerComponent } from '../shared/spinner';
-import { PromoteCardComponent } from '../shared/promote-card';
-import { QrCodeComponent } from '../shared/qr-code';
-import { RevealDirective, burstConfetti } from '../shared/reveal';
 
-const STEP_KEYS = ['step_identity', 'step_documents', 'step_photo', 'step_payment', 'step_recap'];
-const STEP_COUNT = STEP_KEYS.length;
-/** Index de l'étape photo (selfie) — étape obligatoire qui bloque la suite du parcours. */
-const PHOTO_STEP = STEP_KEYS.indexOf('step_photo');
+const NIU_MAX = 20;
 
-interface WizardForm {
-  prenom: string; nom: string; sexe: string; docType: string; cni: string; niu: string; cniExp: string; phone: string;
-  naissance: string;                                   // date de naissance (yyyy-MM-dd from the date input)
-  cniOcrNom: string | null; cniOcrPrenom: string | null; // surname/given name OCR read off the CNI
-  email: string; quartier: string; ville: string;
-  selfie: boolean; selfieData: string | null; selfieKey: string | null;
-  cniRectoData: string | null; cniRectoKey: string | null;
-  cniVersoData: string | null; cniVersoKey: string | null;
-  saraReceiptData: string | null; saraReceiptKey: string | null; saraRef: string;
-  pay: string; payPhone: string; delivery: string; pickupAgencyId: string; refPhone: string;
-  cardType: 'bancaire' | 'prepaid';
-}
+type Phase = 'funnel' | 'paying' | 'success' | 'failure';
 
-function parseExp(d: string): Date | null {
-  if (d.length !== 8) return null;
-  const dd = +d.slice(0, 2), mm = +d.slice(2, 4), yy = +d.slice(4, 8);
-  if (mm < 1 || mm > 12 || dd < 1 || dd > 31 || yy < 2024 || yy > 2099) return null;
-  const dt = new Date(yy, mm - 1, dd);
-  if (dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return null;
-  return dt;
-}
-const fmtExp = (d: string) => (d.length === 8 ? `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4, 8)}` : d);
-
-/** Birth date sanity (yyyy-MM-dd from the date input): a real calendar date, in the past, year ≥ 1900. */
-function isValidBirth(d: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
-  const [yy, mm, dd] = d.split('-').map(Number);
-  if (yy < 1900 || mm < 1 || mm > 12 || dd < 1 || dd > 31) return false;
-  const dt = new Date(yy, mm - 1, dd);
-  if (dt.getMonth() !== mm - 1 || dt.getDate() !== dd) return false;
-  return dt < new Date();
-}
+const fcfa = (n: number) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA';
 
 @Component({
-  selector: 'page-subscribe',
-  standalone: true,
-  imports: [
-    AppBarComponent, IconComponent, FieldComponent, PhoneFieldComponent, CniFieldComponent,
-    ExpiryFieldComponent, StepsComponent, StatusBadgeComponent, AvatarComponent,
-    PhotoCaptureComponent, ReceiptUploadComponent, TileChoiceComponent, PromoteCardComponent, QrCodeComponent,
-    SpinnerComponent, RevealDirective,
-  ],
-  templateUrl: './subscribe.html',
+  selector: 'app-subscribe',
+  imports: [PhotoCaptureComponent, PhoneFieldComponent],
+  template: `
+    <!-- ════════ FUNNEL ════════ -->
+    @if (phase() === 'funnel') {
+      <div style="flex:1;display:flex;flex-direction:column;background:#fff">
+        <!-- topbar -->
+        <div style="padding:12px 16px;border-bottom:1px solid #F3F4F6;display:flex;align-items:center;gap:12px;background:#fff;position:sticky;top:38px;z-index:50">
+          <button (click)="prev()" class="icon-sq">
+            <svg width="18" height="18" fill="none" stroke="#374151" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"></path></svg>
+          </button>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:14px;font-weight:700;color:var(--navy)">{{ i18n.t('step' + step() + '_title') }}</div>
+            <div style="font-size:11px;color:var(--muted-2);margin-top:1px">{{ i18n.t('step_of', { n: step() + 1, total: 6 }) }}</div>
+          </div>
+          <div class="brand-logo" style="width:36px;height:36px;border-radius:10px">
+            <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"></path></svg>
+          </div>
+        </div>
+        <!-- progress -->
+        <div style="height:3px;background:#F3F4F6">
+          <div style="height:100%;background:linear-gradient(90deg,#C8102E,#E8344A);border-radius:0 2px 2px 0;transition:width .4s ease" [style.width.%]="((step() + 1) / 6) * 100"></div>
+        </div>
+
+        <div style="flex:1;overflow-y:auto;padding:20px 16px 110px">
+          <div style="max-width:520px;margin:0 auto;width:100%">
+
+            <!-- STEP 0 -->
+            @if (step() === 0) {
+              <div class="fade-in">
+                <div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:4px">{{ i18n.t('select_product') }}</div>
+                <div style="font-size:13px;color:var(--muted);margin-bottom:20px">{{ i18n.t('home_subscribe_desc') }}</div>
+                <div style="display:flex;gap:8px;margin-bottom:20px;overflow-x:auto;padding-bottom:4px">
+                  @for (cf of categories(); track cf) {
+                    <button (click)="cat.set(cf)" class="chip" [class.chip-on]="cat() === cf">{{ cf === '__all' ? i18n.t('cat_all') : cf }}</button>
+                  }
+                </div>
+                <div style="display:grid;grid-template-columns:1fr;gap:12px">
+                  @for (p of filteredProducts(); track p.id) {
+                    <button (click)="selectProduct(p)" class="prod-card" [class.prod-on]="selected()?.id === p.id">
+                      <div class="prod-mini" [style.background]="cardGradient(p)">
+                        <div style="position:absolute;top:6px;left:6px;width:12px;height:9px;border-radius:2px;background:linear-gradient(135deg,#C9A227,#E0B73A)"></div>
+                        <span style="font-size:7px;font-weight:800;color:rgba(255,255,255,.85);letter-spacing:.5px">{{ p.groupCode }}</span>
+                      </div>
+                      <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+                          <span style="font-size:14px;font-weight:700;color:var(--navy)">{{ p.label }}</span>
+                          @if (hasPromo(p)) { <span class="promo-tag">{{ i18n.t('promo') }}</span> }
+                        </div>
+                        <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+                          <span style="font-size:12px;color:var(--muted-2);padding:2px 6px;border-radius:4px;background:var(--surface-3)">{{ p.kind }}</span>
+                          @if (hasPromo(p)) { <span style="font-size:12px;color:var(--muted-2);text-decoration:line-through">{{ price(p.basePrice) }}</span> }
+                          <span style="font-size:14px;font-weight:700" [style.color]="hasPromo(p) ? 'var(--primary)' : 'var(--navy)'">{{ price(p.effectivePrice) }}</span>
+                        </div>
+                      </div>
+                      <div style="flex-shrink:0;display:flex;align-items:center">
+                        <div class="radio" [class.radio-on]="selected()?.id === p.id">
+                          @if (selected()?.id === p.id) { <div class="radio-dot"></div> }
+                        </div>
+                      </div>
+                    </button>
+                  }
+                  @if (filteredProducts().length === 0) {
+                    <div style="text-align:center;color:var(--muted);padding:24px">…</div>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- STEP 1 — Identité -->
+            @if (step() === 1) {
+              <div class="slide-r">
+                <div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:20px">{{ i18n.t('funnel_step1') }}</div>
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_firstname') }} *</label>
+                  <input class="in" [class.in-err]="!!fieldErr('firstName')" maxlength="80" [value]="firstName()" (input)="firstName.set(val($event))">
+                  @if (fieldErr('firstName')) { <div class="ferr">{{ fieldErr('firstName') }}</div> }
+                </div>
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_lastname') }} *</label>
+                  <input class="in" [class.in-err]="!!fieldErr('lastName')" maxlength="80" [value]="lastName()" (input)="lastName.set(val($event))">
+                  @if (fieldErr('lastName')) { <div class="ferr">{{ fieldErr('lastName') }}</div> }
+                </div>
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_sex') }} *</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    <button type="button" (click)="sexe.set('M')" class="seg" [class.seg-on]="sexe() === 'M'">{{ i18n.t('field_sex_m') }}</button>
+                    <button type="button" (click)="sexe.set('F')" class="seg" [class.seg-on]="sexe() === 'F'">{{ i18n.t('field_sex_f') }}</button>
+                  </div>
+                  @if (fieldErr('sexe')) { <div class="ferr">{{ fieldErr('sexe') }}</div> }
+                </div>
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_idtype') }}</label>
+                  <select class="in" [value]="idType()" (change)="idType.set(val($event))">
+                    <option value="cni">{{ i18n.t('field_cni') }}</option>
+                    <option value="passport">{{ i18n.t('field_passport') }}</option>
+                    <option value="recepisse">{{ i18n.t('field_receipt') }}</option>
+                  </select>
+                </div>
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_idnumber') }} *</label>
+                  <input class="in" [class.in-err]="!!fieldErr('idNumber')" style="text-transform:uppercase" placeholder="AB123456"
+                         [value]="idNumber()" (input)="onIdNumber($event)">
+                  @if (fieldErr('idNumber')) { <div class="ferr">{{ fieldErr('idNumber') }}</div> }
+                </div>
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_niu') }}</label>
+                  <input class="in" [class.in-err]="!!fieldErr('niu')" style="text-transform:uppercase" [attr.maxlength]="niuMax"
+                         [placeholder]="i18n.t('niu_ph')" [value]="niu()" (input)="onNiu($event)">
+                  <div class="fhint">{{ i18n.t('niu_hint') }} ({{ niu().length }}/{{ niuMax }})</div>
+                  @if (fieldErr('niu')) { <div class="ferr">{{ fieldErr('niu') }}</div> }
+                </div>
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_expiry') }} *</label>
+                  <input type="date" class="in" [class.in-err]="!!fieldErr('expiry')" [min]="todayIso" [value]="expiry()" (input)="expiry.set(val($event))">
+                  @if (fieldErr('expiry')) { <div class="ferr">{{ fieldErr('expiry') }}</div> }
+                </div>
+                @if (idType() === 'cni') {
+                  <div class="fld">
+                    <label class="lab">{{ i18n.t('field_birth') }} *</label>
+                    <input type="date" class="in" [class.in-err]="!!fieldErr('birth')" [max]="todayIso" [value]="birth()" (input)="birth.set(val($event))">
+                    @if (fieldErr('birth')) { <div class="ferr">{{ fieldErr('birth') }}</div> }
+                  </div>
+                }
+                <phone-field
+                  [label]="i18n.t('field_phone') + ' *'"
+                  [hint]="i18n.t('tel_hint')"
+                  [value]="phone()"
+                  (valueChange)="phone.set($event)"
+                  [err]="fieldErr('phone')" />
+                <div class="fld">
+                  <label class="lab">{{ i18n.t('field_email') }} *</label>
+                  <input type="email" class="in" [class.in-err]="!!fieldErr('email')" placeholder="nom@email.cm" [value]="email()" (input)="email.set(val($event))">
+                  @if (fieldErr('email')) { <div class="ferr">{{ fieldErr('email') }}</div> }
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" class="fld">
+                  <div>
+                    <label class="lab">{{ i18n.t('field_district') }} *</label>
+                    <input class="in" [class.in-err]="!!fieldErr('district')" maxlength="80" [value]="district()" (input)="district.set(val($event))">
+                    @if (fieldErr('district')) { <div class="ferr">{{ fieldErr('district') }}</div> }
+                  </div>
+                  <div>
+                    <label class="lab">{{ i18n.t('field_city') }} *</label>
+                    <input class="in" [class.in-err]="!!fieldErr('city')" maxlength="80" [value]="city()" (input)="city.set(val($event))">
+                    @if (fieldErr('city')) { <div class="ferr">{{ fieldErr('city') }}</div> }
+                  </div>
+                </div>
+                <div class="dashed">
+                  <phone-field
+                    [label]="i18n.t('field_referrer')"
+                    [hint]="i18n.t('ref_phone_hint')"
+                    [value]="referrer()"
+                    (valueChange)="referrer.set($event)"
+                    [err]="fieldErr('referrer')" />
+                </div>
+                <div class="dashed">
+                  <label class="lab" style="margin-bottom:8px">{{ i18n.t('geo_capture') }}</label>
+                  @if (geo()) {
+                    <div style="display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--label);margin-bottom:6px">
+                      <span>{{ i18n.t('geo_lat') }}: <strong>{{ geo()!.lat.toFixed(4) }}</strong></span>
+                      <span>{{ i18n.t('geo_lng') }}: <strong>{{ geo()!.lng.toFixed(4) }}</strong></span>
+                      <span>{{ i18n.t('geo_accuracy') }}: <strong>{{ geo()!.acc.toFixed(0) }}m</strong></span>
+                    </div>
+                    <div class="alert-success" style="display:inline-flex;align-items:center;gap:4px">✓ {{ i18n.t('geo_captured') }}</div>
+                  } @else {
+                    <button (click)="captureGeo()" class="btn-soft" style="display:inline-flex;gap:6px;background:#fff;border:1.5px solid var(--border)">
+                      <svg width="16" height="16" fill="none" stroke="#C8102E" stroke-width="2" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                      {{ i18n.t('geo_capture') }}
+                    </button>
+                  }
+                </div>
+              </div>
+            }
+
+            <!-- STEP 2 — KYC (caméra live + auto-cadrage document) -->
+            @if (step() === 2) {
+              <div class="slide-r">
+                <div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:4px">{{ i18n.t('kyc_title') }}</div>
+                <div style="font-size:13px;color:var(--muted);margin-bottom:16px">{{ i18n.t('kyc_tip') }}</div>
+                <div style="margin-bottom:16px">
+                  <label class="lab" style="margin-bottom:8px;display:block">{{ i18n.t('kyc_front') }} *</label>
+                  <photo-capture
+                    [imageData]="cniRectoData()"
+                    facing="environment"
+                    [boxW]="280" [boxH]="180"
+                    [qualityCheck]="true"
+                    detect="document"
+                    [autoCapture]="true"
+                    [guide]="i18n.t('cni_recto_guide')"
+                    tipsTitle="cni_tips_title"
+                    [tips]="cniTips"
+                    (captured)="onCniRecto($event)"
+                    (retake)="onRetakeRecto()" />
+                  @if (uploading() === 'cni-recto') {
+                    <p class="muted" style="font-size:12px;text-align:center;margin-top:8px">{{ i18n.t('uploading') }}</p>
+                  }
+                </div>
+                @if (idType() !== 'passport') {
+                  <div style="margin-bottom:8px">
+                    <label class="lab" style="margin-bottom:8px;display:block">{{ i18n.t('kyc_back') }} *</label>
+                    <photo-capture
+                      [imageData]="cniVersoData()"
+                      facing="environment"
+                      [boxW]="280" [boxH]="180"
+                      [qualityCheck]="true"
+                      detect="document"
+                      [autoCapture]="true"
+                      [guide]="i18n.t('cni_verso_guide')"
+                      tipsTitle="cni_tips_title"
+                      [tips]="cniTips"
+                      (captured)="onCniVerso($event)"
+                      (retake)="onRetakeVerso()" />
+                    @if (uploading() === 'cni-verso') {
+                      <p class="muted" style="font-size:12px;text-align:center;margin-top:8px">{{ i18n.t('uploading') }}</p>
+                    }
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- STEP 3 — Selfie (détection visage + auto-capture) -->
+            @if (step() === 3) {
+              <div class="slide-r">
+                <div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:4px;text-align:center">{{ i18n.t('selfie_title') }}</div>
+                <div style="font-size:13px;color:var(--muted);margin-bottom:16px;text-align:center">{{ i18n.t('selfie_tip') }}</div>
+                <photo-capture
+                  [imageData]="selfieData()"
+                  facing="user"
+                  [round]="true"
+                  [boxW]="200" [boxH]="200"
+                  [allowGallery]="false"
+                  detect="face"
+                  [autoCapture]="true"
+                  [guide]="i18n.t('photo_guide')"
+                  (captured)="onSelfie($event)"
+                  (retake)="onRetakeSelfie()" />
+                @if (uploading() === 'selfie') {
+                  <p class="muted" style="font-size:12px;text-align:center;margin-top:8px">{{ i18n.t('uploading') }}</p>
+                }
+              </div>
+            }
+
+            <!-- STEP 4 -->
+            @if (step() === 4) {
+              <div class="slide-r">
+                <div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:20px">{{ i18n.t('funnel_step4') }}</div>
+                <div style="margin-bottom:24px">
+                  <label class="lab" style="margin-bottom:10px">{{ i18n.t('pay_delivery') }}</label>
+                  <div style="display:flex;flex-direction:column;gap:8px">
+                    @for (d of deliveryOptions; track d.id) {
+                      <button (click)="delivery.set(d.id)" class="opt" [class.opt-on]="delivery() === d.id">
+                        <div style="flex:1;text-align:left"><div style="font-size:14px;font-weight:600;color:var(--navy)">{{ i18n.t(d.label) }}</div></div>
+                        <div class="radio" [class.radio-on]="delivery() === d.id">@if (delivery() === d.id) { <div class="radio-dot"></div> }</div>
+                      </button>
+                    }
+                  </div>
+                  @if (delivery() === 'agence') {
+                    <div style="margin-top:10px">
+                      <select class="in" [value]="deliveryAgency()" (change)="deliveryAgency.set(val($event))">
+                        <option value="">{{ i18n.t('pay_select_agency') }}</option>
+                        @for (a of agencies(); track a.id) { <option [value]="a.id">{{ a.name }} — {{ a.city }}</option> }
+                      </select>
+                    </div>
+                  }
+                </div>
+                <div style="margin-bottom:24px">
+                  <label class="lab" style="margin-bottom:10px">{{ i18n.t('pay_method') }}</label>
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+                    @for (m of payMethods; track m.id) {
+                      <button type="button" (click)="selectPayMethod(m.id)" class="pm" [class.pm-on]="payMethod() === m.id" [style.border-color]="payMethod() === m.id ? m.color : 'var(--border)'">
+                        <div class="pm-ic" [style.background]="m.color"><span style="font-size:14px;font-weight:800" [style.color]="m.text">{{ m.icon }}</span></div>
+                        <span style="font-size:13px;font-weight:600;color:var(--navy)">{{ i18n.t(m.label) }}</span>
+                      </button>
+                    }
+                  </div>
+                </div>
+                @if (payMethod() === 'om' || payMethod() === 'mtn') {
+                  <div class="fade-in">
+                    <phone-field
+                      [label]="i18n.t('pay_momo_phone') + ' *'"
+                      [hint]="i18n.t('pay_phone_hint')"
+                      [value]="momoPhone()"
+                      (valueChange)="momoPhone.set($event)"
+                      [err]="momoPhoneErr()" />
+                  </div>
+                }
+                @if (payMethod() === 'sara') {
+                  <div class="fade-in">
+                    <div class="fld"><label class="lab">{{ i18n.t('pay_sara_ref') }} *</label><input class="in" [value]="saraRef()" (input)="saraRef.set(val($event))"></div>
+                    <button (click)="captureSara()" class="btn-soft" style="width:100%;border:2px dashed var(--border-2);background:var(--surface-2)">
+                      {{ saraReceiptKey() ? '✓ ' + i18n.t('kyc_captured') : i18n.t('kyc_capture') }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+
+            <!-- STEP 5 -->
+            @if (step() === 5) {
+              <div class="slide-r">
+                <div style="font-size:18px;font-weight:800;color:var(--navy);margin-bottom:20px">{{ i18n.t('summary_title') }}</div>
+                <div class="card-visual">
+                  <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                    <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.6);letter-spacing:1px">AFRILAND FIRST BANK</span>
+                    <span style="font-size:14px;font-weight:800;color:rgba(255,255,255,.8);letter-spacing:1px">{{ selected()?.groupCode }}</span>
+                  </div>
+                  <div>
+                    <div style="width:36px;height:26px;border-radius:4px;background:linear-gradient(135deg,#C9A227,#E0B73A);margin-bottom:16px"></div>
+                    <div style="font-size:16px;letter-spacing:3px;color:rgba(255,255,255,.7);font-family:monospace;margin-bottom:8px">•••• •••• •••• ••••</div>
+                    <div style="font-size:14px;font-weight:700;color:#fff;text-transform:uppercase;letter-spacing:.5px">{{ firstName() }} {{ lastName() }}</div>
+                  </div>
+                </div>
+                <div class="sum-card">
+                  <div class="sum-h"><svg width="16" height="16" fill="none" stroke="#C8102E" stroke-width="2" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>{{ i18n.t('summary_personal') }}</div>
+                  @for (r of personalRows(); track r.label) {
+                    <div class="sum-row"><span class="sum-k">{{ r.label }}</span><span class="sum-v">{{ r.value }}</span></div>
+                  }
+                </div>
+                <div class="sum-card">
+                  <div class="sum-h"><svg width="16" height="16" fill="none" stroke="#C8102E" stroke-width="2" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>{{ i18n.t('summary_tariff') }}</div>
+                  @for (r of tariffRows(); track r.label) {
+                    <div class="sum-row"><span class="sum-k">{{ r.label }}</span><span class="sum-v">{{ r.value }}</span></div>
+                  }
+                  <div style="display:flex;justify-content:space-between;padding:10px 0 0;margin-top:4px">
+                    <span style="font-size:14px;font-weight:800;color:var(--navy)">{{ i18n.t('summary_total') }}</span>
+                    <span style="font-size:18px;font-weight:800;color:var(--primary)">{{ price(total()) }}</span>
+                  </div>
+                </div>
+              </div>
+            }
+
+            @if (error()) { <div class="alert-error shake" style="margin-top:8px">{{ error() }}</div> }
+          </div>
+        </div>
+
+        <!-- bottom bar -->
+        <div style="position:fixed;bottom:0;left:0;right:0;padding:12px 16px;background:#fff;border-top:1px solid #F3F4F6;z-index:50">
+          <div style="max-width:520px;margin:0 auto;width:100%;display:flex;gap:10px">
+            @if (step() > 0) {
+              <button (click)="prev()" class="btn-soft" style="flex:0 0 auto;border:1.5px solid var(--border);background:#fff;border-radius:12px;padding:14px 20px">{{ i18n.t('back') }}</button>
+            }
+            <button (click)="next()" class="btn btn-primary" style="flex:1;border-radius:12px" [disabled]="submitting()">{{ step() === 5 ? i18n.t('finish') : i18n.t('next') }}</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ════════ PAYMENT PROCESSING ════════ -->
+    @if (phase() === 'paying') {
+      <div class="screen" style="align-items:center;justify-content:center;padding:32px 16px;text-align:center;background:#fff">
+        <div class="fade-in" style="max-width:400px;width:100%">
+          <div style="position:relative;width:120px;height:120px;margin:0 auto 24px">
+            <svg width="120" height="120" viewBox="0 0 120 120" style="animation:spinRing 2s linear infinite"><circle cx="60" cy="60" r="52" stroke="#F3F4F6" stroke-width="6" fill="none"></circle><circle cx="60" cy="60" r="52" stroke="#C8102E" stroke-width="6" fill="none" stroke-linecap="round" stroke-dasharray="327" stroke-dashoffset="120"></circle></svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border-radius:12px;background:var(--primary);display:flex;align-items:center;justify-content:center;animation:pulse 1.5s ease infinite"><span style="font-size:20px;font-weight:800;color:#fff">₣</span></div></div>
+          </div>
+          <div style="font-size:18px;font-weight:700;color:var(--navy);margin-bottom:8px">{{ i18n.t('pay_processing_title') }}</div>
+          <div style="font-size:14px;color:var(--muted);margin-bottom:4px">{{ i18n.t('pay_processing_msg') }}</div>
+          @if (createdRef()) {
+            <div style="padding:10px 16px;background:var(--surface-2);border-radius:10px;display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--muted);margin:12px 0 20px">{{ i18n.t('processing_ref') }} <span style="font-weight:700;color:var(--navy)" class="mono">{{ createdRef() }}</span></div>
+          }
+          <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px;padding:16px;background:var(--surface-2);border-radius:12px;border:1px dashed var(--border-2)">
+            <div style="font-size:11px;font-weight:600;color:var(--muted-2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">Simulation</div>
+            <button (click)="simulate('success')" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #059669;background:#ECFDF5;color:#059669;font-size:14px;font-weight:700;cursor:pointer">{{ i18n.t('demo_approve') }}</button>
+            <button (click)="simulate('failed')" style="width:100%;padding:12px;border-radius:10px;border:1.5px solid #DC2626;background:#FEF2F2;color:#DC2626;font-size:14px;font-weight:700;cursor:pointer">{{ i18n.t('demo_fail') }}</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ════════ SUCCESS ════════ -->
+    @if (phase() === 'success') {
+      <div class="screen" style="align-items:center;justify-content:center;padding:32px 16px;text-align:center;background:linear-gradient(180deg,#ECFDF5 0%,#fff 40%)">
+        <div class="slide-up" style="max-width:400px;width:100%">
+          <div style="margin-bottom:24px"><svg width="80" height="80" viewBox="0 0 80 80" style="animation:countPulse .6s ease"><circle cx="40" cy="40" r="36" fill="#059669" opacity=".12"></circle><circle cx="40" cy="40" r="28" fill="#059669" opacity=".2"></circle><circle cx="40" cy="40" r="20" fill="#059669"></circle><path d="M28 40l8 8 16-16" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="40" stroke-dashoffset="40" style="animation:drawCheck .5s ease .3s forwards"></path></svg></div>
+          <div style="font-size:22px;font-weight:800;color:#059669;margin-bottom:8px">{{ i18n.t('success_title') }}</div>
+          <div style="font-size:14px;color:var(--muted);margin-bottom:24px">{{ i18n.t('success_msg') }}</div>
+          <div style="background:#fff;border-radius:14px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:20px">
+            <div style="font-size:12px;color:var(--muted-2);margin-bottom:4px">{{ i18n.t('success_ref') }}</div>
+            <div class="mono" style="font-size:28px;font-weight:800;color:var(--navy);letter-spacing:2px;margin-bottom:12px">{{ createdRef() }}</div>
+            <button (click)="copyRef()" class="btn-soft" style="background:var(--surface-3);border:1.5px solid var(--border)">{{ i18n.t('success_copy') }}</button>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button (click)="restart()" class="btn btn-primary" style="border-radius:12px">{{ i18n.t('success_new') }}</button>
+            <button (click)="goHome()" class="btn-soft" style="width:100%;border-radius:12px;padding:14px">{{ i18n.t('success_home') }}</button>
+          </div>
+        </div>
+      </div>
+    }
+
+    <!-- ════════ FAILURE ════════ -->
+    @if (phase() === 'failure') {
+      <div class="screen" style="align-items:center;justify-content:center;padding:32px 16px;text-align:center;background:linear-gradient(180deg,#FEF2F2 0%,#fff 40%)">
+        <div style="animation:shakeX .5s ease forwards;max-width:400px;width:100%">
+          <div style="margin-bottom:24px"><svg width="80" height="80" viewBox="0 0 80 80"><circle cx="40" cy="40" r="36" fill="#DC2626" opacity=".1"></circle><circle cx="40" cy="40" r="28" fill="#DC2626" opacity=".15"></circle><circle cx="40" cy="40" r="20" fill="#DC2626"></circle><path d="M30 30l20 20M50 30l-20 20" stroke="#fff" stroke-width="3" stroke-linecap="round"></path></svg></div>
+          <div style="font-size:22px;font-weight:800;color:#DC2626;margin-bottom:8px">{{ i18n.t('failure_title') }}</div>
+          <div style="font-size:14px;color:var(--muted);margin-bottom:24px">{{ failureMsg() || i18n.t('failure_msg') }}</div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <button (click)="retry()" class="btn btn-primary" style="border-radius:12px">{{ i18n.t('failure_retry') }}</button>
+            <button (click)="goHome()" class="btn-soft" style="width:100%;border-radius:12px;padding:14px">{{ i18n.t('failure_home') }}</button>
+          </div>
+        </div>
+      </div>
+    }
+  `,
+  styles: [`
+    :host { display: flex; flex: 1; flex-direction: column; }
+    .icon-sq { display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:10px;border:1.5px solid var(--border);background:#fff;cursor:pointer;transition:all .2s;flex-shrink:0 }
+    .icon-sq:hover { border-color: var(--primary); background:#F9FAFB }
+    .chip { flex-shrink:0;padding:8px 16px;border-radius:20px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);background:#fff;color:var(--label);transition:all .2s }
+    .chip-on { border-color: var(--primary); background:#FEF2F2; color: var(--primary) }
+    .prod-card { display:flex;gap:14px;padding:16px;border-radius:14px;border:2px solid var(--border);background:#fff;cursor:pointer;text-align:left;transition:all .2s;width:100% }
+    .prod-card:hover { border-color: var(--primary); box-shadow:0 2px 12px rgba(200,16,46,.08) }
+    .prod-on { border-color: var(--primary); background:#FEF2F2 }
+    .prod-mini { flex-shrink:0;width:64px;height:42px;border-radius:6px;display:flex;align-items:flex-end;justify-content:flex-end;padding:4px 6px;position:relative;overflow:hidden }
+    .promo-tag { padding:2px 6px;border-radius:4px;background:#FEF2F2;color:var(--primary);font-size:10px;font-weight:700;letter-spacing:.5px }
+    .radio { width:22px;height:22px;border-radius:50%;border:2px solid var(--border-2);display:flex;align-items:center;justify-content:center;transition:all .2s }
+    .radio-on { border-color: var(--primary) }
+    .radio-dot { width:12px;height:12px;border-radius:50%;background:var(--primary) }
+    .fld { margin-bottom:16px }
+    .lab { display:block;font-size:13px;font-weight:600;color:var(--label);margin-bottom:6px }
+    .in { width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;background:var(--surface-2);transition:all .2s }
+    .in-err { border-color:var(--primary) !important }
+    .ferr { font-size:11.5px;color:var(--primary);margin-top:5px;font-weight:600 }
+    .fhint { font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.35 }
+    .prefix { flex-shrink:0;padding:12px 10px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--muted);background:var(--surface-3);font-weight:600 }
+    .seg { padding:12px;border-radius:10px;border:1.5px solid var(--border);background:#fff;font-size:14px;font-weight:600;color:var(--label);cursor:pointer;transition:all .2s }
+    .seg-on { border-color: var(--primary); background:#FEF2F2; color: var(--primary) }
+    .dashed { margin-bottom:16px;padding:16px;background:#F9FAFB;border-radius:12px;border:1px dashed var(--border-2) }
+    .slide-r { animation: slideRight .3s ease }
+    .kyc-ok { position:relative;border-radius:12px;overflow:hidden;border:2px solid #059669;background:#ECFDF5 }
+    .kyc-ok-in { width:100%;height:180px;background:linear-gradient(135deg,#E5E7EB,#D1D5DB);display:flex;flex-direction:column;align-items:center;justify-content:center }
+    .retake { position:absolute;top:8px;right:8px;padding:6px 12px;border-radius:8px;background:rgba(0,0,0,.6);color:#fff;border:none;font-size:11px;font-weight:600;cursor:pointer }
+    .kyc-empty { width:100%;height:180px;border-radius:12px;border:2px dashed var(--border-2);background:var(--surface-2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:all .2s }
+    .kyc-empty:hover { border-color: var(--primary); background:#FEF2F2 }
+    .kyc-cam { width:48px;height:48px;border-radius:12px;background:var(--surface-3);display:flex;align-items:center;justify-content:center }
+    .selfie-circle { width:200px;height:200px;border-radius:50%;display:flex;align-items:center;justify-content:center }
+    .opt { display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;border:1.5px solid var(--border);background:#fff;cursor:pointer;transition:all .2s;width:100% }
+    .opt-on { border-color: var(--primary) }
+    .pm { display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;border-radius:12px;border:2px solid var(--border);background:#fff;cursor:pointer;transition:all .2s }
+    .pm-ic { width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center }
+    .card-visual { margin-bottom:20px;border-radius:14px;overflow:hidden;background:linear-gradient(135deg,#C8102E 0%,#7A0B1E 50%,#1B1B2F 100%);padding:24px 20px;aspect-ratio:1.6;display:flex;flex-direction:column;justify-content:space-between }
+    .sum-card { background:#F9FAFB;border-radius:14px;padding:18px;margin-bottom:14px }
+    .sum-h { font-size:13px;font-weight:700;color:var(--navy);margin-bottom:12px;display:flex;align-items:center;gap:6px }
+    .sum-row { display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);gap:8px }
+    .sum-k { font-size:12px;color:var(--muted);flex-shrink:0 }
+    .sum-v { font-size:12px;font-weight:600;color:var(--navy);text-align:right;overflow-wrap:break-word;min-width:0 }
+  `],
 })
-export class SubscribeComponent implements OnInit, OnDestroy {
-  /** Success check badge — confetti origin once the reference/success screen appears. */
-  @ViewChild('successCheck') successCheck?: ElementRef<HTMLElement>;
-
-  i18n = inject(I18n);
+export class SubscribePage {
+  protected i18n = inject(I18n);
   private api = inject(Api);
-  private auth = inject(Auth);
-  private geo = inject(Geo);
   private router = inject(Router);
-  private route = inject(ActivatedRoute);
-  private receipt = inject(ReceiptService);
 
-  /** Browser GPS fix captured when the wizard opens (best-effort) — stored with the subscription. */
-  private geoFix: GeoFix | null = null;
-
-  channel: 'agent' | 'self' = 'agent';
-  get isSelf() { return this.channel === 'self'; }
-  readonly STEP_COUNT = STEP_COUNT;
-  readonly payById = payById;
-
-  private configStore = inject(ConfigStore);
-  private DEFAULT_CONFIG: CardConfig = { price: 10000, fees: 500, transport: 1000, rechargeMin: 500, rechargeMax: 1_000_000, rechargeInitiale: 2500, passPremium: 2000, rechargeInitialeBancaire: 2500, passPremiumBancaire: 2000 };
-  get config(): CardConfig { return this.configStore.cfg() ?? this.DEFAULT_CONFIG; }
-
-  /** Pickup branches (lieux de retrait) loaded from the server — shown when delivery == agence. */
-  agencies = signal<Agency[]>([]);
-
+  phase = signal<Phase>('funnel');
   step = signal(0);
-  /** Self (QR) flow opens on a welcome screen; the agent flow starts straight on the form. */
-  started = signal(false);
-  proc = signal<null | 'paying' | 'reference' | 'failed'>(null);
-  phase = signal<'send' | 'wait'>('send');
-  /** Auto-polling exhausted its window but the payment isn't terminal → prolonged-wait screen. */
-  waitLong = signal(false);
-  /** A manual "J'ai payé / Rafraîchir" status check is in flight. */
-  refreshing = signal(false);
+  error = signal('');
   touched = signal(false);
-  refAgent = signal<Agent | null>(null);
-  refUnknown = signal(false);
-  result = signal<{ ref: string; payStatus?: string; amount?: number; message?: string | null;
-                    fullName?: string; pay?: string; payPhone?: string | null; createdAt?: string } | null>(null);
-  receiptBusy = signal(false);
-  copied = signal(false);
-  busy = signal(false);
-  submitError = signal('');
-  /** True when the backend runs the simulated MoMo gateway (demo validate/decline buttons). */
-  simulated = signal(false);
-  // SARA receipt: extraction in flight + the auto-extracted payer/amount shown alongside the reference.
-  saraExtracting = signal(false);
-  saraExtract = signal<{ payerPhone: string | null; amount: number | null } | null>(null);
-  // True once the receipt's transaction number was auto-read from the upload (vs typed by hand).
-  saraRefDetected = signal(false);
-  // Non-blocking CNI OCR cross-check: i18n key of the warning to show when the typed data does not
-  // match what OCR read on the card (null = no warning). Advisory only — never blocks the wizard.
-  cniOcrWarning = signal<string | null>(null);
+  submitting = signal(false);
+  readonly niuMax = NIU_MAX;
+  readonly todayIso = new Date().toISOString().slice(0, 10);
 
-  private pollTimer: ReturnType<typeof setTimeout> | null = null;
-  private polling = false;
+  products = signal<ProductDto[]>([]);
+  config = signal<ConfigDto | null>(null);
+  agencies = signal<AgencyDto[]>([]);
+  cat = signal('__all');
+  selected = signal<ProductDto | null>(null);
 
-  /** Progressive guidance shown on the CNI capture (i18n keys, rendered as a checklist). */
+  // step 1
+  firstName = signal(''); lastName = signal(''); sexe = signal(''); idType = signal('cni');
+  idNumber = signal(''); niu = signal(''); expiry = signal(''); birth = signal('');
+  phone = signal(''); email = signal(''); district = signal(''); city = signal(''); referrer = signal('');
+  geo = signal<{ lat: number; lng: number; acc: number } | null>(null);
+  // step 2/3 — previews + storage keys
+  cniRectoData = signal<string | null>(null);
+  cniVersoData = signal<string | null>(null);
+  selfieData = signal<string | null>(null);
+  cniRectoKey = signal(''); cniVersoKey = signal(''); selfieKey = signal('');
+  uploading = signal<'cni-recto' | 'cni-verso' | 'selfie' | 'sara' | ''>('');
   readonly cniTips = ['cni_tip_flat', 'cni_tip_light', 'cni_tip_glare', 'cni_tip_frame'];
-  /** SARA money: numbered steps to follow in the SARA app before uploading the receipt. */
-  readonly saraSteps = ['sara_step1', 'sara_step2', 'sara_step3', 'sara_step4', 'sara_step5'];
+  // step 4
+  delivery = signal('promote'); deliveryAgency = signal('');
+  payMethod = signal(''); momoPhone = signal(''); saraRef = signal(''); saraReceiptKey = signal('');
+  // result
+  createdRef = signal(''); failureMsg = signal('');
 
-  form: WizardForm = {
-    prenom: '', nom: '', sexe: '', docType: 'cni', cni: '', niu: '', cniExp: '', phone: '',
-    naissance: '', cniOcrNom: null, cniOcrPrenom: null,
-    email: '', quartier: '', ville: '',
-    selfie: false, selfieData: null, selfieKey: null,
-    cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
-    saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-    pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'prepaid',
-  };
+  deliveryOptions = [
+    { id: 'promote', label: 'delivery_promote' },
+    { id: 'agence', label: 'delivery_agence' },
+    { id: 'home', label: 'delivery_home' },
+  ];
+  payMethods = [
+    { id: 'om', label: 'pay_om', icon: 'OM', color: '#FF7900', text: '#fff' },
+    { id: 'mtn', label: 'pay_mtn', icon: 'MTN', color: '#FFCB05', text: '#1B1B2F' },
+    { id: 'cash', label: 'pay_cash', icon: '₣', color: '#059669', text: '#fff' },
+    { id: 'sara', label: 'pay_sara', icon: 'S', color: '#1B1B2F', text: '#fff' },
+  ];
 
-  ngOnInit() {
-    this.channel = this.route.snapshot.data['channel'] === 'self' ? 'self' : 'agent';
-    this.restore();                                   // bring back any in-progress entry
-    // Agent flow starts on the form; the client (QR) flow opens on the welcome screen — unless a
-    // draft is being resumed mid-way, in which case skip straight back to where they were.
-    this.started.set(!this.isSelf || this.step() > 0);
-    // Ensure store is fresh; components read `this.config` which returns the shared value.
-    this.configStore.refresh();
-    this.api.paymentProvider().subscribe({ next: (p) => this.simulated.set(p.provider === 'simulated'), error: () => {} });
-    // Pickup branches for the "En agence" option (best-effort — empty list just hides the choice).
-    this.api.getAgencies().subscribe({ next: (a) => this.agencies.set(a ?? []), error: () => {} });
-    if (this.isSelf && this.form.refPhone) this.onRefPhone(this.form.refPhone);
-    // Best-effort GPS — prompts for the permission once; stored with the subscription if granted.
-    this.geo.current().then((fix) => (this.geoFix = fix));
+  categories = computed(() => {
+    const set = new Set<string>(['__all']);
+    for (const p of this.products()) if (p.groupCode) set.add(p.groupCode);
+    return [...set];
+  });
+  filteredProducts = computed(() => {
+    const c = this.cat();
+    return this.products().filter((p) => p.active && (c === '__all' || p.groupCode === c));
+  });
+
+  total = computed(() => {
+    const base = this.selected()?.effectivePrice ?? 0;
+    const t = this.delivery() === 'home' ? (this.config()?.transport ?? 0) : 0;
+    return base + t;
+  });
+
+  personalRows = computed(() => [
+    { label: this.i18n.t('field_firstname'), value: this.firstName() },
+    { label: this.i18n.t('field_lastname'), value: this.lastName() },
+    { label: this.i18n.t('field_idnumber'), value: this.idNumber() },
+    { label: this.i18n.t('field_phone'), value: formatPhone(this.phone()) },
+    { label: this.i18n.t('field_email'), value: this.email() },
+    { label: this.i18n.t('field_city'), value: this.city() },
+  ]);
+  tariffRows = computed(() => {
+    const rows = [{ label: this.selected()?.label ?? '', value: this.price(this.selected()?.effectivePrice ?? 0) }];
+    if (this.delivery() === 'home') rows.push({ label: this.i18n.t('delivery_home'), value: this.price(this.config()?.transport ?? 0) });
+    return rows;
+  });
+
+  constructor() {
+    this.api.products().subscribe((p) => this.products.set(p));
+    this.api.config().subscribe((c) => this.config.set(c));
+    this.api.agencies().subscribe((a) => this.agencies.set(a));
   }
 
-  /** Leave the welcome screen and begin the wizard (client/QR flow). */
-  begin() { this.started.set(true); }
-  get showWelcome() { return this.isSelf && !this.started() && !this.proc(); }
+  val(e: Event) { return (e.target as HTMLInputElement).value; }
 
-  ngOnDestroy() { this.stopPolling(); }
-
-  set<K extends keyof WizardForm>(k: K, v: WizardForm[K]) {
-    this.form[k] = v;
-    if (k === 'refPhone') this.onRefPhone(v as string);
-    // When a MoMo method is picked, default the payment number to the KYC phone (still editable):
-    // the client confirms or changes the number that will actually receive the prompt.
-    if (k === 'pay' && (v === 'om' || v === 'mtn') && !this.form.payPhone) this.form.payPhone = this.form.phone;
-    this.persist();
+  onIdNumber(e: Event) {
+    const v = (e.target as HTMLInputElement).value.replace(/[^0-9A-Za-z-]/g, '').toUpperCase().slice(0, 20);
+    this.idNumber.set(v);
   }
 
-  // ---- draft persistence: survive reloads / navigating away, so nothing typed is lost ----
-  private storageKey() { return `promote-wizard-${this.channel}`; }
-
-  /** Save the whole form (text fields, upload keys AND the image previews) + step, so a reload
-   *  restores the client's session exactly — photos included. If the payload exceeds the
-   *  localStorage quota (large SARA PDF, several photos), we fall back to saving everything
-   *  EXCEPT the heavy base64 previews (the uploads still live on the server, by their keys). */
-  private persist() {
-    const key = this.storageKey();
-    try {
-      localStorage.setItem(key, JSON.stringify({ form: this.form, step: this.step() }));
-    } catch {
-      try {
-        const { selfieData, cniRectoData, cniVersoData, saraReceiptData, ...rest } = this.form;
-        localStorage.setItem(key, JSON.stringify({ form: rest, step: this.step() }));
-      } catch { /* storage unavailable — ignore */ }
-    }
+  onNiu(e: Event) {
+    const v = (e.target as HTMLInputElement).value.replace(/[^0-9A-Za-z]/g, '').toUpperCase().slice(0, NIU_MAX);
+    this.niu.set(v);
   }
 
-  private restore() {
-    try {
-      const raw = localStorage.getItem(this.storageKey());
-      if (!raw) return;
-      const saved = JSON.parse(raw) as { form?: Partial<WizardForm>; step?: number };
-      // Merge saved fields back in. Image previews are restored when present; if the quota
-      // fallback dropped them, the keys still submit and the preview simply stays empty.
-      if (saved.form) this.form = { ...this.form, ...saved.form };
-      if (typeof saved.step === 'number') this.step.set(Math.min(this.lastStep, Math.max(0, saved.step)));
-    } catch { /* corrupt draft — ignore */ }
+  selectPayMethod(id: string) {
+    this.payMethod.set(id);
+    if ((id === 'om' || id === 'mtn') && !this.momoPhone()) this.momoPhone.set(this.phone());
   }
 
-  private clearPersist() { try { localStorage.removeItem(this.storageKey()); } catch { /* ignore */ } }
-
-  private onRefPhone(v: string) {
-    // Resolve & show the referrer's NAME only on the client/QR path. In the commercial
-    // (agent) flow the number is still captured & stored, but the name is never revealed.
-    if (this.isSelf && isValidPhoneNumber(v)) {
-      this.api.resolveAgent(v).subscribe((a) => { this.refAgent.set(a); this.refUnknown.set(!a); });
-    } else {
-      this.refAgent.set(null); this.refUnknown.set(false);
-    }
-  }
-
-  // ---- derived ----
-  get transport() { return this.form.delivery === 'home' ? (this.config.transport || 0) : 0; }
-  readonly isBancaire = false;
-  get rechargeInitiale() { return this.config.rechargeInitiale || 0; }
-  get passPremium() { return this.config.passPremium || 0; }
-  get total() { return (this.config.price || 0) + this.rechargeInitiale + this.passPremium + this.transport; }
-  get cardLabel() { return this.i18n.t('offer_card_label'); }
-  get fullName() { return (this.form.prenom + ' ' + this.form.nom).trim(); }
-  get pm() { return payById(this.form.pay); }
-
-  get errs() {
-    const f = this.form;
-    const expDate = parseExp(f.cniExp);
-    const phoneOk = isValidPhoneNumber(f.phone);
-    const emailOk = /^\S+@\S+\.\S+$/.test(f.email);
-    // CNI = alphanumérique ; passeport / récépissé = alphanumérique (lettres, chiffres, tiret).
-    const docOk = f.docType === 'cni'
-      ? /^[0-9A-Z]{6,}$/.test(f.cni.trim().toUpperCase())
-      : /^[0-9A-Z-]{5,}$/.test(f.cni.trim().toUpperCase());
+  /** Per-field validation map for step 1 (identity). */
+  private fieldErrors(): Record<string, string | null> {
+    const docOk = this.idType() === 'cni'
+      ? /^[0-9A-Z]{6,}$/.test(this.idNumber().trim())
+      : /^[0-9A-Z-]{5,}$/.test(this.idNumber().trim());
+    const phoneOk = isValidPhoneNumber(this.phone());
+    const emailOk = /^\S+@\S+\.\S+$/.test(this.email().trim());
+    const expiryDate = this.expiry() ? new Date(this.expiry()) : null;
+    const birthDate = this.birth() ? new Date(this.birth()) : null;
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const ref = this.referrer().trim();
+    const refOk = !ref || isValidPhoneNumber(ref);
+    const niuVal = this.niu().trim();
     return {
-      prenom: !f.prenom.trim() ? this.i18n.t('required') : null,
-      nom: !f.nom.trim() ? this.i18n.t('required') : null,
-      sexe: !f.sexe ? this.i18n.t('required') : null,
-      cni: !f.cni ? this.i18n.t('required') : !docOk ? this.i18n.t(f.docType === 'cni' ? 'cni_invalid' : 'doc_num_invalid') : null,
-      cniExp: !f.cniExp ? this.i18n.t('required') : !expDate ? this.i18n.t('exp_invalid')
-        : expDate < new Date() ? this.i18n.t('exp_expired') : null,
-      // Birth date — part of the anti-duplicate identity (required for a CNI; N/A for passport/récépissé).
-      naissance: f.docType !== 'cni' ? null
-        : !f.naissance ? this.i18n.t('required')
-        : !isValidBirth(f.naissance) ? this.i18n.t('birth_invalid') : null,
-      phone: !f.phone ? this.i18n.t('required') : !phoneOk ? this.i18n.t('invalid_phone') : null,
-      email: !f.email.trim() ? this.i18n.t('required') : !emailOk ? this.i18n.t('email_invalid') : null,
-      quartier: !f.quartier.trim() ? this.i18n.t('required') : null,
-      ville: !f.ville.trim() ? this.i18n.t('required') : null,
+      firstName: !this.firstName().trim() ? this.i18n.t('required') : null,
+      lastName: !this.lastName().trim() ? this.i18n.t('required') : null,
+      sexe: !this.sexe() ? this.i18n.t('required') : null,
+      idNumber: !this.idNumber().trim() ? this.i18n.t('required')
+        : !docOk ? this.i18n.t(this.idType() === 'cni' ? 'cni_invalid' : 'doc_num_invalid') : null,
+      niu: niuVal && niuVal.length > NIU_MAX ? this.i18n.t('niu_invalid') : null,
+      expiry: !this.expiry() ? this.i18n.t('required')
+        : !expiryDate || expiryDate < today ? this.i18n.t('exp_expired') : null,
+      birth: this.idType() !== 'cni' ? null
+        : !this.birth() ? this.i18n.t('required')
+        : !birthDate || birthDate >= today ? this.i18n.t('birth_invalid') : null,
+      phone: !this.phone() ? this.i18n.t('required') : !phoneOk ? this.i18n.t('invalid_phone') : null,
+      email: !this.email().trim() ? this.i18n.t('required') : !emailOk ? this.i18n.t('email_invalid') : null,
+      district: !this.district().trim() ? this.i18n.t('required') : null,
+      city: !this.city().trim() ? this.i18n.t('required') : null,
+      referrer: !refOk ? this.i18n.t('invalid_phone') : null,
     };
   }
-  e(key: 'prenom' | 'nom' | 'sexe' | 'cni' | 'cniExp' | 'naissance' | 'phone' | 'email' | 'quartier' | 'ville'): string | null {
-    return this.touched() ? this.errs[key] : null;
+
+  /** Show a field error after the step was submitted or the field has enough input. */
+  fieldErr(key: string): string | null {
+    if (!this.touched()) return null;
+    return this.fieldErrors()[key] ?? null;
   }
 
-  get step0ok() {
-    const x = this.errs;
-    return !x.prenom && !x.nom && !x.sexe && !x.cni && !x.cniExp && !x.naissance
-      && !x.phone && !x.email && !x.quartier && !x.ville;
+  private step1Valid(): boolean {
+    return !Object.values(this.fieldErrors()).some(Boolean);
   }
-  // Document / photo steps are satisfied by a local capture OR a restored upload key (so a
-  // page reload mid-wizard doesn't force the client to retake what was already uploaded).
-  get docsOk() {
-    const recto = !!this.form.cniRectoData || !!this.form.cniRectoKey;
-    const verso = !!this.form.cniVersoData || !!this.form.cniVersoKey;
-    // Le passeport n'a qu'une page d'identité → le verso est facultatif.
-    return recto && (this.form.docType === 'passport' ? true : verso);
-  }
-  /** Libellés dépendant du type de pièce (CNI / passeport / récépissé). */
-  get docLabel() { return this.i18n.t('doc_' + this.form.docType); }
-  get docNumLabel() { return this.i18n.t('doc_num_' + this.form.docType); }
-  get needsVerso() { return this.form.docType !== 'passport'; }
-  get selfieOk() { return !!this.form.selfieData || !!this.form.selfieKey; }
-  /** Mobile Money methods that need a payment number + USSD push. */
-  get isMomo() { return this.form.pay === 'om' || this.form.pay === 'mtn'; }
-  /** Valid = a real number for the chosen country; for Cameroon it must also match the operator (MTN/Orange). */
-  get payPhoneOk() {
-    const v = this.form.payPhone;
-    if (!isValidPhoneNumber(v)) return false;
-    const p = parsePhoneNumberFromString(v);
-    return p?.country === 'CM' ? matchesOperator(this.form.pay, p.nationalNumber as string) : true;
-  }
-  /** Error to show under the payment number: invalid number, or (Cameroon only) wrong operator. */
-  get payPhoneError(): string | null {
-    if (!this.isMomo) return null;
-    const v = this.form.payPhone;
+
+  private momoPhoneError(): string | null {
+    const m = this.payMethod();
+    if (m !== 'om' && m !== 'mtn') return null;
+    const v = this.momoPhone();
+    if (!v) return this.i18n.t('required');
     if (!isValidPhoneNumber(v)) return this.i18n.t('invalid_phone');
     const p = parsePhoneNumberFromString(v);
-    if (p?.country === 'CM' && !matchesOperator(this.form.pay, p.nationalNumber as string)) {
-      return this.i18n.t(this.form.pay === 'mtn' ? 'pay_phone_not_mtn' : 'pay_phone_not_om');
+    if (p?.country === 'CM' && !matchesOperator(m, p.nationalNumber as string)) {
+      return this.i18n.t(m === 'mtn' ? 'pay_phone_not_mtn' : 'pay_phone_not_om');
     }
     return null;
   }
-  /** Show the payment-number error once the field is "complete enough" or the step was touched. */
-  get payPhoneErrorShown(): string | null {
-    return this.touched() || this.form.payPhone.length >= 9 ? this.payPhoneError : null;
-  }
-  /** Payment step: a method is chosen + a pickup branch when "En agence"; MoMo needs a valid
-   *  payment number, SARA needs a receipt. */
-  get payStepOk() {
-    if (!this.form.pay) return false;
-    if (!this.deliveryOk) return false;
-    if (this.isMomo) return this.payPhoneOk;
-    // SARA: receipt uploaded AND its reference confirmed (the primary field — may need correction).
-    if (this.form.pay === 'sara') return !!this.form.saraReceiptKey && !!this.form.saraRef.trim();
-    return true;
-  }
-  get stepValid() {
-    return [this.step0ok, this.docsOk, this.selfieOk, this.payStepOk, true][this.step()];
-  }
-  /** All steps satisfied — required before the final confirmation can fire. */
-  get formComplete() { return this.step0ok && this.docsOk && this.selfieOk && this.payStepOk; }
-  /** First step still missing something (used to route the client there on confirm). */
-  private firstInvalidStep() {
-    if (!this.step0ok) return 0;
-    if (!this.docsOk) return 1;
-    if (!this.selfieOk) return 2;
-    if (!this.payStepOk) return 3;
-    return this.lastStep;
-  }
-  /** Highest step the client may navigate to: can't jump past the first incomplete step, so the
-   *  recap/payment is unreachable until every prior step is valid. Drives the step-bar lock. */
-  get maxReachableStep() { return this.firstInvalidStep(); }
-  get lastStep() { return STEP_COUNT - 1; }
-  stepKey(i: number) { return STEP_KEYS[i]; }
-  /** Localised step names for the clickable progress bar. */
-  get stepLabels() { return STEP_KEYS.map((k) => this.i18n.t(k)); }
 
-  /** Step-bar navigation. Backward is always free. Forward may NOT skip past an incomplete step:
-   *  the target is capped at the first step still missing/invalid, so the client can never reach
-   *  the recap / payment with incorrect data. The landed step surfaces what's left (touched). */
-  goToStep(i: number) {
-    if (i === this.step()) return;
-    const goingForward = i > this.step();
-    // firstInvalidStep() is the furthest reachable step (== lastStep only when everything is valid).
-    const target = goingForward ? Math.min(i, this.firstInvalidStep()) : i;
-    this.touched.set(goingForward);
-    this.step.set(Math.min(this.lastStep, Math.max(0, target)));
-    if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
-    this.persist();
+  momoPhoneErr(): string | null {
+    return this.touched() ? this.momoPhoneError() : null;
   }
 
-  get headTitle() { return ['identity_title', 'doc_title', 'photo_title', 'payment_title', 'recap_title'][this.step()]; }
-  get headSub() { return ['identity_sub', 'doc_sub', 'photo_sub', 'payment_sub', 'recap_sub2'][this.step()]; }
-  get expDisplay() { return fmtExp(this.form.cniExp); }
-  get isCash() { return this.result()?.payStatus === 'cash'; }
-  get isSaraPending() { return this.result()?.payStatus === 'sara_pending'; }
+  price = (n: number) => fcfa(n);
+  hasPromo = (p: ProductDto) => p.effectivePrice < p.basePrice || (p.promotions?.some((x) => x.active) ?? false);
+  cardGradient = (p: ProductDto) =>
+    p.groupCode?.toLowerCase().includes('visa') ? 'linear-gradient(135deg,#1B1B2F,#3A3A5A)'
+    : p.groupCode?.toLowerCase().includes('master') || p.groupCode?.toLowerCase().includes('mc') ? 'linear-gradient(135deg,#7A0B1E,#C8102E)'
+    : 'linear-gradient(135deg,#C8102E,#7A0B1E)';
 
-  /** Real deep link encoded in the reference QR — opens the print point on that ref. */
-  get refUrl() {
-    const r = this.result();
-    const origin = typeof window !== 'undefined' ? window.location.origin : '';
-    return r ? `${origin}/print?ref=${r.ref}` : '';
-  }
+  selectProduct(p: ProductDto) { this.selected.set(p); }
 
-  get payTiles(): TileOption[] {
-    const desc: Record<string, string> = {
-      om: this.i18n.t('pay_om_desc'), mtn: this.i18n.t('pay_mtn_desc'),
-      sara: this.i18n.t('pay_sara_desc'), cash: this.i18n.t('pay_cash_desc'),
-    };
-    return PAY_METHODS.map((p) => ({
-      id: p.id, bg: p.bg, color: p.fg, icon: p.short, logo: p.logo,
-      title: p.id === 'cash' ? this.i18n.t('pay_cash_name') : p.name,
-      desc: desc[p.id] ?? '',
-    }));
+  captureGeo() {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => this.geo.set({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy }),
+      () => this.error.set('Géolocalisation indisponible.'),
+      { enableHighAccuracy: true, timeout: 10000 },
+    );
   }
 
-  /** Retrait / livraison tiles: "Promote" (par défaut) + "En agence" (si des agences existent). */
-  get deliveryTiles(): TileOption[] {
-    const tiles: TileOption[] = [
-      { id: 'promote', icon: '★', bg: 'var(--primary)', color: '#fff',
-        title: this.i18n.t('del_promote_title'), desc: this.i18n.t('del_promote_desc') },
-    ];
-    if (this.agencies().length) {
-      tiles.push({ id: 'agence', icon: '▣', bg: 'var(--af-gold)', color: '#1a1a1a',
-        title: this.i18n.t('del_agence_title'), desc: this.i18n.t('del_agence_desc') });
-    }
-    return tiles;
+  /** Upload captured KYC image to backend storage. */
+  private uploadImage(dataUrl: string, kind: 'cni-recto' | 'cni-verso' | 'selfie', onKey: (key: string) => void) {
+    this.uploading.set(kind);
+    this.error.set('');
+    this.api.uploadKycImage(dataUrl, kind).subscribe({
+      next: (r) => { this.uploading.set(''); onKey(r.key); },
+      error: (e) => {
+        this.uploading.set('');
+        const code = e?.error?.error;
+        this.error.set(code === 'image_too_large'
+          ? this.i18n.t('err_image_too_large')
+          : code === 'invalid_kind'
+            ? this.i18n.t('err_image_kind')
+            : this.i18n.t('err_image_upload'));
+      },
+    });
   }
-
-  /** Picking a delivery mode; switching away from "agence" clears the chosen branch. */
-  setDelivery(mode: string) {
-    this.form.delivery = mode;
-    if (mode !== 'agence') this.form.pickupAgencyId = '';
-    this.persist();
-  }
-  onPickupAgency(e: Event) { this.set('pickupAgencyId', (e.target as HTMLSelectElement).value); }
-
-  /** Resolved name of the chosen pickup branch (for the recap). */
-  get pickupAgencyName(): string {
-    return this.agencies().find((a) => a.id === this.form.pickupAgencyId)?.name ?? '';
-  }
-  /** Delivery step is valid: a branch must be chosen when "En agence" is selected. */
-  get deliveryOk() { return this.form.delivery !== 'agence' || !!this.pickupAgencyName; }
-
-  // ---- navigation ----
-  next() {
-    this.touched.set(true);
-    if (this.stepValid) {
-      this.touched.set(false);
-      this.step.set(Math.min(this.lastStep, this.step() + 1));
-      // Entering the payment step with a MoMo method: default the payment number to the
-      // KYC phone (still editable) so the client just confirms it or types the right one.
-      if (this.step() === 3 && this.isMomo && !this.form.payPhone) this.form.payPhone = this.form.phone;
-      this.persist();
-    }
-  }
-  prev() {
-    if (this.step() === 0) {
-      if (this.isSelf) this.started.set(false); // client returns to the welcome screen
-      else this.exit();
-    } else { this.touched.set(false); this.step.set(this.step() - 1); this.persist(); }
-  }
-  // Staff (agent OR cashier) return to their own dashboard; the public/QR client returns to /qr.
-  exit() { this.router.navigateByUrl(this.isSelf ? '/qr' : this.auth.landingPath()); }
-  home() { this.router.navigateByUrl(this.isSelf ? '/qr' : this.auth.landingPath()); }
-
-  /** Client photo captured (front or rear camera): keep preview + upload. */
-  onSelfie(dataUrl: string) {
-    this.form.selfieData = dataUrl; this.form.selfieKey = null;
-    this.api.uploadImage(dataUrl, 'selfie').subscribe({ next: (r) => { this.form.selfieKey = r.key; this.persist(); }, error: () => {} });
-  }
-  onRetakeSelfie() { this.form.selfieData = null; this.form.selfieKey = null; this.persist(); }
 
   onCniRecto(dataUrl: string) {
-    this.form.cniRectoData = dataUrl; this.form.cniRectoKey = null;
-    this.api.uploadImage(dataUrl, 'cni-recto').subscribe({ next: (r) => { this.form.cniRectoKey = r.key; this.persist(); }, error: () => {} });
-    this.crossCheckCni(dataUrl);
+    this.cniRectoData.set(dataUrl);
+    this.cniRectoKey.set('');
+    this.uploadImage(dataUrl, 'cni-recto', (k) => this.cniRectoKey.set(k));
   }
-  onRetakeRecto() { this.form.cniRectoData = null; this.form.cniRectoKey = null; this.cniOcrWarning.set(null); this.persist(); }
-
-  /** OCR the captured CNI front and warn (without blocking) if the typed name/number disagree.
-   *  Best-effort: any error, OCR disabled, or unreadable card → no warning shown. */
-  private crossCheckCni(dataUrl: string) {
-    this.cniOcrWarning.set(null);
-    this.api.cniOcr(dataUrl, { prenom: this.form.prenom, nom: this.form.nom, cni: this.form.cni }).subscribe({
-      next: (r) => {
-        if (!r.available) return;
-        // Persist what OCR read off the card so the anti-duplicate identity check can compare BOTH
-        // the typed name and the CNI-read name server-side.
-        this.form.cniOcrNom = r.extractedNom; this.form.cniOcrPrenom = r.extractedPrenom; this.persist();
-        if (r.numberMatch === false) this.cniOcrWarning.set('cni_ocr_number_mismatch');
-        else if (r.nameMatch === false) this.cniOcrWarning.set('cni_ocr_name_mismatch');
-      },
-      error: () => {},
-    });
-  }
+  onRetakeRecto() { this.cniRectoData.set(null); this.cniRectoKey.set(''); }
 
   onCniVerso(dataUrl: string) {
-    this.form.cniVersoData = dataUrl; this.form.cniVersoKey = null;
-    this.api.uploadImage(dataUrl, 'cni-verso').subscribe({ next: (r) => { this.form.cniVersoKey = r.key; this.persist(); }, error: () => {} });
+    this.cniVersoData.set(dataUrl);
+    this.cniVersoKey.set('');
+    this.uploadImage(dataUrl, 'cni-verso', (k) => this.cniVersoKey.set(k));
   }
-  onRetakeVerso() { this.form.cniVersoData = null; this.form.cniVersoKey = null; this.persist(); }
+  onRetakeVerso() { this.cniVersoData.set(null); this.cniVersoKey.set(''); }
 
-  /** SARA money receipt picked (image or PDF): keep preview + upload, store its key. */
-  onSaraReceipt(dataUrl: string) {
-    this.form.saraReceiptData = dataUrl; this.form.saraReceiptKey = null;
-    this.saraExtract.set(null); this.saraRefDetected.set(false); this.saraExtracting.set(true);
-    // Upload + auto-extract: the receipt reference is the primary field; the client confirms/corrects it.
-    this.api.uploadReceipt(dataUrl).subscribe({
-      next: (r) => {
-        this.form.saraReceiptKey = r.key;
-        this.form.saraRef = r.reference ?? '';
-        this.saraRefDetected.set(!!(r.reference && r.reference.trim()));
-        this.saraExtract.set({ payerPhone: r.payerPhone, amount: r.amount });
-        this.saraExtracting.set(false);
-        this.persist();
-      },
-      error: () => { this.saraExtracting.set(false); },
-    });
+  onSelfie(dataUrl: string) {
+    this.selfieData.set(dataUrl);
+    this.selfieKey.set('');
+    this.uploadImage(dataUrl, 'selfie', (k) => this.selfieKey.set(k));
   }
+  onRetakeSelfie() { this.selfieData.set(null); this.selfieKey.set(''); }
 
-  private payload() {
-    return {
-      prenom: this.form.prenom.trim(), nom: this.form.nom.trim(), sexe: this.form.sexe,
-      docType: this.form.docType,
-      cni: this.form.cni, niu: this.form.niu.trim() || undefined, cniExp: fmtExp(this.form.cniExp), phone: this.form.phone,
-      naissance: this.form.naissance || undefined,
-      cniOcrNom: this.form.cniOcrNom || undefined, cniOcrPrenom: this.form.cniOcrPrenom || undefined,
-      email: this.form.email.trim(), quartier: this.form.quartier.trim(), ville: this.form.ville.trim(),
-      pay: this.form.pay, payPhone: this.isMomo ? this.form.payPhone : undefined, delivery: this.form.delivery,
-      pickupAgencyId: this.form.delivery === 'agence' ? (this.form.pickupAgencyId || undefined) : undefined,
-      cardType: this.form.cardType,
-      selfie: !!this.form.selfieData, selfieKey: this.form.selfieKey,
-      cniRectoKey: this.form.cniRectoKey, cniVersoKey: this.form.cniVersoKey,
-      saraReceiptKey: this.form.saraReceiptKey,
-      saraRef: this.form.pay === 'sara' ? (this.form.saraRef.trim() || undefined) : undefined,
-      referrerPhone: this.form.refPhone || undefined,
-      latitude: this.geoFix?.lat, longitude: this.geoFix?.lng, geoAccuracy: this.geoFix?.accuracy,
+  /** SARA receipt — file picker fallback (PDF/image). */
+  captureSara() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*,application/pdf';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        this.uploading.set('sara');
+        this.error.set('');
+        this.api.uploadReceipt(dataUrl).subscribe({
+          next: (r) => {
+            this.uploading.set('');
+            this.saraReceiptKey.set(r.key);
+            if (r.reference) this.saraRef.set(r.reference);
+          },
+          error: () => { this.uploading.set(''); this.error.set(this.i18n.t('err_image_upload')); },
+        });
+      };
+      reader.readAsDataURL(file);
     };
+    input.click();
   }
 
-  confirm() {
-    if (this.busy()) return;
-    // Free navigation lets the client reach the recap with gaps — route them to the first
-    // incomplete step instead of submitting an invalid file.
-    if (!this.formComplete) { this.touched.set(true); this.step.set(this.firstInvalidStep()); return; }
-    this.busy.set(true);
-    this.submitError.set('');
-    const obs = this.isSelf ? this.api.createSelf(this.payload()) : this.api.createAssisted(this.payload());
-    obs.subscribe({
-      next: (s: Subscription) => {
-        this.busy.set(false);
-        this.submitError.set('');
-        this.clearPersist();   // record created server-side — drop the local draft
-        this.result.set({ ref: s.ref, payStatus: s.payStatus, amount: s.amount, message: s.paymentMessage,
-          fullName: s.fullName, pay: s.pay, payPhone: s.payPhone, createdAt: s.createdAt });
-        // cash and SARA money are settled off-platform → straight to the reference screen, no polling.
-        if (this.form.pay === 'cash' || this.form.pay === 'sara') { this.proc.set('reference'); this.celebrate(); }
-        else if (s.payStatus === 'paid') { this.proc.set('reference'); this.celebrate(); }
-        else if (s.payStatus === 'failed') { this.proc.set('failed'); } // gateway rejected the push
-        else {
-          this.proc.set('paying');
-          this.runMomo();
-          // The customer confirms on their phone; the result arrives via the aggregator
-          // (webhook + get-status) — poll the backend until it resolves.
-          this.startStatusPolling(s.ref);
-        }
-      },
-      error: (err) => {
-        this.busy.set(false);
-        // A 401 is handled globally (the interceptor ends the session and routes to login). A 403
-        // means the account lacks the AGENT/CASHIER role — surface that instead of blaming the form.
-        if (err?.status === 403) { this.submitError.set('forbidden_role'); return; }
-        const code = err?.error?.error as string | undefined;
-        const known = ['cni_exists', 'cni_invalid', 'validation_error', 'server_error'];
-        this.submitError.set(known.includes(code ?? '') ? code! : 'submit_failed');
-      },
-    });
+  private toFr(iso: string): string {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return d && m && y ? `${d}/${m}/${y}` : iso;
   }
 
-  /** Celebrate on the success/reference screen — confetti from the check badge once it's rendered. */
-  private celebrate() {
-    setTimeout(() => { if (this.successCheck?.nativeElement) burstConfetti(this.successCheck.nativeElement); }, 50);
-  }
-
-  private runMomo() {
-    this.phase.set('send');
-    setTimeout(() => this.phase.set('wait'), 1300);
-  }
-
-  /** ~7-minute polling window with back-off. Mobile Money confirmations can legitimately take
-   *  over 2 minutes, so a short window produced false "failed" on real payments. */
-  private readonly pollMax = 56;
-  private pollDelay(n: number) { return n < 10 ? 3000 : n < 24 ? 5000 : 10000; }
-
-  /** Poll the live payment status (back-off) until terminal; on window exhaustion show a
-   *  prolonged-wait screen (never a false failure) the client can refresh manually. */
-  private startStatusPolling(ref: string) {
-    this.stopPolling();
-    this.polling = true;
-    this.waitLong.set(false);
-    let attempts = 0;
-    const tick = () => {
-      if (!this.polling) return;
-      this.api.paymentStatus(ref).subscribe({
-        next: (s) => {
-          if (!this.polling) return;
-          if (s.payStatus === 'paid') {
-            this.polling = false;
-            this.result.set({ ...(this.result() ?? { ref }), payStatus: 'paid' });
-            this.proc.set('reference');
-            this.celebrate();
-          } else if (s.payStatus === 'failed') {
-            this.polling = false;
-            // Keep the decline reason (e.g. "Solde insuffisant") so the failure screen can explain it.
-            this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: s.message ?? this.result()?.message });
-            this.proc.set('failed');
-          } else if (++attempts >= this.pollMax) {
-            // Don't declare failure — the confirmation may still arrive (late webhook). Switch to a
-            // prolonged-wait state the client can refresh, instead of a misleading "échec".
-            this.polling = false;
-            this.waitLong.set(true);
-          } else {
-            this.pollTimer = setTimeout(tick, this.pollDelay(attempts));
-          }
-        },
-        error: () => {
-          if (!this.polling) return;
-          if (++attempts >= this.pollMax) { this.polling = false; this.waitLong.set(true); }
-          else this.pollTimer = setTimeout(tick, this.pollDelay(attempts));
-        },
-      });
-    };
-    this.pollTimer = setTimeout(tick, this.pollDelay(0));
-  }
-
-  /** Manual "J'ai payé / Rafraîchir" during a prolonged wait — a single status check. */
-  manualRefresh() {
-    const ref = this.result()?.ref;
-    if (!ref || this.refreshing()) return;
-    this.refreshing.set(true);
-    this.api.paymentStatus(ref).subscribe({
-      next: (s) => {
-        this.refreshing.set(false);
-        if (s.payStatus === 'paid') {
-          this.result.set({ ...(this.result() ?? { ref }), payStatus: 'paid' });
-          this.proc.set('reference');
-          this.celebrate();
-        } else if (s.payStatus === 'failed') {
-          this.result.set({ ...(this.result() ?? { ref }), payStatus: 'failed', message: s.message ?? this.result()?.message });
-          this.proc.set('failed');
-        }
-        // else: still pending → stay on the prolonged-wait screen
-      },
-      error: () => this.refreshing.set(false),
-    });
-  }
-  /** Resume auto-polling from the prolonged-wait screen. */
-  resumePolling() {
-    const ref = this.result()?.ref;
-    if (ref) this.startStatusPolling(ref);
-  }
-
-  /** Simulated gateway only — the real aggregator settles via webhook / get-status polling. */
-  simulatePay(outcome: 'validate' | 'fail') {
-    const ref = this.result()?.ref;
-    if (!ref || this.busy()) return;
-    this.busy.set(true);
-    this.api.simulateSubscriptionPay(ref, outcome, outcome === 'fail' ? 'Refusé par le client' : undefined).subscribe({
-      next: (s) => {
-        this.stopPolling();
-        this.busy.set(false);
-        this.waitLong.set(false);
-        const base = this.result() ?? { ref: s.ref };
-        if (outcome === 'validate') {
-          this.result.set({ ...base, payStatus: 'paid' });
-          this.proc.set('reference');
-          this.celebrate();
-        } else {
-          this.result.set({ ...base, payStatus: 'failed', message: s.paymentMessage ?? 'Refusé par le client' });
-          this.proc.set('failed');
-        }
-      },
-      error: () => this.busy.set(false),
-    });
-  }
-
-  private stopPolling() {
-    this.polling = false;
-    if (this.pollTimer) { clearTimeout(this.pollTimer); this.pollTimer = null; }
-  }
-  retry() { this.stopPolling(); this.waitLong.set(false); this.proc.set(null); }
-
-  reset() {
-    this.stopPolling();
-    this.clearPersist();
-    this.form = {
-      prenom: '', nom: '', sexe: '', docType: 'cni', cni: '', niu: '', cniExp: '', phone: '', email: '', quartier: '', ville: '',
-      naissance: '', cniOcrNom: null, cniOcrPrenom: null,
-      selfie: false, selfieData: null, selfieKey: null,
-      cniRectoData: null, cniRectoKey: null, cniVersoData: null, cniVersoKey: null,
-      saraReceiptData: null, saraReceiptKey: null, saraRef: '',
-      pay: 'om', payPhone: '', delivery: 'promote', pickupAgencyId: '', refPhone: '', cardType: 'prepaid',
-    };
-    this.touched.set(false); this.result.set(null); this.proc.set(null); this.step.set(0);
-    this.waitLong.set(false); this.refreshing.set(false);
-    this.refAgent.set(null); this.refUnknown.set(false);
-    this.started.set(!this.isSelf); // client returns to the welcome screen
-  }
-
-  copyRef() {
-    const r = this.result(); if (!r) return;
-    try { navigator.clipboard.writeText(r.ref); } catch { /* ignore */ }
-    this.copied.set(true); setTimeout(() => this.copied.set(false), 1500);
-  }
-
-  goPrint() {
-    const r = this.result();
-    this.router.navigate(['/print'], { queryParams: r ? { ref: r.ref } : {} });
-  }
-
-  /** Generate and download a PNG receipt: payment info + reference + QR to show at the print point. */
-  async downloadReceipt() {
-    const r = this.result();
-    if (!r || this.receiptBusy()) return;
-    this.receiptBusy.set(true);
-    try {
-      await this.receipt.download({
-        ref: r.ref, fullName: r.fullName, pay: r.pay, payPhone: r.payPhone,
-        payStatus: r.payStatus, amount: r.amount, createdAt: r.createdAt,
-      });
-    } finally {
-      this.receiptBusy.set(false);
+  private validate(): string {
+    const s = this.step();
+    if (s === 0 && !this.selected()) return this.i18n.t('select_product');
+    if (s === 1) {
+      this.touched.set(true);
+      if (!this.step1Valid()) return this.i18n.t('err_required_fields');
     }
+    if (s === 2) {
+      if (!this.cniRectoKey() || (this.idType() !== 'passport' && !this.cniVersoKey())) return this.i18n.t('err_kyc_required');
+    }
+    if (s === 3 && !this.selfieKey()) return this.i18n.t('err_selfie_required');
+    if (s === 4) {
+      if (!this.payMethod()) return this.i18n.t('err_pay_method');
+      this.touched.set(true);
+      const momoErr = this.momoPhoneError();
+      if (momoErr) return momoErr;
+    }
+    return '';
   }
 
-  // waiting description split helpers
-  waitBefore() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[0]; }
-  waitAfter() { return this.i18n.t('waiting_desc', { op: this.pm.name }).split('{n}')[1] ?? ''; }
-
-  /** Display an E.164 number in pretty international form (the value already carries its country code). */
-  fmtPhone(v: string) { return formatPhone(v); }
-
-  /** True when the decline reason indicates the Mobile Money account lacked funds → show a clear, dedicated notice. */
-  get insufficientBalance() {
-    const m = (this.result()?.message || '').toLowerCase();
-    return /insuffisan|insufficient|\bsolde\b|provision|\bfonds?\b|\bfunds?\b|not enough/.test(m);
+  next() {
+    const err = this.validate();
+    if (err) { this.error.set(err); return; }
+    this.error.set('');
+    if (this.step() < 5) {
+      if (this.step() === 0) this.touched.set(false);
+      this.step.set(this.step() + 1);
+      return;
+    }
+    this.submit();
   }
-  /** True when the transaction expired (the client never entered their PIN in time). */
-  get expired() {
-    const m = (this.result()?.message || '').toLowerCase();
-    return !this.insufficientBalance && /expir|timeout|time out|délai|delai/.test(m);
+  prev() {
+    this.error.set('');
+    this.touched.set(false);
+    if (this.step() === 0) { this.router.navigateByUrl('/home'); return; }
+    this.step.set(this.step() - 1);
   }
-  /** Amount the client tried to pay (for the failure message). */
-  get failAmount() { return this.result()?.amount ?? this.total; }
+
+  private buildRequest(): CreateSubscriptionRequest {
+    return {
+      prenom: this.firstName().trim(),
+      nom: this.lastName().trim(),
+      sexe: this.sexe(),
+      docType: this.idType(),
+      cni: this.idNumber().trim().toUpperCase(),
+      niu: this.niu().trim() || undefined,
+      cniExp: this.expiry(),
+      phone: this.phone().trim(),
+      email: this.email().trim(),
+      quartier: this.district().trim(),
+      ville: this.city().trim(),
+      pay: this.payMethod(),
+      payPhone: this.momoPhone().trim() || undefined,
+      delivery: this.delivery(),
+      selfie: !!this.selfieKey(),
+      selfieKey: this.selfieKey() || undefined,
+      cniRectoKey: this.cniRectoKey() || undefined,
+      cniVersoKey: this.cniVersoKey() || undefined,
+      saraReceiptKey: this.saraReceiptKey() || undefined,
+      saraRef: this.saraRef().trim() || undefined,
+      referrerPhone: this.referrer().trim() || undefined,
+      latitude: this.geo()?.lat ?? null,
+      longitude: this.geo()?.lng ?? null,
+      geoAccuracy: this.geo()?.acc ?? null,
+      pickupAgencyId: this.delivery() === 'agence' ? this.deliveryAgency() : undefined,
+      productCode: this.selected()?.code,
+      naissance: this.idType() === 'cni' ? this.toFr(this.birth()) : undefined,
+    };
+  }
+
+  submit() {
+    this.submitting.set(true);
+    this.api.createSelfSubscription(this.buildRequest()).subscribe({
+      next: (sub) => {
+        this.submitting.set(false);
+        this.createdRef.set(sub.ref);
+        const m = this.payMethod();
+        if (m === 'om' || m === 'mtn') this.phase.set('paying');
+        else this.phase.set('success');
+      },
+      error: (e) => {
+        this.submitting.set(false);
+        this.failureMsg.set(e?.error?.error || e?.error?.message || '');
+        this.phase.set('failure');
+      },
+    });
+  }
+
+  simulate(outcome: 'success' | 'failed') {
+    const ref = this.createdRef();
+    this.api.paySubscription(ref, outcome).subscribe({
+      next: () => this.phase.set(outcome === 'success' ? 'success' : 'failure'),
+      error: () => this.phase.set('failure'),
+    });
+  }
+
+  copyRef() { navigator.clipboard?.writeText(this.createdRef()); }
+  restart() { window.location.reload(); }
+  retry() { this.phase.set('funnel'); this.step.set(4); }
+  goHome() { this.router.navigateByUrl('/home'); }
 }

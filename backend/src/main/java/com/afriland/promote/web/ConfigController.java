@@ -8,8 +8,10 @@ import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.web.dto.Dtos.ConfigDto;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Configuration", description = "Tarification carte Promote (CardConfig)")
 @RestController
 @RequestMapping("/api/config")
 public class ConfigController {

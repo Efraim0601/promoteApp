@@ -1,254 +1,117 @@
-import { Component, OnInit, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
-import { I18n } from '../core/i18n';
+import { Component, inject, signal } from '@angular/core';
 import { Api } from '../core/api';
-import { Auth } from '../core/auth';
-import { Collecte, CreateCollecteRequest } from '../core/models';
-import { COLLECTE_PRODUCTS, CARD_TYPES } from '../shared/constants';
-import { AppBarComponent } from '../shared/app-bar';
-import { IconComponent } from '../shared/icon';
-import { FieldComponent } from '../shared/fields';
-import { TileChoiceComponent, TileOption } from '../shared/tile-choice';
-import { SpinnerComponent } from '../shared/spinner';
-import { RevealDirective } from '../shared/reveal';
-import * as XLSX from 'xlsx';
+import { I18n } from '../core/i18n';
+import { CollecteDto, CollecteStats, CreateCollecteRequest } from '../core/models';
+import { StaffSidebar } from '../shared/staff-sidebar';
 
-interface CForm {
-  product: string; clientNom: string; clientPhone: string;
-  cniNumber: string; accountNumber: string;
-  cardPrefix: string; cardSuffix: string; cardType: string;
-}
-const EMPTY: CForm = { product: '', clientNom: '', clientPhone: '', cniNumber: '', accountNumber: '', cardPrefix: '', cardSuffix: '', cardType: '' };
+const PRODUCTS = [
+  { code: 'compte_ouvert', label: 'Compte ouvert' },
+  { code: 'carte_bancaire', label: 'Carte bancaire' },
+  { code: 'sara_money', label: 'Sara Money' },
+  { code: 'e_first', label: 'E-First' },
+];
 
-/**
- * Collecteur portal: capture bank-product sales (collectes) and manage one's own — the native
- * replacement for the KoboToolbox "Questionnaire 4". The client fields shown depend on the product.
- */
 @Component({
-  selector: 'page-collecte',
-  standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, TileChoiceComponent, SpinnerComponent, RevealDirective],
+  selector: 'app-collecte',
+  imports: [StaffSidebar],
   template: `
-  <div class="scr">
-    <app-bar>
-      <button appbar-right class="icon-btn" (click)="auth.logout()" [title]="i18n.t('logout')"><ic name="logout" [size]="15" [sw]="2"></ic></button>
-    </app-bar>
-    <div class="scr-body" reveal="screen">
-      <div class="kicker" data-reveal="item">{{ i18n.t('col_kicker') }}</div>
-      <h1 style="font-size:21px;margin:2px 0 2px" data-reveal="item">{{ editingRef() ? i18n.t('col_edit_title') : i18n.t('col_new_title') }}</h1>
-      <p class="muted" style="font-size:12.5px;line-height:1.5;margin-bottom:14px" data-reveal="item">{{ i18n.t('col_sub') }}</p>
-
-      <!-- Product -->
-      <div style="font-size:13px;font-weight:700;margin-bottom:8px" data-reveal="item">{{ i18n.t('col_product_label') }}</div>
-      <tile-choice [options]="productTiles" [value]="form().product" (valueChange)="setProduct($event)" data-reveal="card"></tile-choice>
-      @if (touched() && !form().product) { <div class="err" style="margin-top:6px;font-weight:700">{{ i18n.t('required') }}</div> }
-
-      @if (form().product) {
-        <div style="display:flex;flex-direction:column;gap:12px;margin-top:16px">
-          <field [label]="i18n.t('col_client_nom')" [err]="touched() && !form().clientNom.trim() ? i18n.t('required') : null" data-reveal="input">
-            <div class="input-prefix"><span class="pfx"><ic name="user" [size]="17"></ic></span>
-              <input [value]="form().clientNom" (input)="set('clientNom', $any($event.target).value)" [placeholder]="i18n.t('col_client_nom_ph')" />
-            </div>
-          </field>
-
-          @if (form().product === 'compte_ouvert' || form().product === 'e_first') {
-            <field [label]="i18n.t('col_cni')" [err]="touched() && !form().cniNumber.trim() ? i18n.t('required') : null" data-reveal="input">
-              <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-                <input [value]="form().cniNumber" (input)="set('cniNumber', $any($event.target).value)" [placeholder]="i18n.t('col_cni_ph')" />
-              </div>
-            </field>
-          }
-
-          @if (form().product === 'carte_bancaire') {
-            <field [label]="i18n.t('col_card_number')" data-reveal="input">
-              <div style="display:flex;align-items:center;gap:6px;padding:0 12px">
-                <ic name="idcard" [size]="17" style="color:var(--muted);flex-shrink:0"></ic>
-                <input #cPfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form().cardPrefix"
-                       (input)="onCardPrefix($any($event.target).value, cSfx)"
-                       style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
-                <span style="color:var(--muted);letter-spacing:.1em;font-size:15px;font-weight:600;user-select:none">**** ****</span>
-                <input #cSfx inputmode="numeric" maxlength="4" placeholder="XXXX" [value]="form().cardSuffix"
-                       (input)="set('cardSuffix', $any($event.target).value.replace(/\D/g,'').slice(0,4))"
-                       style="width:52px;text-align:center;letter-spacing:.1em;border:none;outline:none;background:transparent;font-size:15px;font-weight:600;padding:12px 0" />
-              </div>
-            </field>
-            <field [label]="i18n.t('col_card_type')" [err]="touched() && !form().cardType ? i18n.t('required') : null" data-reveal="input">
-              <div class="input-prefix"><span class="pfx"><ic name="idcard" [size]="17"></ic></span>
-                <select [value]="form().cardType" (change)="set('cardType', $any($event.target).value)">
-                  <option value="" disabled>{{ i18n.t('col_card_type_ph') }}</option>
-                  @for (t of cardTypes; track t) { <option [value]="t">{{ i18n.t('ct_' + t) }}</option> }
-                </select>
-              </div>
-            </field>
-          }
-
-          <field [label]="i18n.t('col_client_phone')" [err]="touched() && !form().clientPhone.trim() ? i18n.t('required') : null" data-reveal="input">
-            <div class="input-prefix"><span class="pfx"><ic name="phone" [size]="17"></ic></span>
-              <input inputmode="tel" [value]="form().clientPhone" (input)="set('clientPhone', $any($event.target).value)" [placeholder]="i18n.t('col_client_phone_ph')" />
-            </div>
-          </field>
+    <app-staff-sidebar active="collecte" />
+    <div style="flex:1;padding:16px 16px 40px;padding-top:48px;max-width:640px;margin:0 auto;width:100%">
+      <div style="padding-left:36px">
+        <div style="font-size:22px;font-weight:800;color:var(--navy);margin-bottom:4px">{{ i18n.t('coll_title') }}</div>
+        <div class="kpi" style="margin:12px 0 20px">
+          <div style="font-size:26px;font-weight:800;color:var(--primary)">{{ stats()?.total ?? mine().length }}</div>
+          <div style="font-size:11px;color:var(--muted)">{{ i18n.t('coll_total') }}</div>
         </div>
-      }
 
-      @if (msg()) { <div class="card" style="margin-top:12px;padding:10px 12px;background:color-mix(in srgb, var(--success) 14%, transparent);color:var(--success);font-size:12.5px;font-weight:700"><ic name="check" [size]="15" style="vertical-align:-2px"></ic> {{ msg() }}</div> }
-      @if (err()) { <p class="err" style="margin-top:10px;text-align:center;font-weight:700">{{ err() }}</p> }
+        <div class="card" style="padding:18px;margin-bottom:24px">
+          <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:14px">{{ i18n.t('coll_new') }}</div>
+          <div class="fld">
+            <label class="lab">{{ i18n.t('coll_product') }} *</label>
+            <select class="in" [value]="product()" (change)="product.set(val($event))">
+              @for (p of products; track p.code) { <option [value]="p.code">{{ p.label }}</option> }
+            </select>
+          </div>
+          <div class="fld"><label class="lab">{{ i18n.t('coll_client') }}</label><input class="in" [value]="clientNom()" (input)="clientNom.set(val($event))"></div>
+          <div class="fld"><label class="lab">{{ i18n.t('field_phone') }}</label><input class="in" [value]="clientPhone()" (input)="clientPhone.set(val($event))"></div>
+          @if (product() === 'compte_ouvert') {
+            <div class="fld"><label class="lab">{{ i18n.t('coll_account') }}</label><input class="in" [value]="accountNumber()" (input)="accountNumber.set(val($event))"></div>
+          }
+          @if (product() === 'carte_bancaire') {
+            <div class="fld"><label class="lab">{{ i18n.t('coll_card') }}</label><input class="in" [value]="cardNumber()" (input)="cardNumber.set(val($event))"></div>
+          }
+          @if (saved()) { <div class="alert-success" style="margin-bottom:10px">✓ {{ i18n.t('coll_saved') }}</div> }
+          @if (error()) { <div class="alert-error shake" style="margin-bottom:10px">{{ error() }}</div> }
+          <button (click)="save()" class="btn btn-primary" style="border-radius:10px" [disabled]="saving()">{{ i18n.t('coll_save') }}</button>
+        </div>
 
-      <div style="display:flex;gap:8px;margin-top:16px" data-reveal="button">
-        <button class="btn btn-primary" (click)="submit()" [disabled]="busy()" style="flex:1;padding:12px">
-          @if (busy()) { <spinner></spinner> } @else { <ic name="check" [size]="17"></ic> {{ editingRef() ? i18n.t('col_save') : i18n.t('col_submit') }} }
-        </button>
-        @if (editingRef()) { <button class="btn btn-ghost" (click)="resetForm()" [disabled]="busy()" style="padding:12px">{{ i18n.t('cancel_short') }}</button> }
-      </div>
-
-      <!-- My collectes -->
-      <div style="display:flex;align-items:center;gap:8px;margin-top:24px;margin-bottom:6px" data-reveal="item">
-        <div class="kicker" style="flex:1">{{ i18n.t('col_mine') }} · {{ mine().length }}</div>
-        @if (mine().length) {
-          <button class="btn btn-ghost" (click)="exportMine()" style="padding:4px 9px;font-size:11px"><ic name="download" [size]="13"></ic> {{ i18n.t('col_export_xl') }}</button>
-        }
-      </div>
-      @if (loading()) {
-        <div class="load-center"><spinner tone="primary"></spinner></div>
-      } @else if (!mine().length) {
-        <p class="muted" style="font-size:12.5px">{{ i18n.t('col_empty') }}</p>
-      } @else {
-        <div class="card" style="padding:2px 0;overflow:hidden" data-reveal="card">
+        <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:12px">{{ i18n.t('coll_recent') }}</div>
+        @if (mine().length === 0) { <div style="text-align:center;color:var(--muted);padding:24px">{{ i18n.t('coll_empty') }}</div> }
+        <div style="display:flex;flex-direction:column;gap:8px">
           @for (c of mine(); track c.ref) {
-            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-top:1px solid var(--border)">
-              <div style="min-width:0;flex:1">
-                <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.clientNom || '—' }} <span class="muted" style="font-weight:500;font-size:11px">· {{ i18n.t('prod_' + c.product) }}</span></div>
-                <div class="muted" style="font-size:11px">{{ c.clientPhone || '—' }} · {{ c.ref }} · {{ date(c.createdAt) }}</div>
+            <div class="row">
+              <div style="display:flex;justify-content:space-between;align-items:flex-start">
+                <div>
+                  <span class="mono" style="font-size:12px;font-weight:700;color:var(--navy)">{{ c.ref }}</span>
+                  <div style="font-size:14px;font-weight:700;color:var(--navy);margin-top:2px">{{ c.clientNom || '—' }}</div>
+                  <div style="font-size:11px;color:var(--muted);margin-top:2px">{{ label(c.product) }}@if (c.clientPhone) { · {{ c.clientPhone }} }</div>
+                </div>
+                <div style="font-size:11px;color:var(--muted-2)">{{ date(c.createdAt) }}</div>
               </div>
-              <button class="icon-btn" (click)="edit(c)" [title]="i18n.t('edit')" style="flex-shrink:0"><ic name="pencil" [size]="15"></ic></button>
-              <button class="icon-btn" (click)="remove(c)" [title]="i18n.t('delete')" [disabled]="busy()" style="flex-shrink:0;color:var(--accent)"><ic name="trash" [size]="15"></ic></button>
             </div>
           }
         </div>
-      }
+      </div>
     </div>
-  </div>`,
+  `,
+  styles: [`
+    :host { display:flex;flex:1;flex-direction:column }
+    .kpi { background:#fff;border-radius:12px;padding:16px;box-shadow:0 1px 3px rgba(0,0,0,.04);border:1px solid var(--surface-3) }
+    .fld { margin-bottom:14px }
+    .lab { display:block;font-size:13px;font-weight:600;color:var(--label);margin-bottom:6px }
+    .in { width:100%;padding:12px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:15px;background:var(--surface-2) }
+    .row { background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);border:1px solid var(--surface-3) }
+  `],
 })
-export class CollecteComponent implements OnInit {
-  i18n = inject(I18n);
-  auth = inject(Auth);
+export class CollectePage {
+  protected i18n = inject(I18n);
   private api = inject(Api);
-  private router = inject(Router);
+  products = PRODUCTS;
 
-  readonly cardTypes = CARD_TYPES;
-  form = signal<CForm>({ ...EMPTY });
-  editingRef = signal<string | null>(null);
-  touched = signal(false);
-  busy = signal(false);
-  msg = signal('');
-  err = signal('');
-  mine = signal<Collecte[]>([]);
-  loading = signal(true);
+  stats = signal<CollecteStats | null>(null);
+  mine = signal<CollecteDto[]>([]);
+  product = signal('compte_ouvert');
+  clientNom = signal(''); clientPhone = signal(''); accountNumber = signal(''); cardNumber = signal('');
+  saving = signal(false); saved = signal(false); error = signal('');
 
-  get productTiles(): TileOption[] {
-    const icons: Record<string, string> = { compte_ouvert: '◉', carte_bancaire: '▣', sara_money: '₣', e_first: '★' };
-    return COLLECTE_PRODUCTS.map((p) => ({
-      id: p, icon: icons[p] ?? '•', bg: 'var(--primary)', color: '#fff',
-      title: this.i18n.t('prod_' + p), desc: this.i18n.t('prod_' + p + '_desc'),
-    }));
+  constructor() { this.reload(); }
+
+  val(e: Event) { return (e.target as HTMLInputElement).value; }
+  label = (code: string) => PRODUCTS.find((p) => p.code === code)?.label ?? code;
+  date = (iso: string) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '');
+
+  private reload() {
+    this.api.collecteStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
+    this.api.myCollectes().subscribe({ next: (l) => this.mine.set(l), error: () => {} });
   }
 
-  ngOnInit() { this.load(); }
-
-  private load() {
-    this.loading.set(true);
-    this.api.myCollectes().subscribe({ next: (c) => { this.mine.set(c); this.loading.set(false); }, error: () => this.loading.set(false) });
-  }
-
-  set<K extends keyof CForm>(k: K, v: CForm[K]) { this.form.update((f) => ({ ...f, [k]: v })); this.msg.set(''); }
-  setProduct(p: string) { this.form.update((f) => ({ ...f, product: p })); this.msg.set(''); }
-  onCardPrefix(v: string, next: HTMLInputElement) {
-    const d = v.replace(/\D/g, '').slice(0, 4);
-    this.form.update((f) => ({ ...f, cardPrefix: d }));
-    if (d.length === 4) next.focus();
-  }
-
-  resetForm() { this.form.set({ ...EMPTY }); this.editingRef.set(null); this.touched.set(false); this.err.set(''); }
-
-  private valid(): boolean {
-    const f = this.form();
-    if (!f.product || !f.clientNom.trim() || !f.clientPhone.trim()) return false;
-    if ((f.product === 'compte_ouvert' || f.product === 'e_first') && !f.cniNumber.trim()) return false;
-    if (f.product === 'carte_bancaire' && !f.cardType) return false;
-    return true;
-  }
-
-  private payload(): CreateCollecteRequest {
-    const f = this.form();
-    return {
-      product: f.product,
-      clientNom: f.clientNom.trim(),
-      clientPhone: f.clientPhone.trim(),
-      cniNumber: (f.product === 'compte_ouvert' || f.product === 'e_first') ? f.cniNumber.trim() : undefined,
-      cardNumber: f.product === 'carte_bancaire' && f.cardPrefix && f.cardSuffix
-        ? `${f.cardPrefix} **** **** ${f.cardSuffix}` : undefined,
-      cardType: f.product === 'carte_bancaire' ? f.cardType : undefined,
+  save() {
+    this.error.set(''); this.saved.set(false);
+    const req: CreateCollecteRequest = {
+      product: this.product(),
+      clientNom: this.clientNom().trim() || undefined,
+      clientPhone: this.clientPhone().trim() || undefined,
+      accountNumber: this.accountNumber().trim() || undefined,
+      cardNumber: this.cardNumber().trim() || undefined,
     };
-  }
-
-  submit() {
-    this.touched.set(true);
-    this.err.set('');
-    if (!this.valid() || this.busy()) return;
-    this.busy.set(true);
-    const ref = this.editingRef();
-    const obs = ref ? this.api.updateCollecte(ref, this.payload()) : this.api.createCollecte(this.payload());
-    obs.subscribe({
-      next: () => { this.busy.set(false); this.msg.set(this.i18n.t(ref ? 'col_saved' : 'col_created')); this.resetForm(); this.load(); },
-      error: () => { this.busy.set(false); this.err.set(this.i18n.t('col_error')); },
+    this.saving.set(true);
+    this.api.createCollecte(req).subscribe({
+      next: () => {
+        this.saving.set(false); this.saved.set(true);
+        this.clientNom.set(''); this.clientPhone.set(''); this.accountNumber.set(''); this.cardNumber.set('');
+        this.reload();
+      },
+      error: (e) => { this.saving.set(false); this.error.set(e?.error?.error || e?.error?.message || 'Erreur'); },
     });
   }
-
-  edit(c: Collecte) {
-    this.editingRef.set(c.ref);
-    const d = (c.cardNumber ?? '').replace(/\D/g, '');
-    this.form.set({
-      product: c.product, clientNom: c.clientNom ?? '', clientPhone: c.clientPhone ?? '',
-      cniNumber: c.cniNumber ?? '', accountNumber: c.accountNumber ?? '',
-      cardPrefix: d.slice(0, 4), cardSuffix: d.length >= 8 ? d.slice(-4) : '',
-      cardType: c.cardType ?? '',
-    });
-    this.touched.set(false); this.msg.set(''); this.err.set('');
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  remove(c: Collecte) {
-    if (this.busy() || !confirm(this.i18n.t('col_delete_confirm'))) return;
-    this.busy.set(true);
-    this.api.deleteCollecte(c.ref).subscribe({
-      next: () => { this.busy.set(false); if (this.editingRef() === c.ref) this.resetForm(); this.load(); },
-      error: () => { this.busy.set(false); this.err.set(this.i18n.t('col_error')); },
-    });
-  }
-
-  exportMine() {
-    const data = this.mine();
-    if (!data.length) return;
-    const today = new Date().toISOString().slice(0, 10);
-    const locale = this.i18n.lang() === 'fr' ? 'fr-FR' : 'en-GB';
-    const rows: (string | number)[][] = [
-      ['Référence', 'Produit', 'Nom client', 'Téléphone', 'N° compte', 'N° carte', 'Type carte', 'Date'],
-      ...data.map((c) => [
-        c.ref,
-        this.i18n.t('prod_' + c.product),
-        c.clientNom ?? '',
-        c.clientPhone ?? '',
-        c.accountNumber ?? '',
-        c.cardNumber ?? '',
-        c.cardType ? this.i18n.t('ct_' + c.cardType) : '',
-        c.createdAt ? new Date(c.createdAt).toLocaleString(locale) : '',
-      ]),
-    ];
-    const ws = XLSX.utils.aoa_to_sheet(rows);
-    ws['!cols'] = [{ wch: 12 }, { wch: 18 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 18 }];
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Mes collectes');
-    XLSX.writeFile(wb, `mes-collectes_${today}.xlsx`);
-  }
-
-  date(iso: string) { try { return new Date(iso).toLocaleDateString(this.i18n.lang() === 'fr' ? 'fr-FR' : 'en-GB'); } catch { return iso; } }
 }

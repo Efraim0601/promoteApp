@@ -18,6 +18,9 @@ import java.util.List;
  * staff agency) that the frontend forward-geocodes, so every client/agent appears on the map.
  * Admin-only (enforced in {@link com.afriland.promote.config.SecurityConfig}).
  */
+import io.swagger.v3.oas.annotations.tags.Tag;
+
+@Tag(name = "Cartographie", description = "Points GPS staff et clients")
 @RestController
 @RequestMapping("/api/map")
 public class MapController {

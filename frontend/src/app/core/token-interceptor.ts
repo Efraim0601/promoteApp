@@ -1,27 +1,24 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { Auth } from './auth';
 
-/** Attaches the JWT Bearer token to outgoing /api requests, and on a 401 from a token-bearing
- *  request ends the (expired/invalid) session and routes back to login with a notice.
- *
- *  Without this, an expired JWT (12h TTL) dies silently — the app keeps "working" on cached views
- *  and public endpoints, and the failure only surfaces as a confusing generic error at the next
- *  authenticated write (e.g. "Impossible d'enregistrer la demande" on the subscription recap). */
+/** Attach the JWT bearer; on 401 clear the session and bounce to /login. */
 export const tokenInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(Auth);
-  const token = auth.token;
-  if (token && req.url.startsWith('/api')) {
-    req = req.clone({ setHeaders: { Authorization: `Bearer ${token}` } });
-  }
-  return next(req).pipe(
-    catchError((err: unknown) => {
-      // A 401 on a token-bearing request means the JWT expired or is invalid → the session is dead.
-      // Exclude the login endpoints, where a 401 just means wrong credentials.
-      if (err instanceof HttpErrorResponse && err.status === 401 && token
-          && !req.url.includes('/api/auth/login')) {
-        auth.expireSession();
+  const router = inject(Router);
+  const token = auth.token();
+
+  const authed = token
+    ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } })
+    : req;
+
+  return next(authed).pipe(
+    catchError((err) => {
+      if (err?.status === 401 && !req.url.includes('/auth/login')) {
+        auth.logout();
+        router.navigateByUrl('/login');
       }
       return throwError(() => err);
     }),

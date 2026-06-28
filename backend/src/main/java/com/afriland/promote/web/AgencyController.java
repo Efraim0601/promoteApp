@@ -10,6 +10,7 @@ import com.afriland.promote.web.dto.Dtos.ImportAgencyRow;
 import com.afriland.promote.web.dto.Dtos.ImportAgencyRowResult;
 import org.springframework.security.core.Authentication;
 import org.springframework.transaction.annotation.Transactional;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -19,6 +20,7 @@ import java.util.*;
  * Pickup points ("lieux de retrait") the client picks when delivery == agence. The list is public
  * (the subscription form needs it) but only the admin can import/manage it (enforced in SecurityConfig).
  */
+@Tag(name = "Agences", description = "Points de retrait et import agences")
 @RestController
 @RequestMapping("/api/agencies")
 public class AgencyController {

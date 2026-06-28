@@ -8,6 +8,7 @@ import com.afriland.promote.repo.CardConfigRepository;
 import com.afriland.promote.repo.ProductComponentRepository;
 import com.afriland.promote.repo.ProductRepository;
 import com.afriland.promote.repo.PromotionRepository;
+import com.afriland.promote.storage.ImageStorage;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,13 +36,18 @@ public class ProductService {
     private final ProductComponentRepository components;
     private final PromotionRepository promotions;
     private final CardConfigRepository configs;
+    private final ProductCategoryService categories;
+    private final ImageStorage storage;
 
     public ProductService(ProductRepository products, ProductComponentRepository components,
-                          PromotionRepository promotions, CardConfigRepository configs) {
+                          PromotionRepository promotions, CardConfigRepository configs,
+                          ProductCategoryService categories, ImageStorage storage) {
         this.products = products;
         this.components = components;
         this.promotions = promotions;
         this.configs = configs;
+        this.categories = categories;
+        this.storage = storage;
     }
 
     // ---- reads ----
@@ -88,14 +94,16 @@ public class ProductService {
         String code = norm(req.getCode());
         if (code.isEmpty()) throw bad("invalid_code");
         if (products.existsByCode(code)) throw new ResponseStatusException(HttpStatus.CONFLICT, "code_exists");
+        String groupCode = resolveGroupCode(trim(req.getGroupCode()));
         Product p = Product.builder()
                 .code(code)
                 .label(req.getLabel() == null ? code : req.getLabel().trim())
                 .description(trim(req.getDescription()))
-                .groupCode(trim(req.getGroupCode()))
+                .groupCode(groupCode)
                 .kind(req.getKind() == null ? Product.Kind.BANK : req.getKind())
                 .basePrice(Math.max(0, req.getBasePrice()))
                 .active(req.isActive())
+                .imageKey(trim(req.getImageKey()))
                 .builtin(false)
                 .build();
         return products.save(p);
@@ -115,11 +123,12 @@ public class ProductService {
         }
         if (req.getLabel() != null && !req.getLabel().isBlank()) p.setLabel(req.getLabel().trim());
         p.setDescription(trim(req.getDescription()));
-        p.setGroupCode(trim(req.getGroupCode()));
+        p.setGroupCode(resolveGroupCode(trim(req.getGroupCode())));
         p.setBasePrice(Math.max(0, req.getBasePrice()));
         p.setActive(req.isActive());
+        if (req.getImageKey() != null) p.setImageKey(trim(req.getImageKey()));
         Product saved = products.save(p);
-        if (saved.getKind() == Product.Kind.CARD) syncCardToConfig(saved);
+        if (ProductService.CARD_CODE.equals(saved.getCode())) syncCardToConfig(saved);
         return saved;
     }
 
@@ -142,7 +151,7 @@ public class ProductService {
                     .productId(id).ckey(c.getCkey()).label(c.getLabel()).amount(Math.max(0, c.getAmount()))
                     .build());
         }
-        if (p.getKind() == Product.Kind.CARD) syncCardToConfig(p);
+        if (ProductService.CARD_CODE.equals(p.getCode())) syncCardToConfig(p);
         return p;
     }
 
@@ -181,6 +190,23 @@ public class ProductService {
         promotions.deleteById(promoId);
     }
 
+    /** Store a representative image for a product and persist its object-storage key. */
+    @Transactional
+    public Product setImage(Long id, byte[] data, String contentType) {
+        Product p = products.findById(id).orElseThrow(() -> notFound());
+        String key = storage.store(data, contentType, "product-image");
+        p.setImageKey(key);
+        return products.save(p);
+    }
+
+    /** Remove the representative image reference (object in storage is left orphaned). */
+    @Transactional
+    public Product clearImage(Long id) {
+        Product p = products.findById(id).orElseThrow(() -> notFound());
+        p.setImageKey(null);
+        return products.save(p);
+    }
+
     // ---- card ↔ CardConfig mirror ----
 
     /** Push the CARD product's basePrice + components into the legacy {@link CardConfig} singleton so
@@ -206,6 +232,12 @@ public class ProductService {
     }
 
     // ---- helpers ----
+
+    private String resolveGroupCode(String groupCode) {
+        if (groupCode == null || groupCode.isBlank()) return null;
+        if (!categories.exists(groupCode)) throw bad("unknown_category");
+        return groupCode;
+    }
 
     private static String norm(String s) { return s == null ? "" : s.trim().toLowerCase().replaceAll("\\s+", "_"); }
     private static String trim(String s) { return s == null || s.isBlank() ? null : s.trim(); }

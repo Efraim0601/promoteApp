@@ -69,6 +69,10 @@ public class Product {
     @ColumnDefault("true")
     private boolean active = true;
 
+    /** Object-storage key for the representative product image (prefix {@code product-image}). */
+    @Column(length = 500)
+    private String imageKey;
+
     @CreationTimestamp
     @Column(updatable = false)
     private java.time.Instant createdAt;

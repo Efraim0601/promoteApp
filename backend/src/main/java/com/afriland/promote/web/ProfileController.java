@@ -7,10 +7,12 @@ import com.afriland.promote.service.ProfileService;
 import com.afriland.promote.web.dto.Dtos.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@Tag(name = "Profils", description = "Habilitations et profils admin")
 @RestController
 @RequestMapping("/api/profiles")
 public class ProfileController {

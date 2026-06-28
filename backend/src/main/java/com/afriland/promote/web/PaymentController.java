@@ -21,6 +21,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.security.core.Authentication;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -29,6 +30,7 @@ import java.io.IOException;
 import java.util.Map;
 
 /** Aggregator-facing payment endpoints: webhook (push notifications) + provider info. */
+@Tag(name = "Paiements", description = "Agrégateur Mobile Money, webhooks et réconciliation")
 @RestController
 @RequestMapping("/api/payment")
 public class PaymentController {

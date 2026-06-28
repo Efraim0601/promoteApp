@@ -1,202 +1,135 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { ActivatedRoute, Router } from '@angular/router';
-import { I18n } from '../core/i18n';
-import { Auth } from '../core/auth';
+import { Component, inject, signal } from '@angular/core';
+import { Router } from '@angular/router';
 import { Api } from '../core/api';
-import { AppBarComponent } from '../shared/app-bar';
-import { IconComponent } from '../shared/icon';
-import { FieldComponent } from '../shared/fields';
-import { SpinnerComponent } from '../shared/spinner';
-import { RevealDirective } from '../shared/reveal';
+import { Auth } from '../core/auth';
+import { I18n } from '../core/i18n';
+import { Role } from '../core/models';
 
-type Mode = 'staff' | 'collecteur';
-
-/** Collecteur phone+PIN sign-in hidden on the login page (API / auth layer unchanged). */
-const SHOW_COLLECTEUR_LOGIN = false;
+/** Landing route per role after a successful staff login. */
+function landingFor(roles: Role[]): string {
+  if (roles.includes('ADMIN')) return '/admin';
+  if (roles.includes('MANAGER') || roles.includes('CHEF_EQUIPE')) return '/manager';
+  if (roles.includes('SUPERVISEUR')) return '/supervision';
+  if (roles.includes('CASHIER')) return '/cashier';
+  if (roles.includes('PRINT_AGENT')) return '/print';
+  if (roles.includes('COLLECTEUR')) return '/collecte';
+  if (roles.includes('AGENT')) return '/dashboard';
+  return '/home';
+}
 
 @Component({
-  selector: 'page-login',
-  standalone: true,
-  imports: [AppBarComponent, IconComponent, FieldComponent, SpinnerComponent, RevealDirective],
+  selector: 'app-login',
   template: `
-  <div class="scr">
-    <app-bar></app-bar>
-    <div class="scr-body" reveal="screen">
-      <div style="text-align:center;margin-top:6px" data-reveal="logo">
-        <span style="width:56px;height:56px;border-radius:16px;display:inline-flex;align-items:center;justify-content:center;background:color-mix(in srgb, var(--primary) 12%, var(--surface));color:var(--primary)">
-          <ic name="lock" [size]="26"></ic>
-        </span>
-        <h1 style="font-size:23px;margin-top:12px">{{ i18n.t('login_title') }}</h1>
-        <p class="muted" style="font-size:13.5px;margin-top:6px;line-height:1.45">{{ i18n.t(showCollecteurLogin && mode() === 'collecteur' ? 'login_collecteur_sub' : 'login_sub') }}</p>
-      </div>
-
-      @if (showCollecteurLogin) {
-      <!-- Mode switch: staff (email + password) vs collecteur (phone + PIN, field data-collection). -->
-      <div style="display:flex;gap:4px;background:var(--surface-2);border-radius:12px;padding:4px;margin-top:4px">
-        <button type="button" (click)="setMode('staff')"
-                [style.background]="mode() === 'staff' ? 'var(--surface)' : 'transparent'"
-                [style.box-shadow]="mode() === 'staff' ? 'var(--shadow)' : 'none'"
-                [style.color]="mode() === 'staff' ? 'var(--text)' : 'var(--muted)'"
-                style="flex:1;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">{{ i18n.t('login_mode_staff') }}</button>
-        <button type="button" (click)="setMode('collecteur')"
-                [style.background]="mode() === 'collecteur' ? 'var(--surface)' : 'transparent'"
-                [style.box-shadow]="mode() === 'collecteur' ? 'var(--shadow)' : 'none'"
-                [style.color]="mode() === 'collecteur' ? 'var(--text)' : 'var(--muted)'"
-                style="flex:1;border:none;border-radius:9px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">{{ i18n.t('login_mode_collecteur') }}</button>
-      </div>
-      }
-
-      @if (!showCollecteurLogin || mode() === 'staff') {
-        @if (!forgot()) {
-        <field [label]="i18n.t('login_email')" data-reveal="input">
-          <div class="input-prefix">
-            <span class="pfx"><ic name="user" [size]="16"></ic></span>
-            <input type="email" autocomplete="username" [placeholder]="i18n.t('login_email_ph')"
-                   [value]="email()" (input)="setEmail($event)" (keydown.enter)="submit()" />
+    <div class="login-bg screen screen-pad">
+      <div style="width:100%;max-width:400px" class="slide-up">
+        <!-- Logo area -->
+        <div style="text-align:center;margin-bottom:32px">
+          <div class="brand-logo" style="width:56px;height:56px;margin-bottom:12px">
+            <svg width="28" height="28" fill="none" viewBox="0 0 24 24" stroke="#fff" stroke-width="2">
+              <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v3M12 14v3M16 14v3"></path>
+            </svg>
           </div>
-        </field>
-        <field [label]="i18n.t('login_pw')" [err]="err() ? i18n.t(err()) : null" data-reveal="input">
-          <div class="input-prefix">
-            <span class="pfx"><ic name="lock" [size]="16"></ic></span>
-            <input [type]="showPw() ? 'text' : 'password'" autocomplete="current-password" placeholder="••••••••"
-                   [value]="pw()" (input)="setPw($event)" (keydown.enter)="submit()" />
-            <button type="button" (click)="showPw.set(!showPw())"
-                    [title]="i18n.t(showPw() ? 'pw_hide' : 'pw_show')" [attr.aria-label]="i18n.t(showPw() ? 'pw_hide' : 'pw_show')"
-                    style="display:flex;align-items:center;padding:0 12px;background:transparent;border:none;cursor:pointer;color:var(--muted)">
-              <ic [name]="showPw() ? 'eyeOff' : 'eye'" [size]="18"></ic>
-            </button>
+          <div style="font-size:20px;font-weight:800;color:var(--navy);letter-spacing:-.3px">Afriland First Bank</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:4px">{{ i18n.t('login_title') }}</div>
+        </div>
+
+        <!-- Login card -->
+        <div class="card" style="padding:28px 24px">
+          <div class="field" style="margin-bottom:18px">
+            <label class="field-label">{{ i18n.t('login_email') }}</label>
+            <input class="input" type="email" [value]="email()" (input)="email.set($any($event.target).value)"
+                   placeholder="email@afrilandfirstbank.com" autocomplete="username" />
           </div>
-        </field>
-        <div style="width:100%;text-align:right;margin-top:-4px">
-          <button type="button" (click)="openForgot()"
-                  style="background:none;border:none;padding:0;font-size:12.5px;font-weight:600;color:var(--primary);cursor:pointer">
+
+          <div class="field" style="margin-bottom:8px">
+            <label class="field-label">{{ i18n.t('login_password') }}</label>
+            <div style="position:relative">
+              <input class="input" [type]="showPw() ? 'text' : 'password'" [value]="password()"
+                     (input)="password.set($any($event.target).value)" (keydown.enter)="submit()"
+                     placeholder="••••••••" autocomplete="current-password" style="padding-right:44px" />
+              <button type="button" (click)="showPw.set(!showPw())"
+                      style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--muted-2);padding:4px">
+                <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          @if (error()) {
+            <div class="alert-error shake" style="margin-bottom:12px;margin-top:8px">{{ error() }}</div>
+          }
+
+          <button class="btn btn-primary" style="margin-top:12px" (click)="submit()" [disabled]="loading()">
+            {{ loading() ? '…' : i18n.t('login_submit') }}
+          </button>
+          <button class="btn-ghost" style="width:100%;padding:10px;margin-top:8px" (click)="forgot()">
             {{ i18n.t('login_forgot') }}
           </button>
         </div>
-        <button class="btn btn-primary" data-reveal="button" (click)="submit()" [disabled]="busy()">
-          @if (busy()) { <spinner></spinner> } @else { {{ i18n.t('login_btn') }} <ic name="arrowR" [size]="18"></ic> }
-        </button>
-        } @else {
-        <div style="text-align:center;margin-bottom:4px">
-          <h2 style="font-size:18px;margin:0">{{ i18n.t('fp_title') }}</h2>
-          <p class="muted" style="font-size:13px;margin-top:8px;line-height:1.45">{{ i18n.t('fp_sub') }}</p>
-        </div>
-        @if (sent()) {
-          <div class="feedback ok-box" style="font-size:12.5px"><ic name="check" [size]="18" style="flex-shrink:0"></ic> {{ i18n.t('fp_sent') }}</div>
-        } @else {
-          <field [label]="i18n.t('login_email')">
-            <div class="input-prefix">
-              <span class="pfx"><ic name="user" [size]="16"></ic></span>
-              <input type="email" autocomplete="username" [placeholder]="i18n.t('login_email_ph')"
-                     [value]="email()" (input)="setEmail($event)" (keydown.enter)="submitForgot()" />
-            </div>
-          </field>
-          <button class="btn btn-primary" (click)="submitForgot()" [disabled]="busy() || !email().trim()">
-            @if (busy()) { <spinner></spinner> } @else { {{ i18n.t('fp_submit') }} <ic name="mail" [size]="18"></ic> }
-          </button>
-        }
-        <button type="button" class="btn btn-ghost" (click)="closeForgot()" style="font-size:13px;margin-top:4px">
-          <ic name="chevL" [size]="16"></ic> {{ i18n.t('fp_back') }}
-        </button>
-        }
-      } @else if (showCollecteurLogin) {
-        <field [label]="i18n.t('login_phone')">
-          <div class="input-prefix">
-            <span class="pfx"><ic name="phone" [size]="16"></ic></span>
-            <input type="tel" inputmode="numeric" maxlength="9" autocomplete="tel" [placeholder]="i18n.t('login_phone_ph')"
-                   [value]="phone()" (input)="setPhone($event)" (keydown.enter)="submitPhone()" />
-          </div>
-        </field>
-        <field [label]="i18n.t('login_pin')" [err]="err() ? i18n.t(err()) : null">
-          <div class="input-prefix">
-            <span class="pfx"><ic name="lock" [size]="16"></ic></span>
-            <input [type]="showPw() ? 'text' : 'password'" inputmode="numeric" maxlength="4" autocomplete="off" placeholder="••••"
-                   style="letter-spacing:4px" [value]="pin()" (input)="setPin($event)" (keydown.enter)="submitPhone()" />
-            <button type="button" (click)="showPw.set(!showPw())"
-                    [title]="i18n.t(showPw() ? 'pw_hide' : 'pw_show')" [attr.aria-label]="i18n.t(showPw() ? 'pw_hide' : 'pw_show')"
-                    style="display:flex;align-items:center;padding:0 12px;background:transparent;border:none;cursor:pointer;color:var(--muted)">
-              <ic [name]="showPw() ? 'eyeOff' : 'eye'" [size]="18"></ic>
-            </button>
-          </div>
-        </field>
-        <button class="btn btn-primary" (click)="submitPhone()" [disabled]="busy() || !phoneValid()">
-          @if (busy()) { <spinner></spinner> } @else { {{ i18n.t('login_btn') }} <ic name="arrowR" [size]="18"></ic> }
-        </button>
-      }
-
-      <div style="flex:1"></div>
-      <button class="btn btn-outline" style="font-size:12.5px" (click)="clientPath()"><ic name="qr" [size]="16"></ic> {{ i18n.t('client_demo_link') }}</button>
+      </div>
     </div>
-  </div>`,
+  `,
   styles: [`
-    .feedback{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:var(--radius); }
-    .ok-box{ background:color-mix(in srgb, var(--primary) 12%, var(--surface)); color:var(--primary); }
+    .login-bg {
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(160deg, #FFF 0%, #FEF2F2 50%, #F7F8FA 100%);
+    }
   `],
 })
-export class LoginComponent {
-  /** Exposed for the template — see {@link SHOW_COLLECTEUR_LOGIN}. */
-  readonly showCollecteurLogin = SHOW_COLLECTEUR_LOGIN;
-
-  i18n = inject(I18n);
+export class LoginPage {
+  protected i18n = inject(I18n);
   private auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
-  private route = inject(ActivatedRoute);
 
-  constructor() {
-    // Routed here by the 401 interceptor after the session expired — tell the user why.
-    if (this.route.snapshot.queryParamMap.get('expired')) this.err.set('session_expired');
-  }
-
-  mode = signal<Mode>('staff');
   email = signal('');
-  pw = signal('');
-  phone = signal('');
-  pin = signal('');
-  err = signal('');   // i18n key of the error to show, or '' when none
+  password = signal('');
   showPw = signal(false);
-  busy = signal(false);
-  forgot = signal(false);
-  sent = signal(false);
-
-  phoneValid = computed(() => /^6\d{8}$/.test(this.phone()) && this.pin().length >= 4);
-
-  setMode(m: Mode) { if (this.mode() !== m) { this.mode.set(m); this.err.set(''); this.showPw.set(false); this.closeForgot(); } }
-  setEmail(e: Event) { this.email.set((e.target as HTMLInputElement).value); this.err.set(''); }
-  setPw(e: Event) { this.pw.set((e.target as HTMLInputElement).value); this.err.set(''); }
-  setPhone(e: Event) { this.phone.set((e.target as HTMLInputElement).value.replace(/\D/g, '')); this.err.set(''); }
-  setPin(e: Event) { this.pin.set((e.target as HTMLInputElement).value.replace(/\D/g, '')); this.err.set(''); }
+  error = signal('');
+  loading = signal(false);
+  notice = signal('');
 
   submit() {
-    if (this.busy()) return;
-    this.busy.set(true);
-    this.auth.login(this.email().trim(), this.pw()).subscribe({
-      next: () => this.router.navigateByUrl(this.auth.mustChangePassword ? '/change-password' : this.auth.landingPath()),
-      error: (e) => { this.err.set(e?.status === 403 ? 'login_disabled' : 'login_err'); this.busy.set(false); },
+    if (this.loading()) return;
+    const email = this.email().trim();
+    const pw = this.password();
+    if (!email || !pw) {
+      this.error.set(this.i18n.t('login_err_required'));
+      return;
+    }
+    this.error.set('');
+    this.loading.set(true);
+    this.auth.login(email, pw).subscribe({
+      next: () => {
+        this.auth.refreshMe().subscribe({
+          next: (u) => {
+            this.loading.set(false);
+            if (u.mustChangePassword) this.router.navigateByUrl('/change-password');
+            else this.router.navigateByUrl(landingFor(this.auth.roles()));
+          },
+          error: () => { this.loading.set(false); this.router.navigateByUrl(landingFor(this.auth.roles())); },
+        });
+      },
+      error: () => {
+        this.loading.set(false);
+        this.error.set(this.i18n.t('login_err_credentials'));
+      },
     });
   }
 
-  submitPhone() {
-    if (this.busy() || !this.phoneValid()) return;
-    this.busy.set(true);
-    this.auth.loginByPhone(this.phone().trim(), this.pin().trim()).subscribe({
-      next: () => this.router.navigateByUrl(this.auth.landingPath()),
-      error: (e) => { this.err.set(e?.status === 403 ? 'login_disabled' : 'login_phone_err'); this.busy.set(false); },
+  forgot() {
+    const email = this.email().trim();
+    if (!email) {
+      this.error.set(this.i18n.t('login_err_required'));
+      return;
+    }
+    this.error.set('');
+    this.api.forgotPassword(email).subscribe({
+      next: () => this.notice.set('OK'),
+      error: () => this.notice.set('OK'),
     });
   }
-
-  openForgot() { this.forgot.set(true); this.sent.set(false); this.err.set(''); }
-  closeForgot() { this.forgot.set(false); this.sent.set(false); this.busy.set(false); }
-
-  submitForgot() {
-    const mail = this.email().trim();
-    if (this.busy() || !mail) return;
-    this.busy.set(true);
-    this.api.forgotPassword(mail).subscribe({
-      next: () => { this.sent.set(true); this.busy.set(false); },
-      error: () => { this.sent.set(true); this.busy.set(false); },
-    });
-  }
-
-  clientPath() { this.router.navigateByUrl('/qr'); }
 }
