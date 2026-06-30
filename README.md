@@ -15,7 +15,8 @@ promoteApp/
 └── .env.example
 ```
 
-- **Frontend** (nginx) sert l'app et **proxifie `/api`** vers le backend.
+- **Frontend** (nginx) sert l'app et **proxifie `/api`** (ainsi que `/swagger-ui` et
+  `/v3/api-docs` pour la **documentation API en ligne**) vers le backend.
 - **Backend** expose l'API en interne sur `:8390`, persiste dans **PostgreSQL**.
 - **MinIO** (stockage objet S3) conserve les **images selfie KYC** ; seule la référence est en base.
 - **Auth** : JWT stateless. Rôles : `ADMIN`, `AGENT` (chargé de clientèle), `PRINT_AGENT`
@@ -114,6 +115,43 @@ Pour le dev, soit lancer le frontend derrière nginx (Docker), soit ajouter un p
 | `GET /api/agents` | protégé | ADMIN |
 | `GET /api/stats/admin` · `GET /api/stats/agent` | protégé | ADMIN · AGENT |
 
+> Cet extrait est **non exhaustif**. La **liste complète et à jour** de tous les endpoints
+> (souscriptions, recharges, collecte, KYC, produits & catégories, commissions, équipes,
+> agences, statistiques, audit, notifications, paiement…) est exposée automatiquement via
+> **Swagger UI / OpenAPI** — voir ci-dessous.
+
+## Documentation de l'API en ligne (Swagger UI / OpenAPI)
+
+L'API est **auto-documentée** (springdoc / OpenAPI 3). Aucune génération manuelle : la doc
+reflète toujours le code déployé. Elle est accessible directement depuis le navigateur, sans
+outil tiers.
+
+| Ressource | URL (local Docker) | URL (production) |
+|---|---|---|
+| **Swagger UI** (interface interactive) | `http://localhost:8973/swagger-ui.html` | `https://<DOMAIN>/swagger-ui.html` |
+| **Spécification OpenAPI** (JSON) | `http://localhost:8973/v3/api-docs` | `https://<DOMAIN>/v3/api-docs` |
+
+> En production, ces chemins passent par nginx (frontend) puis Caddy ; ils sont **publics**
+> côté authentification (la *liste* des endpoints est consultable), mais **appeler** un
+> endpoint protégé exige un jeton.
+
+### Se connecter et tester depuis Swagger UI
+
+1. Récupérer un jeton JWT :
+   - **Staff** : `POST /api/auth/login` (email + mot de passe) ;
+   - **Collecteur** : `POST /api/auth/login-phone` (téléphone 9 chiffres + PIN 4 chiffres).
+2. Cliquer sur **Authorize** (cadenas, en haut de la page) et saisir `Bearer <token_jwt>`.
+3. Dérouler un endpoint, **Try it out**, renseigner les paramètres, **Execute**.
+
+Les endpoints publics (`/api/config`, catalogue en lecture, parcours client QR) fonctionnent
+sans jeton. La configuration de l'interface (titre, serveurs, authentification Bearer) est dans
+[`OpenApiConfig`](backend/src/main/java/com/afriland/promote/config/OpenApiConfig.java) et la
+section `springdoc:` de [`application.yml`](backend/src/main/resources/application.yml).
+
+> Pour **restreindre** la doc en production (ex. ne l'exposer qu'en interne), il suffit de mettre
+> `springdoc.swagger-ui.enabled=false` / `springdoc.api-docs.enabled=false` dans `.env`/`application.yml`,
+> ou de retirer le bloc `location ~ ^/(swagger-ui|v3/api-docs)` de `frontend/nginx.conf`.
+
 ## Images KYC (selfies)
 
 Le selfie est capturé via la **caméra du navigateur** (`getUserMedia`), envoyé au backend
@@ -141,23 +179,46 @@ au moment de l'intégration.
 1. Installez Docker + Compose sur le VPS, clonez le projet.
 2. `cp .env.example .env` puis renseignez un `JWT_SECRET` fort et un mot de passe DB.
 3. `docker compose up -d --build`.
-4. **HTTPS (obligatoire pour la caméra `getUserMedia`)** — config **Caddy** fournie, sur un
-   **port personnalisé** (défaut **8443**) pour ne pas entrer en conflit avec un serveur déjà
-   présent sur 80/443. Pas de domaine ? Utilisez **sslip.io** avec votre IP. Dans `.env` :
-   `DOMAIN=<ip>.sslip.io`, `CADDY_HTTPS_PORT=8443`, `WEB_PORT=127.0.0.1:8973`,
-   `APP_CORS_ALLOWED_ORIGINS=https://<ip>.sslip.io:8443`. Puis :
-   ```bash
-   sudo ufw allow 8443/tcp
-   ./deploy.sh --tls --fresh
-   ```
-   → servie en **https://<ip>.sslip.io:8443**. Caddy utilise son CA local (`tls internal`) →
-   le navigateur affiche **un avertissement de certificat à accepter une fois** (HTTPS actif →
-   caméra OK). Avec un vrai domaine + ports 80/443 libres, on peut repasser à Let's Encrypt.
+4. **HTTPS (obligatoire pour la caméra `getUserMedia`)** — déploiement via `./deploy.sh`, qui
+   applique les overlays Caddy fournis. Deux modes :
+
+   - **Production (vrai domaine, recommandé)** — `--le` : certificat **Let's Encrypt** de
+     confiance sur les **ports standard 80/443** (aucun avertissement navigateur). Prérequis :
+     un domaine public pointant (enregistrement DNS A) vers le serveur, ports 80/443 libres.
+     Dans `.env` : `DOMAIN=promote.mondomaine.cm`, `ACME_EMAIL=ops@mondomaine.cm`,
+     `WEB_PORT=127.0.0.1:8973` (front hors interface publique),
+     `APP_CORS_ALLOWED_ORIGINS=https://promote.mondomaine.cm`,
+     `APP_PUBLIC_URL=https://promote.mondomaine.cm`. Puis :
+     ```bash
+     sudo ufw allow 80/tcp && sudo ufw allow 443/tcp
+     ./deploy.sh --le
+     ```
+     → servie en **https://promote.mondomaine.cm**, doc API sur **/swagger-ui.html**.
+
+   - **Sans domaine (recette/démo)** — `--tls` : Caddy sur un **port personnalisé** (défaut
+     **8443**) avec un certificat **auto-signé** (CA local, avertissement à accepter une fois).
+     Utilisez **sslip.io** avec votre IP. Dans `.env` : `DOMAIN=<ip>.sslip.io`,
+     `CADDY_HTTPS_PORT=8443`, `WEB_PORT=127.0.0.1:8973`,
+     `APP_CORS_ALLOWED_ORIGINS=https://<ip>.sslip.io:8443`. Puis :
+     ```bash
+     sudo ufw allow 8443/tcp
+     ./deploy.sh --tls
+     ```
+     → servie en **https://<ip>.sslip.io:8443**.
+
+   > ⚠️ N'utilisez **pas** `--fresh` sur un serveur en production : il **efface** les volumes
+   > base + MinIO (réservé à une réinitialisation volontaire). Restez sur la branche `master`.
+
 5. Sauvegardes : sauvegardez les volumes `pgdata` (base) **et** `minio_data` (images KYC), p. ex.
    `docker run --rm -v <projet>_pgdata:/data -v "$PWD":/backup alpine tar czf /backup/pgdata.tgz /data`
    (idem pour `minio_data`), ou `pg_dump` pour la base.
 
-Mises à jour : `git pull && docker compose up -d --build`.
+Mises à jour : `git pull && ./deploy.sh --le --no-build` (ou avec rebuild des images :
+`./deploy.sh --le`). `--no-build` redémarre sans reconstruire.
+
+> **Accès à la documentation API après déploiement** : ouvrez `https://<DOMAIN>/swagger-ui.html`.
+> La spécification OpenAPI brute est sur `https://<DOMAIN>/v3/api-docs` (importable dans Postman /
+> Insomnia / générateurs de clients).
 
 ## Tests
 
