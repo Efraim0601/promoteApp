@@ -84,6 +84,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/team/**").hasAnyRole("ADMIN", "MANAGER", "SUPERVISEUR", "CHEF_EQUIPE")
 
                 // ---- admin (+ manager: quasi-admin commercial) ----
+                // Runtime integration settings (SMTP + TrustPayWay credentials) are ADMIN-only.
+                .requestMatchers("/api/settings/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/config").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.GET, "/api/subscriptions").hasAnyRole("ADMIN", "MANAGER")
                 .requestMatchers(HttpMethod.GET, "/api/agents").hasRole("ADMIN")

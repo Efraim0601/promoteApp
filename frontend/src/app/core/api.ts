@@ -29,7 +29,12 @@ import {
   ProductDto,
   ProfileDto,
   RechargeDto,
+  SmtpSettingsDto,
+  SmtpSettingsUpdate,
   SubscriptionDto,
+  TestResult,
+  TrustPayWaySettingsDto,
+  TrustPayWaySettingsUpdate,
   User,
   UserDto,
 } from './models';
@@ -159,6 +164,25 @@ export class Api {
   }
   importUsers(req: ImportUsersRequest): Observable<ImportUsersResult> {
     return this.http.post<ImportUsersResult>(`${this.base}/users/import`, req);
+  }
+  // ---- integration settings (admin) ----
+  smtpSettings(): Observable<SmtpSettingsDto> {
+    return this.http.get<SmtpSettingsDto>(`${this.base}/settings/smtp`);
+  }
+  updateSmtpSettings(req: SmtpSettingsUpdate): Observable<SmtpSettingsDto> {
+    return this.http.put<SmtpSettingsDto>(`${this.base}/settings/smtp`, req);
+  }
+  testSmtp(to: string): Observable<TestResult> {
+    return this.http.post<TestResult>(`${this.base}/settings/smtp/test`, { to });
+  }
+  trustPayWaySettings(): Observable<TrustPayWaySettingsDto> {
+    return this.http.get<TrustPayWaySettingsDto>(`${this.base}/settings/trustpayway`);
+  }
+  updateTrustPayWaySettings(req: TrustPayWaySettingsUpdate): Observable<TrustPayWaySettingsDto> {
+    return this.http.put<TrustPayWaySettingsDto>(`${this.base}/settings/trustpayway`, req);
+  }
+  testTrustPayWay(): Observable<TestResult> {
+    return this.http.post<TestResult>(`${this.base}/settings/trustpayway/test`, {});
   }
   allSubscriptions(): Observable<SubscriptionDto[]> {
     return this.http.get<SubscriptionDto[]>(`${this.base}/subscriptions`);

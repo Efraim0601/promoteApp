@@ -3,12 +3,13 @@ import { Api } from '../core/api';
 import { I18n } from '../core/i18n';
 import {
   ActionAuditDto, AdminStats, AgencyDto, CreateUserRequest, ImportRowResult, ImportUserRow,
-  ImportUsersResult, LoginAuditDto, PaymentStats, ProfileDto, SubscriptionDto, UserDto,
+  ImportUsersResult, LoginAuditDto, PaymentStats, ProfileDto, SmtpSettingsDto, SmtpSettingsUpdate,
+  SubscriptionDto, TrustPayWaySettingsDto, TrustPayWaySettingsUpdate, UserDto,
 } from '../core/models';
 import { StaffSidebar } from '../shared/staff-sidebar';
 import * as XLSX from 'xlsx';
 
-type Tab = 'overview' | 'users' | 'transactions' | 'agencies' | 'permissions' | 'audit';
+type Tab = 'overview' | 'users' | 'transactions' | 'agencies' | 'permissions' | 'audit' | 'settings';
 const fcfa = (n: number) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0)) + ' F';
 const ROLES = ['AGENT', 'CASHIER', 'PRINT_AGENT', 'COLLECTEUR', 'SUPERVISEUR', 'CHEF_EQUIPE', 'MANAGER', 'ADMIN'];
 const PAGE = 10;
@@ -22,7 +23,7 @@ const PAGE = 10;
       <div style="padding-left:36px">
         <div class="tabs">
           @for (t of tabs; track t) {
-            <button (click)="setTab(t)" class="tab" [class.tab-on]="tab() === t">{{ i18n.t('adm_' + t) }}</button>
+            <button (click)="setTab(t)" class="tab" [class.tab-on]="tab() === t">{{ tabLabel(t) }}</button>
           }
         </div>
 
@@ -262,6 +263,64 @@ const PAGE = 10;
             }
           </div>
         }
+
+        <!-- SETTINGS -->
+        @if (tab() === 'settings') {
+          <div class="fade-in" style="display:flex;flex-direction:column;gap:16px">
+
+            <!-- SMTP -->
+            <div class="panel">
+              <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Serveur email (SMTP)</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Sert à l'envoi des identifiants aux nouveaux comptes et des réinitialisations. Laissez un champ vide pour utiliser la valeur du serveur (.env).</div>
+              @if (smtp(); as s) {
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                  <div><label class="lab">Hôte SMTP</label><input class="in" [value]="s.host || ''" (input)="patchSmtp('host', val($event))" placeholder="smtp.office365.com"></div>
+                  <div><label class="lab">Port</label><input class="in" type="number" [value]="s.port ?? ''" (input)="patchSmtp('port', val($event))" placeholder="587"></div>
+                  <div><label class="lab">Identifiant (username)</label><input class="in" [value]="s.username || ''" (input)="patchSmtp('username', val($event))" autocomplete="off"></div>
+                  <div><label class="lab">Mot de passe {{ s.passwordSet ? '(défini ✓)' : '' }}</label><input class="in" type="password" [value]="smtpPassword()" (input)="smtpPassword.set(val($event))" placeholder="•••••• (laisser vide pour conserver)" autocomplete="new-password"></div>
+                  <div><label class="lab">Expéditeur (from)</label><input class="in" [value]="s.from || ''" (input)="patchSmtp('from', val($event))" placeholder="no-reply@afrilandfirstbank.com"></div>
+                  <div><label class="lab">Nom expéditeur</label><input class="in" [value]="s.fromName || ''" (input)="patchSmtp('fromName', val($event))" placeholder="Afriland Carte Promote"></div>
+                  <div style="grid-column:1 / -1"><label class="lab">URL publique de l'application (lien de connexion dans les emails)</label><input class="in" [value]="s.publicUrl || ''" (input)="patchSmtp('publicUrl', val($event))" placeholder="https://promote.afrilandfirstbank.com"></div>
+                </div>
+                <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--label);margin-bottom:12px;cursor:pointer">
+                  <input type="checkbox" [checked]="s.enabled === true" (change)="patchSmtpBool('enabled', chk($event))">
+                  Envoi d'emails activé
+                </label>
+                @if (smtpMsg()) { <div class="alert-success" style="margin-bottom:10px">✓ {{ smtpMsg() }}</div> }
+                @if (smtpErr()) { <div class="alert-error" style="margin-bottom:10px">{{ smtpErr() }}</div> }
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button (click)="saveSmtp()" [disabled]="smtpBusy()" class="btn btn-primary" style="width:auto;padding:10px 18px;border-radius:10px">Enregistrer</button>
+                  <button (click)="doTestSmtp()" [disabled]="smtpBusy()" class="btn-soft" style="border-radius:10px">{{ smtpBusy() ? '…' : 'Envoyer un email de test' }}</button>
+                </div>
+              } @else { <div style="color:var(--muted);font-size:13px">Chargement…</div> }
+            </div>
+
+            <!-- TrustPayWay -->
+            <div class="panel">
+              <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:4px">Passerelle de paiement (TrustPayWay)</div>
+              <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Connexion à l'agrégateur Mobile Money. Les clés secrètes ne sont jamais réaffichées ; laissez vide pour conserver la valeur en place.</div>
+              @if (tpw(); as t) {
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                  <div style="grid-column:1 / -1"><label class="lab">URL de base de l'API</label><input class="in" [value]="t.baseUrl || ''" (input)="patchTpw('baseUrl', val($event))" placeholder="https://api.trustpayway.com"></div>
+                  <div><label class="lab">Application ID</label><input class="in" [value]="t.applicationId || ''" (input)="patchTpw('applicationId', val($event))" autocomplete="off"></div>
+                  <div><label class="lab">Clé secrète {{ t.secretKeySet ? '(définie ✓)' : '' }}</label><input class="in" type="password" [value]="tpwSecret()" (input)="tpwSecret.set(val($event))" placeholder="•••••• (laisser vide pour conserver)" autocomplete="new-password"></div>
+                  <div style="grid-column:1 / -1"><label class="lab">URL de notification (webhook)</label><input class="in" [value]="t.notifUrl || ''" (input)="patchTpw('notifUrl', val($event))" placeholder="https://…/api/payment/webhook/trustpayway"></div>
+                  <div><label class="lab">Secret webhook {{ t.webhookSecretSet ? '(défini ✓)' : '' }}</label><input class="in" type="password" [value]="tpwWebhook()" (input)="tpwWebhook.set(val($event))" placeholder="•••••• (optionnel)" autocomplete="new-password"></div>
+                  <div><label class="lab">Timeout connexion (ms)</label><input class="in" type="number" [value]="t.connectTimeoutMs ?? ''" (input)="patchTpw('connectTimeoutMs', val($event))" placeholder="5000"></div>
+                  <div><label class="lab">Timeout push (ms)</label><input class="in" type="number" [value]="t.readTimeoutMs ?? ''" (input)="patchTpw('readTimeoutMs', val($event))" placeholder="45000"></div>
+                  <div><label class="lab">Timeout statut (ms)</label><input class="in" type="number" [value]="t.statusReadTimeoutMs ?? ''" (input)="patchTpw('statusReadTimeoutMs', val($event))" placeholder="12000"></div>
+                </div>
+                @if (tpwMsg()) { <div class="alert-success" style="margin-bottom:10px">✓ {{ tpwMsg() }}</div> }
+                @if (tpwErr()) { <div class="alert-error" style="margin-bottom:10px">{{ tpwErr() }}</div> }
+                <div style="display:flex;gap:8px;flex-wrap:wrap">
+                  <button (click)="saveTpw()" [disabled]="tpwBusy()" class="btn btn-primary" style="width:auto;padding:10px 18px;border-radius:10px">Enregistrer</button>
+                  <button (click)="doTestTpw()" [disabled]="tpwBusy()" class="btn-soft" style="border-radius:10px">{{ tpwBusy() ? '…' : 'Tester la connexion' }}</button>
+                </div>
+                <div style="font-size:11px;color:var(--muted-2);margin-top:10px">Note : l'activation de la passerelle (provider) reste pilotée par la variable d'environnement et nécessite un redémarrage. Cet écran configure la connexion.</div>
+              } @else { <div style="color:var(--muted);font-size:13px">Chargement…</div> }
+            </div>
+          </div>
+        }
       </div>
     </div>
   `,
@@ -290,8 +349,9 @@ const PAGE = 10;
 export class AdminPage {
   protected i18n = inject(I18n);
   private api = inject(Api);
-  tabs: Tab[] = ['overview', 'users', 'transactions', 'agencies', 'permissions', 'audit'];
+  tabs: Tab[] = ['overview', 'users', 'transactions', 'agencies', 'permissions', 'audit', 'settings'];
   roles = ROLES;
+  tabLabel = (t: Tab) => (t === 'settings' ? 'Paramètres' : this.i18n.t('adm_' + t));
 
   tab = signal<Tab>('overview');
   stats = signal<AdminStats | null>(null);
@@ -315,6 +375,12 @@ export class AdminPage {
   importResult = signal<ImportUsersResult | null>(null);
   txFilter = signal('all'); txPage = signal(0);
   auditTab = signal<'logins' | 'actions'>('logins');
+  // settings
+  smtp = signal<SmtpSettingsDto | null>(null);
+  smtpPassword = signal(''); smtpMsg = signal(''); smtpErr = signal(''); smtpBusy = signal(false);
+  tpw = signal<TrustPayWaySettingsDto | null>(null);
+  tpwSecret = signal(''); tpwWebhook = signal('');
+  tpwMsg = signal(''); tpwErr = signal(''); tpwBusy = signal(false);
 
   constructor() {
     this.api.adminStats().subscribe({ next: (s) => this.stats.set(s), error: () => {} });
@@ -335,6 +401,7 @@ export class AdminPage {
     if (t === 'agencies' && this.agencies().length === 0) this.api.agencies().subscribe({ next: (l) => this.agencies.set(l), error: () => {} });
     if (t === 'permissions' && this.profiles().length === 0) this.api.profiles().subscribe({ next: (l) => this.profiles.set(l), error: () => {} });
     if (t === 'audit') this.loadAudit();
+    if (t === 'settings' && !this.smtp()) this.loadSettings();
   }
 
   adminKpis = computed(() => {
@@ -487,5 +554,65 @@ export class AdminPage {
   loadAudit() {
     if (this.auditTab() === 'logins') this.api.auditLogins().subscribe({ next: (l) => this.logins.set(l), error: () => {} });
     else this.api.auditActions().subscribe({ next: (l) => this.actions.set(l), error: () => {} });
+  }
+
+  // ---- settings (SMTP + TrustPayWay) ----
+  loadSettings() {
+    this.api.smtpSettings().subscribe({ next: (s) => this.smtp.set(s), error: () => {} });
+    this.api.trustPayWaySettings().subscribe({ next: (t) => this.tpw.set(t), error: () => {} });
+  }
+  patchSmtp(key: keyof SmtpSettingsDto, value: string) {
+    const s = this.smtp(); if (!s) return;
+    const v: unknown = key === 'port' ? (value ? Number(value) : null) : (value || null);
+    this.smtp.set({ ...s, [key]: v });
+  }
+  patchSmtpBool(key: keyof SmtpSettingsDto, value: boolean) {
+    const s = this.smtp(); if (!s) return;
+    this.smtp.set({ ...s, [key]: value });
+  }
+  patchTpw(key: keyof TrustPayWaySettingsDto, value: string) {
+    const t = this.tpw(); if (!t) return;
+    const numeric = key === 'connectTimeoutMs' || key === 'readTimeoutMs' || key === 'statusReadTimeoutMs';
+    const v: unknown = numeric ? (value ? Number(value) : null) : (value || null);
+    this.tpw.set({ ...t, [key]: v });
+  }
+  saveSmtp() {
+    const s = this.smtp(); if (!s) return;
+    this.smtpBusy.set(true); this.smtpMsg.set(''); this.smtpErr.set('');
+    const req: SmtpSettingsUpdate = {
+      enabled: s.enabled, host: s.host, port: s.port, username: s.username,
+      password: this.smtpPassword() || null, from: s.from, fromName: s.fromName, publicUrl: s.publicUrl,
+    };
+    this.api.updateSmtpSettings(req).subscribe({
+      next: (r) => { this.smtp.set(r); this.smtpPassword.set(''); this.smtpBusy.set(false); this.smtpMsg.set('Paramètres SMTP enregistrés'); },
+      error: (e) => { this.smtpBusy.set(false); this.smtpErr.set(e?.error?.error || e?.error?.message || 'Erreur'); },
+    });
+  }
+  doTestSmtp() {
+    this.smtpBusy.set(true); this.smtpMsg.set(''); this.smtpErr.set('');
+    this.api.testSmtp('').subscribe({
+      next: (r) => { this.smtpBusy.set(false); if (r.ok) this.smtpMsg.set(r.message); else this.smtpErr.set(r.message); },
+      error: (e) => { this.smtpBusy.set(false); this.smtpErr.set(e?.error?.message || 'Erreur'); },
+    });
+  }
+  saveTpw() {
+    const t = this.tpw(); if (!t) return;
+    this.tpwBusy.set(true); this.tpwMsg.set(''); this.tpwErr.set('');
+    const req: TrustPayWaySettingsUpdate = {
+      baseUrl: t.baseUrl, secretKey: this.tpwSecret() || null, applicationId: t.applicationId,
+      notifUrl: t.notifUrl, webhookSecret: this.tpwWebhook() || null,
+      connectTimeoutMs: t.connectTimeoutMs, readTimeoutMs: t.readTimeoutMs, statusReadTimeoutMs: t.statusReadTimeoutMs,
+    };
+    this.api.updateTrustPayWaySettings(req).subscribe({
+      next: (r) => { this.tpw.set(r); this.tpwSecret.set(''); this.tpwWebhook.set(''); this.tpwBusy.set(false); this.tpwMsg.set('Paramètres TrustPayWay enregistrés'); },
+      error: (e) => { this.tpwBusy.set(false); this.tpwErr.set(e?.error?.error || e?.error?.message || 'Erreur'); },
+    });
+  }
+  doTestTpw() {
+    this.tpwBusy.set(true); this.tpwMsg.set(''); this.tpwErr.set('');
+    this.api.testTrustPayWay().subscribe({
+      next: (r) => { this.tpwBusy.set(false); if (r.ok) this.tpwMsg.set(r.message); else this.tpwErr.set(r.message); },
+      error: (e) => { this.tpwBusy.set(false); this.tpwErr.set(e?.error?.message || 'Erreur'); },
+    });
   }
 }

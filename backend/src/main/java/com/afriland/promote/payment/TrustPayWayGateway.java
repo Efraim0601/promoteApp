@@ -1,6 +1,7 @@
 package com.afriland.promote.payment;
 
 import com.afriland.promote.model.PayStatus;
+import com.afriland.promote.service.IntegrationSettingsService;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -43,38 +44,71 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     private static final Logger log = LoggerFactory.getLogger(TrustPayWayGateway.class);
 
-    private final TrustPayWayProperties props;
-    private final RestClient http;        // USSD push (process-payment) — tolerant read timeout
-    private final RestClient statusHttp;  // get-status polls — short read timeout (fail fast)
+    private final IntegrationSettingsService settings;
     private final ObjectMapper json;
+
+    // RestClients are rebuilt lazily whenever the effective base URL / timeouts change (admin edits
+    // the TrustPayWay settings at runtime). volatile: read on the hot path, written under lock.
+    private volatile RestClient http;        // USSD push (process-payment) — tolerant read timeout
+    private volatile RestClient statusHttp;  // get-status polls — short read timeout (fail fast)
+    private volatile String clientSig;       // base URL + timeouts the current clients were built for
 
     // Cached access token + its expiry instant (login is reused until it nears expiry).
     private volatile String accessToken;
     private volatile Instant tokenExpiry = Instant.EPOCH;
+    private volatile String credSig;         // base + secret + appId the token was obtained with
 
-    public TrustPayWayGateway(TrustPayWayProperties props, ObjectMapper json) {
-        this.props = props;
+    public TrustPayWayGateway(IntegrationSettingsService settings, ObjectMapper json) {
+        this.settings = settings;
         this.json = json;
-        // Bounded connect/read timeouts so a slow or hung aggregator never pins a worker thread
-        // indefinitely (the root cause of thread-pool exhaustion under load).
-        ClientHttpRequestFactorySettings settings = ClientHttpRequestFactorySettings.DEFAULTS
-                .withConnectTimeout(Duration.ofMillis(props.getConnectTimeoutMs()))
-                .withReadTimeout(Duration.ofMillis(props.getReadTimeoutMs()));
-        String baseUrl = props.getBaseUrl() == null ? "" : props.getBaseUrl();
-        this.http = RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(ClientHttpRequestFactories.get(settings))
-                .build();
-        // Separate client for status polls with a SHORT read timeout: a hung get-status must fail
-        // fast instead of pinning a reconciliation thread for the full push timeout (45s), which
-        // starved the sweep and let pending orders expire unconfirmed.
-        ClientHttpRequestFactorySettings statusSettings = ClientHttpRequestFactorySettings.DEFAULTS
-                .withConnectTimeout(Duration.ofMillis(props.getConnectTimeoutMs()))
-                .withReadTimeout(Duration.ofMillis(props.getStatusReadTimeoutMs()));
-        this.statusHttp = RestClient.builder()
-                .baseUrl(baseUrl)
-                .requestFactory(ClientHttpRequestFactories.get(statusSettings))
-                .build();
+    }
+
+    /** (Re)build the two RestClients if the effective base URL or timeouts changed since last call. */
+    private void ensureClients() {
+        String base = settings.tpwBaseUrl() == null ? "" : settings.tpwBaseUrl();
+        int ct = settings.tpwConnectTimeoutMs();
+        int rt = settings.tpwReadTimeoutMs();
+        int st = settings.tpwStatusReadTimeoutMs();
+        String sig = base + "|" + ct + "|" + rt + "|" + st;
+        if (sig.equals(clientSig) && http != null && statusHttp != null) return;
+        synchronized (this) {
+            if (sig.equals(clientSig) && http != null && statusHttp != null) return;
+            // Bounded connect/read timeouts so a slow or hung aggregator never pins a worker thread
+            // indefinitely (the root cause of thread-pool exhaustion under load).
+            ClientHttpRequestFactorySettings push = ClientHttpRequestFactorySettings.DEFAULTS
+                    .withConnectTimeout(Duration.ofMillis(ct)).withReadTimeout(Duration.ofMillis(rt));
+            this.http = RestClient.builder().baseUrl(base)
+                    .requestFactory(ClientHttpRequestFactories.get(push)).build();
+            // Separate client for status polls with a SHORT read timeout: a hung get-status must fail
+            // fast instead of pinning a reconciliation thread for the full push timeout, which
+            // starved the sweep and let pending orders expire unconfirmed.
+            ClientHttpRequestFactorySettings poll = ClientHttpRequestFactorySettings.DEFAULTS
+                    .withConnectTimeout(Duration.ofMillis(ct)).withReadTimeout(Duration.ofMillis(st));
+            this.statusHttp = RestClient.builder().baseUrl(base)
+                    .requestFactory(ClientHttpRequestFactories.get(poll)).build();
+            this.clientSig = sig;
+        }
+    }
+
+    /**
+     * Force a fresh login with the current credentials and report the outcome. Used by the admin
+     * "test connection" action. @return null on success, or a human-readable error otherwise.
+     */
+    public String testConnection() {
+        if (settings.tpwBaseUrl() == null || settings.tpwBaseUrl().isBlank()) {
+            return "URL de base TrustPayWay non configurée.";
+        }
+        if (settings.tpwSecretKey() == null || settings.tpwSecretKey().isBlank()) {
+            return "Clé secrète TrustPayWay non configurée.";
+        }
+        try {
+            ensureClients();
+            synchronized (this) { accessToken = null; tokenExpiry = Instant.EPOCH; }
+            token();   // performs POST /api/login
+            return null;
+        } catch (RuntimeException e) {
+            return e.getMessage();
+        }
     }
 
     @Override
@@ -84,6 +118,7 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     @Override
     public PaymentRequest requestPayment(Payable sub, String operator) {
+        ensureClients();
         String network = network(operator);
         String msisdn = msisdn(sub);
         // Send the globally-unique gateway order id (falls back to the bare ref for safety). It is
@@ -96,7 +131,7 @@ public class TrustPayWayGateway implements PaymentGateway {
                 "subscriberMsisdn", msisdn,
                 "description", sub.getPaymentLabel(),
                 "orderId", orderId,
-                "notifUrl", props.getNotifUrl()
+                "notifUrl", settings.tpwNotifUrl() == null ? "" : settings.tpwNotifUrl()
         );
         // Capture the raw body + HTTP status ourselves: on failure the API may answer either a
         // structured 417 ({data.status, message}) OR a bare {"error": "..."} — the latter has no
@@ -204,6 +239,7 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     @Override
     public Optional<GatewayStatus> queryDetailedStatus(Payable sub) {
+        ensureClients();
         // TrustPayWay accepts either the aggregator transaction id or our orderId (gatewayRef).
         // After a 500→400 Duplicate push the tx id is often missing locally while the order is live.
         String id = sub.getPaymentTxId();
@@ -261,6 +297,7 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     /** Call {@code /api/verify/{id}} and map the final status; empty on 404 / non-2xx / parse error. */
     private Optional<GatewayStatus> verifyStatus(Payable sub) {
+        ensureClients();
         String id = sub.getGatewayRef();
         if (id == null || id.isBlank()) id = sub.getPaymentTxId();
         if (id == null || id.isBlank()) return Optional.empty();
@@ -299,17 +336,26 @@ public class TrustPayWayGateway implements PaymentGateway {
 
     // ---- helpers ---------------------------------------------------------
 
-    /** Reuse the access token until ~30 s before it expires, then re-login. */
+    /** Reuse the access token until ~30 s before it expires, then re-login. A change of base URL,
+     *  secret key or application id (admin edited the settings) invalidates the cached token. */
     private synchronized String token() {
+        ensureClients();
+        String secret = settings.tpwSecretKey() == null ? "" : settings.tpwSecretKey();
+        String appId = settings.tpwApplicationId() == null ? "" : settings.tpwApplicationId();
+        String sig = settings.tpwBaseUrl() + "|" + secret + "|" + appId;
+        if (!sig.equals(credSig)) {
+            accessToken = null;
+            credSig = sig;
+        }
         if (accessToken != null && Instant.now().isBefore(tokenExpiry.minusSeconds(30))) {
             return accessToken;
         }
         LoginResponse login = http.post()
                 .uri("/api/login")
-                .header("Authorization", "Bearer " + props.getSecretKey())
+                .header("Authorization", "Bearer " + secret)
                 .accept(MediaType.APPLICATION_JSON)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("applicationId", props.getApplicationId()))
+                .body(Map.of("applicationId", appId))
                 .exchange((req, res) -> {
                     String raw = readBody(res);
                     if (!res.getStatusCode().is2xxSuccessful() || raw == null || raw.isBlank()) {

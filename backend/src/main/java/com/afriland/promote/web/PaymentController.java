@@ -4,8 +4,8 @@ import com.afriland.promote.model.PayStatus;
 import com.afriland.promote.model.Subscription;
 import com.afriland.promote.payment.PaymentGateway;
 import com.afriland.promote.payment.TrustPayWayGateway;
-import com.afriland.promote.payment.TrustPayWayProperties;
 import com.afriland.promote.service.ActionAuditService;
+import com.afriland.promote.service.IntegrationSettingsService;
 import com.afriland.promote.service.RechargeService;
 import com.afriland.promote.service.SubscriptionService;
 import com.afriland.promote.service.PaymentReconciliationService;
@@ -41,21 +41,21 @@ public class PaymentController {
     private final RechargeService rechargeService;
     private final PaymentReconciliationService reconciliationService;
     private final PaymentGateway gateway;            // the active (@Primary) gateway
-    private final TrustPayWayProperties trustPayWay;
+    private final IntegrationSettingsService settings;
     private final ActionAuditService audit;
     private final ObjectMapper json;
     private final ThreadPoolTaskExecutor reconcileExecutor;
 
     public PaymentController(SubscriptionService service, RechargeService rechargeService,
                              PaymentReconciliationService reconciliationService,
-                             PaymentGateway gateway, TrustPayWayProperties trustPayWay,
+                             PaymentGateway gateway, IntegrationSettingsService settings,
                              ActionAuditService audit, ObjectMapper json,
                              @Qualifier("reconcileExecutor") ThreadPoolTaskExecutor reconcileExecutor) {
         this.service = service;
         this.rechargeService = rechargeService;
         this.reconciliationService = reconciliationService;
         this.gateway = gateway;
-        this.trustPayWay = trustPayWay;
+        this.settings = settings;
         this.audit = audit;
         this.json = json;
         this.reconcileExecutor = reconcileExecutor;
@@ -157,7 +157,7 @@ public class PaymentController {
             @RequestBody TrustPayWayWebhook body,
             @RequestHeader(value = "X-Webhook-Secret", required = false) String secret) {
 
-        String expected = trustPayWay.getWebhookSecret();
+        String expected = settings.tpwWebhookSecret();
         if (expected != null && !expected.isBlank() && !expected.equals(secret)) {
             log.warn("Rejected TrustPayWay webhook for orderId={} (bad secret)", body.orderId());
             return ResponseEntity.status(403).build();

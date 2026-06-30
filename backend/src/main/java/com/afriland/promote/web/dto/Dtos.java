@@ -164,6 +164,30 @@ public final class Dtos {
                             int rechargeInitiale, int passPremium,
                             int rechargeInitialeBancaire, int passPremiumBancaire) {}
 
+    // ---- integration settings (SMTP + TrustPayWay) ----
+    /** SMTP settings returned to the admin UI. The password is never sent back — {@code passwordSet}
+     *  tells the UI whether one is configured. Values shown are the effective ones (DB or env). */
+    public record SmtpSettingsDto(Boolean enabled, String host, Integer port, String username,
+                                  String from, String fromName, String publicUrl, boolean passwordSet) {}
+    /** SMTP update payload. A null/blank {@code password} keeps the stored one; other null/blank
+     *  fields revert that override to the environment/application.yml default. */
+    public record SmtpSettingsUpdate(Boolean enabled, String host, Integer port, String username,
+                                     String password, String from, String fromName, String publicUrl) {}
+    /** TrustPayWay settings returned to the admin UI. Secrets are never sent back — the {@code *Set}
+     *  flags tell the UI whether each one is configured. */
+    public record TrustPayWaySettingsDto(String baseUrl, String applicationId, String notifUrl,
+                                         Integer connectTimeoutMs, Integer readTimeoutMs,
+                                         Integer statusReadTimeoutMs,
+                                         boolean secretKeySet, boolean webhookSecretSet) {}
+    /** TrustPayWay update payload. A null/blank secret keeps the stored one; other null/blank fields
+     *  revert that override to the environment/application.yml default. */
+    public record TrustPayWaySettingsUpdate(String baseUrl, String secretKey, String applicationId,
+                                            String notifUrl, String webhookSecret,
+                                            Integer connectTimeoutMs, Integer readTimeoutMs,
+                                            Integer statusReadTimeoutMs) {}
+    public record TestEmailRequest(String to) {}
+    public record TestResult(boolean ok, String message) {}
+
     // ---- products / promotions (catalog) ----
     public record ProductComponentDto(String ckey, String label, int amount) {
         public static ProductComponentDto of(com.afriland.promote.model.ProductComponent c) {

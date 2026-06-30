@@ -77,6 +77,27 @@ export interface ConfigDto {
   rechargeInitialeBancaire: number;
   passPremiumBancaire: number;
 }
+// ---- integration settings (SMTP + TrustPayWay) ----
+export interface SmtpSettingsDto {
+  enabled: boolean | null; host: string | null; port: number | null; username: string | null;
+  from: string | null; fromName: string | null; publicUrl: string | null; passwordSet: boolean;
+}
+export interface SmtpSettingsUpdate {
+  enabled: boolean | null; host: string | null; port: number | null; username: string | null;
+  password: string | null; from: string | null; fromName: string | null; publicUrl: string | null;
+}
+export interface TrustPayWaySettingsDto {
+  baseUrl: string | null; applicationId: string | null; notifUrl: string | null;
+  connectTimeoutMs: number | null; readTimeoutMs: number | null; statusReadTimeoutMs: number | null;
+  secretKeySet: boolean; webhookSecretSet: boolean;
+}
+export interface TrustPayWaySettingsUpdate {
+  baseUrl: string | null; secretKey: string | null; applicationId: string | null;
+  notifUrl: string | null; webhookSecret: string | null;
+  connectTimeoutMs: number | null; readTimeoutMs: number | null; statusReadTimeoutMs: number | null;
+}
+export interface TestResult { ok: boolean; message: string; }
+
 export interface PaymentStatusDto {
   ref: string;
   payStatus: string;
