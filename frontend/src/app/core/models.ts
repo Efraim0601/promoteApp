@@ -231,6 +231,20 @@ export interface CreateUserRequest {
   name: string; email: string; role?: string; roles?: string[];
   agency?: string; phone?: string; parentUserId?: string;
 }
+// ---- bulk user import ----
+export interface ImportUserRow {
+  name: string; email: string; role: string; phone?: string; agency?: string;
+}
+export interface ImportUsersRequest { rows: ImportUserRow[]; updateExisting: boolean; }
+export interface ImportRowResult {
+  email: string; name: string; role: string;
+  status: 'created' | 'updated' | 'skipped' | 'invalid';
+  reason: string | null; password: string | null;
+}
+export interface ImportUsersResult {
+  created: number; updated: number; skipped: number; invalid: number;
+  rows: ImportRowResult[];
+}
 export interface ProfileDto {
   id: number; name: string; description: string; builtin: boolean; permissions: string[];
 }

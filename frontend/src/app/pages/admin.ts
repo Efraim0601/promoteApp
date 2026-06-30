@@ -2,10 +2,11 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Api } from '../core/api';
 import { I18n } from '../core/i18n';
 import {
-  ActionAuditDto, AdminStats, AgencyDto, CreateUserRequest, LoginAuditDto,
-  PaymentStats, ProfileDto, SubscriptionDto, UserDto,
+  ActionAuditDto, AdminStats, AgencyDto, CreateUserRequest, ImportRowResult, ImportUserRow,
+  ImportUsersResult, LoginAuditDto, PaymentStats, ProfileDto, SubscriptionDto, UserDto,
 } from '../core/models';
 import { StaffSidebar } from '../shared/staff-sidebar';
+import * as XLSX from 'xlsx';
 
 type Tab = 'overview' | 'users' | 'transactions' | 'agencies' | 'permissions' | 'audit';
 const fcfa = (n: number) => new Intl.NumberFormat('fr-FR').format(Math.round(n || 0)) + ' F';
@@ -67,7 +68,70 @@ const PAGE = 10;
                 <input [value]="userSearch()" (input)="userSearch.set(val($event))" [placeholder]="i18n.t('dash_search')" style="width:100%;padding:10px 12px 10px 36px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;background:var(--surface-2)">
               </div>
               <button (click)="showCreate.set(!showCreate())" class="btn btn-primary" style="width:auto;padding:10px 18px;border-radius:10px">+ {{ i18n.t('adm_add_user') }}</button>
+              <button (click)="toggleImport()" class="btn-soft" style="width:auto;padding:10px 18px;border-radius:10px;white-space:nowrap">↥ Importer</button>
             </div>
+
+            @if (showImport()) {
+              <div class="panel" style="border:2px solid var(--primary);margin-bottom:16px">
+                <div style="font-size:14px;font-weight:700;color:var(--navy);margin-bottom:6px">Import en masse (Excel / CSV)</div>
+                <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+                  Fichier <b>.xlsx</b>, <b>.xls</b> ou <b>.csv</b> avec les colonnes :
+                  <b>nom</b>, <b>email</b>, <b>role</b>, <b>telephone</b>, <b>agence</b>.
+                  Le rôle peut combiner plusieurs valeurs avec « | » (ex. AGENT|COLLECTEUR).
+                  Un mot de passe temporaire est généré et envoyé par email à chaque nouvel utilisateur.
+                  <button (click)="downloadTemplate()" class="linkbtn">Télécharger un modèle</button>
+                </div>
+
+                <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+                  <input #fileInput type="file" accept=".xlsx,.xls,.csv" (change)="onFile($event)"
+                         style="font-size:13px">
+                  @if (parsedRows().length) { <span style="font-size:12px;color:var(--label);font-weight:600">{{ parsedRows().length }} ligne(s) détectée(s)</span> }
+                </div>
+                @if (parseErr()) { <div class="alert-error" style="margin-bottom:10px">{{ parseErr() }}</div> }
+
+                @if (parsedRows().length && !importResult()) {
+                  <div style="max-height:180px;overflow:auto;border:1px solid var(--surface-3);border-radius:8px;margin-bottom:10px">
+                    @for (r of parsedRows().slice(0, 50); track $index) {
+                      <div class="urow" style="border:none;border-bottom:1px solid var(--surface-3);border-radius:0;padding:8px 12px">
+                        <div style="min-width:0"><div style="font-size:13px;font-weight:600;color:var(--navy)">{{ r.name || '—' }}</div><div style="font-size:11px;color:var(--muted)">{{ r.email || '—' }}</div></div>
+                        <span class="rolechip">{{ r.role || '—' }}</span>
+                      </div>
+                    }
+                  </div>
+                  <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:var(--label);margin-bottom:12px;cursor:pointer">
+                    <input type="checkbox" [checked]="updateExisting()" (change)="updateExisting.set(chk($event))">
+                    Mettre à jour les comptes existants (sinon ils sont ignorés)
+                  </label>
+                  @if (importErr()) { <div class="alert-error" style="margin-bottom:10px">{{ importErr() }}</div> }
+                  <div style="display:flex;gap:8px">
+                    <button (click)="runImport()" [disabled]="importing()" class="btn btn-primary" style="width:auto;padding:10px 18px;border-radius:10px">
+                      {{ importing() ? 'Import en cours…' : 'Importer ' + parsedRows().length + ' utilisateur(s)' }}
+                    </button>
+                    <button (click)="resetImport()" class="btn-soft" style="border-radius:10px">{{ i18n.t('adm_cancel') }}</button>
+                  </div>
+                }
+
+                @if (importResult(); as res) {
+                  <div class="alert-success" style="margin-bottom:10px">
+                    ✓ {{ res.created }} créé(s), {{ res.updated }} mis à jour, {{ res.skipped }} ignoré(s), {{ res.invalid }} invalide(s)
+                  </div>
+                  <div style="max-height:220px;overflow:auto;border:1px solid var(--surface-3);border-radius:8px;margin-bottom:10px">
+                    @for (r of res.rows; track $index) {
+                      <div class="urow" style="border:none;border-bottom:1px solid var(--surface-3);border-radius:0;padding:8px 12px">
+                        <div style="min-width:0">
+                          <div style="font-size:13px;font-weight:600;color:var(--navy)">{{ r.name || r.email }}</div>
+                          <div style="font-size:11px;color:var(--muted)">{{ r.email }} · {{ r.role }}</div>
+                          @if (r.password) { <div style="font-size:11px;color:var(--label)">Mot de passe : <span class="mono">{{ r.password }}</span></div> }
+                          @if (r.reason) { <div style="font-size:11px;color:#DC2626">{{ reasonLabel(r.reason) }}</div> }
+                        </div>
+                        <span class="statuschip" [style.color]="statusColor(r.status)" [style.border-color]="statusColor(r.status)">{{ statusLabel(r.status) }}</span>
+                      </div>
+                    }
+                  </div>
+                  <button (click)="resetImport()" class="btn-soft" style="border-radius:10px">Fermer</button>
+                }
+              </div>
+            }
 
             @if (showCreate()) {
               <div class="panel" style="border:2px solid var(--primary);margin-bottom:16px">
@@ -219,6 +283,8 @@ const PAGE = 10;
     .sale { background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 3px rgba(0,0,0,.04);border:1px solid var(--surface-3) }
     .pg { padding:6px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;font-size:12px;font-weight:600;cursor:pointer }
     .pg:disabled { opacity:.4;cursor:default }
+    .linkbtn { background:none;border:none;color:var(--primary);font-size:12px;font-weight:700;cursor:pointer;padding:0;text-decoration:underline }
+    .statuschip { padding:2px 8px;border-radius:12px;font-size:10px;font-weight:700;background:#fff;border:1.5px solid;flex-shrink:0 }
   `],
 })
 export class AdminPage {
@@ -241,6 +307,12 @@ export class AdminPage {
   showCreate = signal(false);
   nName = signal(''); nEmail = signal(''); nRole = signal('AGENT'); nAgency = signal('');
   createMsg = signal(''); createErr = signal('');
+  showImport = signal(false);
+  parsedRows = signal<ImportUserRow[]>([]);
+  parseErr = signal(''); importErr = signal('');
+  updateExisting = signal(false);
+  importing = signal(false);
+  importResult = signal<ImportUsersResult | null>(null);
   txFilter = signal('all'); txPage = signal(0);
   auditTab = signal<'logins' | 'actions'>('logins');
 
@@ -250,6 +322,7 @@ export class AdminPage {
   }
 
   val(e: Event) { return (e.target as HTMLInputElement).value; }
+  chk(e: Event) { return (e.target as HTMLInputElement).checked; }
   roleOf = (u: UserDto) => (u.roles && u.roles.length ? u.roles[0] : u.role);
   money = (n: number) => fcfa(n);
   date = (iso: string) => (iso ? new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' }) : '');
@@ -310,6 +383,104 @@ export class AdminPage {
       error: (e) => this.createErr.set(e?.error?.error || e?.error?.message || 'Erreur'),
     });
   }
+  // ---- bulk import (Excel / CSV) ----
+  toggleImport() {
+    const open = !this.showImport();
+    this.showImport.set(open);
+    if (open) this.showCreate.set(false); else this.resetImport();
+  }
+  resetImport() {
+    this.parsedRows.set([]); this.parseErr.set(''); this.importErr.set('');
+    this.importResult.set(null); this.importing.set(false); this.updateExisting.set(false);
+    this.showImport.set(false);
+  }
+
+  /** Read the first non-empty value among candidate header names (case/space/accent-insensitive). */
+  private pick(row: Record<string, unknown>, keys: Record<string, string>, candidates: string[]): string {
+    for (const c of candidates) {
+      const k = keys[c];
+      if (k && row[k] != null && String(row[k]).trim() !== '') return String(row[k]).trim();
+    }
+    return '';
+  }
+  private norm(s: string): string {
+    return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[\s._-]/g, '');
+  }
+
+  async onFile(e: Event) {
+    this.parseErr.set(''); this.importErr.set(''); this.importResult.set(null); this.parsedRows.set([]);
+    const input = e.target as HTMLInputElement;
+    const file = input.files && input.files[0];
+    if (!file) return;
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, { defval: '' });
+      if (!raw.length) { this.parseErr.set('Fichier vide ou aucune ligne de données.'); return; }
+      // Map normalized header → original header key.
+      const keys: Record<string, string> = {};
+      for (const h of Object.keys(raw[0])) keys[this.norm(h)] = h;
+      const rows: ImportUserRow[] = raw.map((r) => ({
+        name: this.pick(r, keys, ['name', 'nom', 'nomcomplet', 'fullname']),
+        email: this.pick(r, keys, ['email', 'mail', 'courriel', 'adresseemail']),
+        role: this.pick(r, keys, ['role', 'roles', 'profil', 'rôle']),
+        phone: this.pick(r, keys, ['phone', 'telephone', 'tel', 'numero', 'mobile']),
+        agency: this.pick(r, keys, ['agency', 'agence', 'zone']),
+      })).filter((r) => r.name || r.email || r.role);
+      if (!rows.length) {
+        this.parseErr.set('Aucune colonne reconnue. Attendu : nom, email, role, telephone, agence.');
+        return;
+      }
+      this.parsedRows.set(rows);
+    } catch {
+      this.parseErr.set('Lecture du fichier impossible. Vérifiez le format (.xlsx, .xls ou .csv).');
+    }
+  }
+
+  runImport() {
+    if (!this.parsedRows().length) return;
+    this.importing.set(true); this.importErr.set('');
+    this.api.importUsers({ rows: this.parsedRows(), updateExisting: this.updateExisting() }).subscribe({
+      next: (res) => {
+        this.importing.set(false);
+        this.importResult.set(res);
+        if (res.created + res.updated > 0) {
+          this.api.users().subscribe({ next: (l) => this.usersList.set(l), error: () => {} });
+        }
+      },
+      error: (e) => { this.importing.set(false); this.importErr.set(e?.error?.error || e?.error?.message || 'Échec de l\'import'); },
+    });
+  }
+
+  downloadTemplate() {
+    const ws = XLSX.utils.aoa_to_sheet([
+      ['nom', 'email', 'role', 'telephone', 'agence'],
+      ['Jean Dupont', 'jean.dupont@example.com', 'AGENT', '670000000', 'Agence Centrale'],
+      ['Marie Mballa', 'marie.mballa@example.com', 'CASHIER', '690000000', 'Agence Akwa'],
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Utilisateurs');
+    XLSX.writeFile(wb, 'modele-import-utilisateurs.xlsx');
+  }
+
+  statusLabel(s: ImportRowResult['status']) {
+    return { created: 'Créé', updated: 'Mis à jour', skipped: 'Ignoré', invalid: 'Invalide' }[s] || s;
+  }
+  statusColor(s: ImportRowResult['status']) {
+    return { created: '#059669', updated: '#2563EB', skipped: '#D97706', invalid: '#DC2626' }[s] || '#6B7280';
+  }
+  reasonLabel(r: string) {
+    return {
+      invalid_name_or_email: 'Nom ou email invalide',
+      invalid_role: 'Rôle invalide',
+      agent_phone_required: 'Téléphone (6XXXXXXXX) requis pour un AGENT',
+      duplicate_in_file: 'Doublon dans le fichier',
+      email_exists: 'Email déjà utilisé',
+      phone_exists: 'Téléphone déjà utilisé',
+    }[r] || r;
+  }
+
   toggleEnabled(u: UserDto) {
     this.api.setUserEnabled(u.id, !u.enabled).subscribe({ next: () => this.usersList.set(this.usersList().map((x) => (x.id === u.id ? { ...x, enabled: !x.enabled } : x))) });
   }

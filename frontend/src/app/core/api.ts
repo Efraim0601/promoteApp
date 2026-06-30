@@ -18,6 +18,8 @@ import {
   CreateRechargeRequest,
   CreateSubscriptionRequest,
   CreateUserRequest,
+  ImportUsersRequest,
+  ImportUsersResult,
   LoginAuditDto,
   LoginResponse,
   NotificationDto,
@@ -154,6 +156,9 @@ export class Api {
   }
   setUserEnabled(id: string, enabled: boolean): Observable<unknown> {
     return this.http.patch(`${this.base}/users/${id}/enabled`, { enabled });
+  }
+  importUsers(req: ImportUsersRequest): Observable<ImportUsersResult> {
+    return this.http.post<ImportUsersResult>(`${this.base}/users/import`, req);
   }
   allSubscriptions(): Observable<SubscriptionDto[]> {
     return this.http.get<SubscriptionDto[]>(`${this.base}/subscriptions`);
