@@ -1,12 +1,16 @@
 package com.afriland.promote.email;
 
 import com.afriland.promote.service.IntegrationSettingsService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.net.URI;
 import java.util.Properties;
 
 /**
@@ -121,7 +125,7 @@ public class EmailService {
                     Si vous n'êtes pas à l'origine de cette demande, contactez un administrateur.
 
                     — Afriland First Bank
-                    """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword, pin);
+                    """.formatted(name == null ? "" : name, changePasswordUrl(), to, tempPassword, pin);
             send(to, subject, body);
             return;
         }
@@ -141,7 +145,7 @@ public class EmailService {
                     Si vous n'êtes pas à l'origine de cette demande, contactez un administrateur.
 
                     — Afriland First Bank
-                    """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword);
+                    """.formatted(name == null ? "" : name, changePasswordUrl(), to, tempPassword);
             send(to, subject, body);
         }
     }
@@ -163,7 +167,7 @@ public class EmailService {
                 Si vous n'êtes pas à l'origine de cette demande, contactez un administrateur.
 
                 — Afriland First Bank
-                """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword);
+                """.formatted(name == null ? "" : name, changePasswordUrl(), to, tempPassword);
         send(to, subject, body);
     }
 
@@ -182,22 +186,72 @@ public class EmailService {
                 Pour votre sécurité, vous devrez définir un nouveau mot de passe lors de votre première connexion.
 
                 — Afriland First Bank
-                """.formatted(name == null ? "" : name, loginUrl(), to, tempPassword);
+                """.formatted(name == null ? "" : name, changePasswordUrl(), to, tempPassword);
         send(to, subject, body);
     }
 
-    /**
-     * Login link for the welcome email. Built from the app base URL so the new user lands directly
-     * on the sign-in page (not the public /client subscription form). Tolerant of how
-     * {@code app.public-url} is configured: a trailing slash or a trailing {@code /client} segment is
-     * stripped before appending {@code /login}.
-     */
+    /** Sign-in link (email/password). Kept for flows that don't set a password (e.g. collecteur PIN). */
     String loginUrl() {
-        String pub = settings.publicUrl();
+        return resolveBaseUrl() + "/login";
+    }
+
+    /**
+     * Link for accounts that must set a password: lands on the initial-password page. New accounts
+     * carry {@code mustChangePassword}, so after signing in with the temporary password the app takes
+     * them straight here (the route is guarded, so an unauthenticated click bounces through /login).
+     */
+    String changePasswordUrl() {
+        return resolveBaseUrl() + "/change-password";
+    }
+
+    /**
+     * Public base URL for links in emails. Resolved automatically from the caller's request so links
+     * work in whatever environment the admin is actually using (local or prod) without hard-coding a
+     * domain: prefer the request {@code Origin} (the exact scheme://host:port of the admin's browser,
+     * which survives the Caddy → nginx → backend proxy chain), then {@code Referer}, and finally the
+     * configured {@code app.public-url} (used when no request is bound, e.g. a background thread).
+     */
+    private String resolveBaseUrl() {
+        String fromRequest = originFromCurrentRequest();
+        String base = (fromRequest != null && !fromRequest.isBlank()) ? fromRequest : settings.publicUrl();
+        return normalizeBase(base);
+    }
+
+    /** Origin (or Referer origin) of the current HTTP request, or null if none is bound / usable. */
+    private String originFromCurrentRequest() {
+        try {
+            var attrs = RequestContextHolder.getRequestAttributes();
+            if (!(attrs instanceof ServletRequestAttributes sra)) return null;
+            HttpServletRequest req = sra.getRequest();
+            String origin = req.getHeader("Origin");
+            if (isHttpUrl(origin)) return origin;
+            String referer = req.getHeader("Referer");
+            if (isHttpUrl(referer)) {
+                URI u = URI.create(referer);
+                if (u.getScheme() != null && u.getHost() != null) {
+                    int port = u.getPort();
+                    return u.getScheme() + "://" + u.getHost() + (port > 0 ? ":" + port : "");
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // no request bound (background thread) or malformed header — fall back to configuration
+        }
+        return null;
+    }
+
+    private static boolean isHttpUrl(String s) {
+        return s != null && (s.startsWith("http://") || s.startsWith("https://"));
+    }
+
+    /** Strip a trailing slash and any app segment so we can safely append the target route. */
+    private String normalizeBase(String pub) {
         String base = pub == null ? "" : pub.trim();
         while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
-        if (base.endsWith("/client")) base = base.substring(0, base.length() - "/client".length());
-        return base + "/login";
+        for (String seg : new String[] {"/client", "/admin", "/login", "/change-password"}) {
+            if (base.endsWith(seg)) { base = base.substring(0, base.length() - seg.length()); break; }
+        }
+        while (base.endsWith("/")) base = base.substring(0, base.length() - 1);
+        return base;
     }
 
     private void send(String to, String subject, String body) {

@@ -1,5 +1,5 @@
 import { Component, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Api } from '../core/api';
 import { Auth } from '../core/auth';
 import { I18n } from '../core/i18n';
@@ -84,6 +84,7 @@ export class LoginPage {
   private auth = inject(Auth);
   private api = inject(Api);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
 
   email = signal('');
   password = signal('');
@@ -107,7 +108,9 @@ export class LoginPage {
         this.auth.refreshMe().subscribe({
           next: (u) => {
             this.loading.set(false);
+            const returnUrl = this.route.snapshot.queryParamMap.get('returnUrl');
             if (u.mustChangePassword) this.router.navigateByUrl('/change-password');
+            else if (returnUrl) this.router.navigateByUrl(returnUrl);
             else this.router.navigateByUrl(landingFor(this.auth.roles()));
           },
           error: () => { this.loading.set(false); this.router.navigateByUrl(landingFor(this.auth.roles())); },
